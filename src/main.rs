@@ -1,15 +1,32 @@
+#![allow(non_camel_case_types)]
+#![feature(maybe_uninit_ref)]
+
 use std::error::Error;
 use std::process;
-use std::fs;
-use std::fs::File;
-use std::io::Read;
+// use std::fs;
+// use std::fs::File;
+// use std::io::Read;
+
+use libc;
+pub type uint32_t = libc::c_uint;
+
+#[derive(Debug, Copy, Clone)]
+#[repr(C)]
+pub struct libesedb_file_header {
+    pub file_type: uint32_t,
+    pub creation_format_version: uint32_t,
+    pub creation_format_revision: uint32_t,
+    pub format_revision: uint32_t,
+    pub format_version: uint32_t,
+    pub page_size: uint32_t,
+}
 
 extern crate clap;
 use clap::{Arg, App};
 
 pub struct Config {
     pub inp_file: String,
-    pub report_file: Option<&'static str>,
+    pub report_file: String,
 }
 
 impl Config {
@@ -29,37 +46,45 @@ impl Config {
                 .help("Path to output report"))
             .get_matches();
 
-        let inp_file = matches.value_of("in").unwrap();
+        let inp_file = matches.value_of("in").unwrap().to_owned();
         println!(" inp_file: {}", inp_file);
 
-        let report_file = matches.value_of("out");
+        let report_file = matches.value_of("out").to_owned();
         match report_file {
-            None => println!("No idea what your favorite number is."),
-            Some(s) => {
-                match s.parse::<i32>() {
-                    Ok(n) => println!("Your favorite number must be {}.", n + 5),
-                    Err(_) => println!("That's not a number! {}", s),
-                }
-            }
-        }
+            Some(s) => s,
+            _ => &""
+        };
 
-        Ok(Config { inp_file : inp_file.to_string(), report_file : report_file.clone() })
+        Ok(Config { inp_file, report_file : report_file.unwrap().to_string() })
     }
 }
 
-fn get_file_as_byte_vec(filename: &String) -> Vec<u8> {
-    let mut f = File::open(&filename).expect("no file found");
-    let metadata = fs::metadata(&filename).expect("unable to read metadata");
-    let mut buffer = vec![0; metadata.len() as usize];
-    f.read(&mut buffer).expect("buffer overflow");
+//https://stackoverflow.com/questions/38334994/how-to-read-a-c-struct-from-a-binary-file-in-rust
+use std::io::{self, BufReader, Read};
+use std::fs::File;
+use std::mem::MaybeUninit;
+use std::slice;
 
-    buffer
+fn read_struct<T, R: Read>(mut read: R) -> io::Result<T> {
+    let num_bytes = ::std::mem::size_of::<T>();
+    unsafe {
+        let mut s = MaybeUninit::<T>::zeroed();
+        let mut buffer = slice::from_raw_parts_mut(s.get_ref() as *mut T as *mut u8, num_bytes);
+        match read.read_exact(buffer) {
+            Ok(()) => Ok(unsafe { s.get_ref() as T }),
+            Err(e) => {
+                ::std::mem::forget(s);
+                Err(e)
+            }
+        }
+    }
 }
 
 pub fn run(config: Config) -> Result<(), Box<dyn Error>> {
-    let contents = get_file_as_byte_vec(&config.inp_file);
+    let mut reader = BufReader::new(File::open(config.inp_file)?);
+    let file_header = read_struct::<libesedb_file_header>(reader);
 
-    println!("{:0x?}", &contents[..128]);
+    println!("{:0x?}", file_header);
 
     Ok(())
 }
@@ -68,7 +93,6 @@ fn main() {
     let config = Config::new().unwrap_or_else(|err| {  println!("Problem parsing arguments: {}", err);
                                                                    process::exit(1);
                                                                 });
-
     println!("file '{}'", config.inp_file);
 
     if let Err(e) = run(config) {
