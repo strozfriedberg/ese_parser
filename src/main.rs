@@ -1,5 +1,4 @@
 #![allow(non_camel_case_types)]
-#![feature(maybe_uninit_ref)]
 
 use std::error::Error;
 use std::process;
@@ -55,34 +54,31 @@ impl Config {
             _ => &""
         };
 
-        Ok(Config { inp_file, report_file : report_file.unwrap().to_string() })
+        Ok(Config { inp_file, report_file : "".to_string()/*report_file.unwrap().to_string()*/ })
     }
 }
 
 //https://stackoverflow.com/questions/38334994/how-to-read-a-c-struct-from-a-binary-file-in-rust
 use std::io::{self, BufReader, Read};
 use std::fs::File;
-use std::mem::MaybeUninit;
+use std::path::Path;
+use std::mem;
 use std::slice;
 
-fn read_struct<T, R: Read>(mut read: R) -> io::Result<T> {
-    let num_bytes = ::std::mem::size_of::<T>();
+fn read_struct<T, P: AsRef<Path>>(path: P) -> io::Result<T> {
+    let path = path.as_ref();
+    let struct_size = ::std::mem::size_of::<T>();
+    let mut reader = BufReader::new(File::open(path)?);
+    let mut r : T = unsafe { mem::zeroed() };
     unsafe {
-        let mut s = MaybeUninit::<T>::zeroed();
-        let mut buffer = slice::from_raw_parts_mut(s.get_ref() as *mut T as *mut u8, num_bytes);
-        match read.read_exact(buffer) {
-            Ok(()) => Ok(unsafe { s.get_ref() as T }),
-            Err(e) => {
-                ::std::mem::forget(s);
-                Err(e)
-            }
-        }
+        let buffer = slice::from_raw_parts_mut(&mut r as *mut _ as *mut u8, struct_size);
+        reader.read_exact(buffer)?;
     }
+    Ok(r)
 }
 
 pub fn run(config: Config) -> Result<(), Box<dyn Error>> {
-    let mut reader = BufReader::new(File::open(config.inp_file)?);
-    let file_header = read_struct::<libesedb_file_header>(reader);
+    let file_header = read_struct::<libesedb_file_header, _>(config.inp_file);
 
     println!("{:0x?}", file_header);
 
