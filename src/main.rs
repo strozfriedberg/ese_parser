@@ -1,10 +1,6 @@
-#![allow(non_camel_case_types)]
+#![allow(non_camel_case_types, non_upper_case_globals)]
 
-use std::error::Error;
 use std::process;
-// use std::fs;
-// use std::fs::File;
-// use std::io::Read;
 
 use libc;
 pub type uint8_t  = libc::c_uchar;
@@ -82,21 +78,21 @@ pub struct esedb_file_header {
 }
 
 use std::fmt;
-#[derive(Debug, Clone)]
-struct EseParserError {
-    message: String,
-}
 
-impl EseParserError {
+#[derive(Debug)]
+pub enum EseParserError {
+    Io(io::Error),
+    Parse(String),
+}
+impl fmt::Display for EseParserError {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(
-            f,
-            "EseParserError {{ file: {}, line: {}, message: {} }}",
-            file!(), line!(), self.message
-        )
+        match *self {
+            EseParserError::Io(ref err) => write!(f, "IO error: {}", err),
+            EseParserError::Parse(ref err) => write!(f, "Parse error: {}", err),
+        }
     }
-
 }
+
 
 extern crate clap;
 use clap::{Arg, App};
@@ -155,13 +151,13 @@ fn read_struct<T, P: AsRef<Path>>(path: P) -> io::Result<T> {
     Ok(r)
 }
 
-pub fn run(config: Config) -> Result<(), Box<dyn Error>> {
-    let file_header = read_struct::<esedb_file_header, _>(config.inp_file)?;
+pub fn run(config: Config) -> Result<(), EseParserError> {
+    let file_header = read_struct::<esedb_file_header, _>(config.inp_file).map_err(EseParserError::Io)?;
 
     println!("{:0x?}", file_header);
 
     if file_header.signature != esedb_file_signature {
-        return Err(Box::new(EseParserError { message: "bad file_header.signature".to_string()}));
+        return Err(EseParserError::Parse ("bad file_header.signature".to_string()));
     }
 
     Ok(())
