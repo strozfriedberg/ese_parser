@@ -1,8 +1,7 @@
-#![allow(non_camel_case_types, non_upper_case_globals)]
+#![allow(non_camel_case_types, non_upper_case_globals, clippy::mut_from_ref, clippy::cast_ptr_alignment)]
 
 use std::process;
 
-use libc;
 pub type uint8_t  = libc::c_uchar;
 pub type uint32_t = libc::c_uint;
 pub type uint64_t = libc::c_long;
@@ -77,12 +76,13 @@ pub struct esedb_file_header {
     pub unknown_flags: uint32_t,
 }
 
+use simple_error::SimpleError;
 use std::fmt;
 
 #[derive(Debug)]
 pub enum EseParserError {
     Io(io::Error),
-    Parse(String),
+    Parse(SimpleError),
 }
 impl fmt::Display for EseParserError {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
@@ -134,14 +134,14 @@ impl Config {
 
 //https://stackoverflow.com/questions/38334994/how-to-read-a-c-struct-from-a-binary-file-in-rust
 use std::io::{self, BufReader, Read};
-use std::fs::{File};
+use std::fs::File;
 use std::path::Path;
-use std::mem;
+use std::mem::{self};
 use std::slice;
 
 fn read_struct<T, P: AsRef<Path>>(path: P) -> io::Result<T> {
     let path = path.as_ref();
-    let struct_size = ::std::mem::size_of::<T>();
+    let struct_size = mem::size_of::<T>();
     let mut reader = BufReader::new(File::open(path)?);
     let mut r : T = unsafe { mem::zeroed() };
     unsafe {
@@ -152,13 +152,36 @@ fn read_struct<T, P: AsRef<Path>>(path: P) -> io::Result<T> {
 }
 
 pub fn run(config: Config) -> Result<(), EseParserError> {
-    let file_header = read_struct::<esedb_file_header, _>(config.inp_file).map_err(EseParserError::Io)?;
+    let mut file_header = read_struct::<esedb_file_header, _>(config.inp_file).map_err(EseParserError::Io)?;
 
     println!("{:0x?}", file_header);
 
-    if file_header.signature != esedb_file_signature {
-        return Err(EseParserError::Parse ("bad file_header.signature".to_string()));
+    assert_eq!(file_header.signature, esedb_file_signature, "bad file_header.signature");
+
+    fn calc_crc32(file_header: &&mut esedb_file_header) -> u32 {
+        unsafe fn any_as_u8_slice<'a, T: Sized>(p: &'a &mut T) -> &'a mut [u8] {
+            slice::from_raw_parts_mut((*p as *const T) as *mut u8, mem::size_of::<T>())
+        }
+        let vec8: &mut [u8] = unsafe{ any_as_u8_slice(& file_header) };
+        let vec32 = unsafe {
+            let length = (vec8.len() - 4) / mem::size_of::<u32>();
+            let capacity = vec8.len() - 4;
+            let ptr = vec8.as_mut_ptr().add(4) as *mut u32;
+
+            Vec::from_raw_parts(ptr, length, capacity)
+        };
+
+        let mut crc32 = 0x89abcdef;
+        for &val in &vec32 {
+            crc32 ^= val;
+        }
+
+        mem::forget(vec32);
+        crc32
     }
+
+    let checksum = file_header.checksum;
+    assert_eq!(checksum, calc_crc32(&&mut file_header));
 
     Ok(())
 }
