@@ -97,6 +97,35 @@ impl fmt::Display for EseParserError {
     }
 }
 
+macro_rules! expect_eq {
+    ($left:expr, $right:expr) => ({
+        match (&$left, &$right) {
+            (left_val, right_val) => {
+                if !(*left_val == *right_val) {
+                    error!(r#"expectation failed: `({} == {})`
+  left: `{:?}`,
+ right: `{:?}`"#, stringify!($left), stringify!($right), &*left_val, &*right_val)
+                }
+            }
+        }
+    });
+    ($left:expr, $right:expr,) => ({
+        expect_eq!($left, $right)
+    });
+    ($left:expr, $right:expr, $($arg:tt)+) => ({
+        match (&($left), &($right)) {
+            (left_val, right_val) => {
+                if !(*left_val == *right_val) {
+                    error!(r#"expectation failed: `({} == {})`
+  left: `{:?}`,
+ right: `{:?}`: {}"#, stringify!($left), stringify!($right), &*left_val, &*right_val,
+                           format_args!($($arg)+))
+                }
+            }
+        }
+    });
+}
+
 
 extern crate clap;
 use clap::{Arg, App};
@@ -188,31 +217,29 @@ pub fn run(config: Config) -> Result<(), EseParserError> {
 
     let stored_checksum = db_file_header.checksum;
     let checksum = calc_crc32(&&mut db_file_header);
-    assert_eq!(stored_checksum, checksum, "wrong checksum");
+    expect_eq!(stored_checksum, checksum, "wrong checksum");
 
     let backup_file_header = read_struct::<esedb_file_header, _>(&config.inp_file, SeekFrom::Start(db_file_header.page_size as u64))
         .map_err(EseParserError::Io)?;
+
     if db_file_header.format_revision == 0 {
         db_file_header.format_revision = backup_file_header.format_revision;
     }
-    else if db_file_header.format_revision != backup_file_header.format_revision {
-        warn!("mismatch in format revision: {:#X} and backup: {:#X}", db_file_header.format_revision, backup_file_header.format_revision);
-    }
-    
+
+    expect_eq!(db_file_header.format_revision, backup_file_header.format_revision, "mismatch in format revision");
+
     if db_file_header.page_size == 0 {
         db_file_header.page_size = backup_file_header.page_size;
     }
-    else if db_file_header.page_size != backup_file_header.page_size {
-        warn!("mismatch in page size: {:#X} and backup: {:#X}", db_file_header.page_size, backup_file_header.page_size );
-        //db_file_header.page_size = (uint32_t) file_offset;
-    }
+
+    expect_eq!(db_file_header.page_size, backup_file_header.page_size, "mismatch in page size");
+    expect_eq!(db_file_header.format_version, 0x620, "unsupported format version");
 
     Ok(())
 }
 
 fn main() {
-    //env_logger::init();
-    let _ = env_logger::builder().is_test(true).try_init();
+    env_logger::init();
 
     let config = Config::new().unwrap_or_else(|err| {  error!("Problem parsing arguments: {}", err);
                                                                    process::exit(1);
