@@ -1,4 +1,5 @@
 //config.rs
+#![allow(deprecated)]
 use log::{ debug };
 use clap::{ Arg, App };
 
