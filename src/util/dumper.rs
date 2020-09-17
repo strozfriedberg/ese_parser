@@ -13,8 +13,12 @@ pub fn dump_db_file_header(db_file_header: esedb_file_header) {
     }
 
     macro_rules! add_field {
-        ($fld: ident) => {add_row!(stringify!($fld), &db_file_header.$fld.to_string())}
+        ($fld: ident) => {
+            let s = format!("{:#x}", db_file_header.$fld);
+            add_row!(stringify!($fld), &s)
+        };
     }
+
     macro_rules! add_dt_field {
         ($dt: ident) => {
             let s = format!("{:.4}-{:0>2}-{:0>2} {:0>2}:{:0>2}:{:0>2}",
