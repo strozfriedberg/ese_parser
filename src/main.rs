@@ -1,10 +1,10 @@
 #![allow(non_camel_case_types,  clippy::mut_from_ref, clippy::cast_ptr_alignment)]
 #[macro_use] extern crate log;
 
-use std::process;
 use std::mem;
 use std::slice;
 use std::io::SeekFrom;
+use regex::Regex;
 
 use env_logger;
 
@@ -42,7 +42,7 @@ use ese_parser::util::dumper::{ dump_db_file_header };
 use ese_parser::util::config::{ Config };
 use ese_parser::util::reader::{ EseParserError, read_struct };
 
-pub fn run(config: Config) -> Result<(), EseParserError> {
+pub fn run(config: &Config) -> Result<(), EseParserError> {
     let mut db_file_header = read_struct::<esedb_file_header, _>(&config.inp_file, SeekFrom::Start(0))
                                         .map_err(EseParserError::Io)?;
 
@@ -96,6 +96,19 @@ pub fn run(config: Config) -> Result<(), EseParserError> {
     Ok(())
 }
 
+fn get_field<'a>(fld: &'a str, input: &'a str) -> Option<&'a str> {
+    let s = format!("{}:(?P<value>.*)", fld);
+    let re = Regex::new(&s).unwrap();
+
+    re.captures(input).and_then(|cap| {
+        cap.name("value").map(|login| login.as_str())
+    })
+}
+
+use std::str;
+use std::process;
+use std::process::Command;
+
 fn main() {
     env_logger::init();
 
@@ -104,9 +117,21 @@ fn main() {
                                                                 });
     info!("file '{}'", config.inp_file);
 
-    if let Err(e) = run(config) {
+    if let Err(e) = run(&config) {
         error!("Application error: {}", e);
 
         process::exit(1);
+    }
+
+    let output = Command::new("esentutl")
+        .args(&["/mh", &config.inp_file])
+        .output()
+        .expect("failed to execute process");
+    let text = str::from_utf8(&output.stdout).unwrap();
+    if let Some(checksum) = get_field("Checksum", text) {
+        println!("checksum: {}", checksum);
+    }
+    else {
+        println!("checksum NOT found");
     }
 }
