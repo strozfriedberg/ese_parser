@@ -3,7 +3,7 @@
 
 use std::mem;
 use std::slice;
-use std::io::SeekFrom;
+use std::io::{self, Write, SeekFrom};
 use regex::Regex;
 
 use env_logger;
@@ -42,7 +42,7 @@ use ese_parser::util::dumper::{ dump_db_file_header };
 use ese_parser::util::config::{ Config };
 use ese_parser::util::reader::{ EseParserError, read_struct };
 
-pub fn run(config: &Config) -> Result<(), EseParserError> {
+pub fn load_db_file_header(config: &Config) -> Result<esedb_file_header, EseParserError> {
     let mut db_file_header = read_struct::<esedb_file_header, _>(&config.inp_file, SeekFrom::Start(0))
                                         .map_err(EseParserError::Io)?;
 
@@ -92,8 +92,7 @@ pub fn run(config: &Config) -> Result<(), EseParserError> {
     expect_eq!(db_file_header.page_size, backup_file_header.page_size, "mismatch in page size");
     expect_eq!(db_file_header.format_version, 0x620, "unsupported format version");
 
-    dump_db_file_header(db_file_header);
-    Ok(())
+    Ok(db_file_header)
 }
 
 fn get_field<'a>(fld: &'a str, input: &'a str) -> Option<&'a str> {
@@ -117,21 +116,48 @@ fn main() {
                                                                 });
     info!("file '{}'", config.inp_file);
 
-    if let Err(e) = run(&config) {
-        error!("Application error: {}", e);
+    let db_file_header = match load_db_file_header(&config) {
+        Ok(x) => x ,
+        Err(e) => {
+            error!("Application error: {}", e);
+            process::exit(1);
+        }
+    };
 
-        process::exit(1);
-    }
-
+    //dump_db_file_header(db_file_header);
     let output = Command::new("esentutl")
         .args(&["/mh", &config.inp_file])
         .output()
         .expect("failed to execute process");
     let text = str::from_utf8(&output.stdout).unwrap();
-    if let Some(checksum) = get_field("Checksum", text) {
-        println!("checksum: {}", checksum);
+
+    macro_rules! check_field {
+        ( $fld: expr, $closure:tt ) => {
+            let val = get_field($fld, text).unwrap().trim();
+            $closure(val);
+        }
+    };
+
+    fn u32_from_opt(str: &str) -> u32 {
+        if let Ok(val) = u32::from_str_radix(str.trim_start_matches("0x"), 16) {
+            return val;
+        }
+        println!("could not parse hex {}", str);
+        io::stdout().flush().unwrap();
+        //panic!("could not parse hex {}", str);
+        return 0;
     }
-    else {
-        println!("checksum NOT found");
-    }
+
+    check_field!("Checksum", (|val: &str| assert_eq!(u32_from_opt(val), db_file_header.checksum) ));
+    check_field!("Format ulMagic", (|val: &str| assert_eq!(u32_from_opt(val), db_file_header.signature) ));
+    //check_field!("Format ulVersion", (|val: &str| assert_eq!(u32_from_opt(val), db_file_header.format_version) ));
+    check_field!("Last Consistent", (|val: &str| {
+        let dt = &db_file_header.consistent_time;
+        let s = format!("{:0>2}/{:0>2}/{:.4} {:0>2}:{:0>2}:{:0>2}",
+                dt[4], dt[3], 1900 + dt[5] as u16,
+                dt[2], dt[1], dt[0],);
+
+        println!("s {}, val {}", s, val);
+        assert!(val.starts_with(&s))
+    }));
 }
