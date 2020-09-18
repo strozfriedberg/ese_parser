@@ -21,8 +21,8 @@ pub fn dump_db_file_header(db_file_header: esedb_file_header) {
 
     macro_rules! add_dt_field {
         ($dt: ident) => {
-            let s = format!("{:.4}-{:0>2}-{:0>2} {:0>2}:{:0>2}:{:0>2}",
-                            1900 + db_file_header.$dt[5] as u16, db_file_header.$dt[4], db_file_header.$dt[3],
+            let s = format!("{:0>2}/{:0>2}/{:.4} {:0>2}:{:0>2}:{:0>2}",
+                            db_file_header.$dt[4], db_file_header.$dt[3], 1900 + db_file_header.$dt[5] as u16,
                             db_file_header.$dt[2], db_file_header.$dt[1], db_file_header.$dt[0],);
             add_row!(stringify!($dt), &s);
         }
