@@ -1,9 +1,10 @@
+#![feature(maybe_uninit_ref)]
 #![allow(non_camel_case_types,  clippy::mut_from_ref, clippy::cast_ptr_alignment)]
 #[macro_use] extern crate log;
 
 use std::mem;
 use std::slice;
-use std::io::{self, Write, SeekFrom};
+use std::io::SeekFrom;
 use regex::Regex;
 
 use env_logger;
@@ -38,7 +39,7 @@ macro_rules! expect_eq {
 }
 
 use ese_parser::ese::db_file_header::{ esedb_file_header, esedb_file_signature };
-use ese_parser::util::dumper::{ dump_db_file_header };
+//use ese_parser::util::dumper::{ dump_db_file_header };
 use ese_parser::util::config::{ Config };
 use ese_parser::util::reader::{ EseParserError, read_struct };
 
@@ -95,18 +96,32 @@ pub fn load_db_file_header(config: &Config) -> Result<esedb_file_header, EsePars
     Ok(db_file_header)
 }
 
-fn get_field<'a>(fld: &'a str, input: &'a str) -> Option<&'a str> {
-    let s = format!("{}:(?P<value>.*)", fld);
-    let re = Regex::new(&s).unwrap();
-
-    re.captures(input).and_then(|cap| {
-        cap.name("value").map(|login| login.as_str())
-    })
-}
-
-use std::str;
+//use std::str;
 use std::process;
-use std::process::Command;
+use std::ffi::{CString};
+use std::os::raw::{c_void, c_ulong};
+use std::mem::{size_of, MaybeUninit};
+use simple_error::SimpleError;
+use ese_parser::ese::esent::{JET_errSuccess, JET_DBINFOMISC, JET_DbInfoMisc, JetGetDatabaseFileInfoA};
+
+#[link(name = "esent")]
+fn get_database_file_info(config: &Config) -> Result<JET_DBINFOMISC, EseParserError> {
+    let filename = CString::new(config.inp_file.as_bytes()).unwrap();
+    let db_info = MaybeUninit::<JET_DBINFOMISC>::zeroed();
+    let res_size = size_of::<JET_DBINFOMISC>() as c_ulong;
+
+    unsafe {
+        let ptr: *mut c_void = db_info.as_ptr() as *mut c_void;
+        let res = JetGetDatabaseFileInfoA(filename.as_ptr(), ptr, res_size, JET_DbInfoMisc) as u32;
+
+        if JET_errSuccess == res {
+            Ok(*(db_info.get_ref()))
+        }
+        else {
+            Err(EseParserError::Parse(SimpleError::new(format!("error={}", res))))
+        }
+    }
+}
 
 fn main() {
     env_logger::init();
@@ -125,29 +140,9 @@ fn main() {
     };
 
     //dump_db_file_header(db_file_header);
-    let output = Command::new("esentutl")
-        .args(&["/mh", &config.inp_file])
-        .output()
-        .expect("failed to execute process");
-    let text = str::from_utf8(&output.stdout).unwrap();
-
-    macro_rules! check_field {
-        ( $fld: expr, $closure:tt ) => {
-            let val = get_field($fld, text).unwrap().trim();
-            $closure(val);
-        }
-    };
-
-    fn u32_from_opt(str: &str) -> u32 {
-        if let Ok(val) = u32::from_str_radix(str.trim_start_matches("0x"), 16) {
-            return val;
-        }
-        println!("could not parse hex {}", str);
-        io::stdout().flush().unwrap();
-        //panic!("could not parse hex {}", str);
-        return 0;
-    }
-
+    let db_info = get_database_file_info(&config).unwrap();
+    assert_eq!(db_file_header.format_version, db_info.ulVersion);
+    /*
     check_field!("Checksum", (|val: &str| assert_eq!(u32_from_opt(val), db_file_header.checksum) ));
     check_field!("Format ulMagic", (|val: &str| assert_eq!(u32_from_opt(val), db_file_header.signature) ));
     //check_field!("Format ulVersion", (|val: &str| assert_eq!(u32_from_opt(val), db_file_header.format_version) ));
@@ -160,4 +155,5 @@ fn main() {
         println!("s {}, val {}", s, val);
         assert!(val.starts_with(&s))
     }));
+     */
 }
