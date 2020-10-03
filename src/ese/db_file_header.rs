@@ -3,6 +3,27 @@
 
 use crate::ese::ctypes::{ uint8_t, uint32_t/*, uint64_t*/ };
 
+#[derive(Copy, Clone, Debug)]
+#[repr(C)]
+pub struct JetDateTime {
+    pub seconds: uint8_t,
+    pub minutes: uint8_t,
+    pub hours: uint8_t,
+    pub day: uint8_t,
+    pub month: uint8_t,
+    pub year: uint8_t,
+    pub time_is_utc: uint8_t,
+    filler: uint8_t,
+}
+
+#[derive(Copy, Clone, Debug)]
+#[repr(C)]
+pub struct JetSignature {
+    pub random: uint32_t,
+    pub logtime_create: JetDateTime,
+    pub computer_name: [uint8_t; 16],
+}
+
 pub static  esedb_file_signature: uint32_t = 0x89abcdef;
 
 pub type esedb_file_header_t = esedb_file_header;
@@ -14,7 +35,7 @@ pub struct esedb_file_header {
     pub format_version: uint32_t,
     pub file_type: uint32_t,
     pub database_time: [uint8_t; 8],
-    pub database_signature: [uint8_t; 28],
+    pub database_signature: JetSignature,
     pub database_state: uint32_t,
     pub consistent_postition: [uint8_t; 8],
     pub consistent_time: [uint8_t; 8],
@@ -23,7 +44,7 @@ pub struct esedb_file_header {
     pub detach_time: [uint8_t; 8],
     pub detach_postition: [uint8_t; 8],
     pub unknown1: uint32_t,
-    pub log_signature: [uint8_t; 28],
+    pub log_signature: JetSignature,
     pub previous_full_backup: [uint8_t; 24],
     pub previous_incremental_backup: [uint8_t; 24],
     pub current_full_backup: [uint8_t; 24],
@@ -37,7 +58,7 @@ pub struct esedb_file_header {
     pub page_size: uint32_t,
     pub repair_count: uint32_t,
     pub repair_time: [uint8_t; 8],
-    pub unknown2: [uint8_t; 28],
+    pub unknown2: JetSignature,
     pub scrub_database_time: [uint8_t; 8],
     pub scrub_time: [uint8_t; 8],
     pub required_log: [uint8_t; 8],
