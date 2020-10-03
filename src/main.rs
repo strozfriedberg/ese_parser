@@ -5,7 +5,6 @@
 use std::mem;
 use std::slice;
 use std::io::SeekFrom;
-use regex::Regex;
 
 use env_logger;
 
@@ -39,7 +38,7 @@ macro_rules! expect_eq {
 }
 
 use ese_parser::ese::db_file_header::{ esedb_file_header, esedb_file_signature };
-//use ese_parser::util::dumper::{ dump_db_file_header };
+use ese_parser::util::dumper::{ dump_db_file_header };
 use ese_parser::util::config::{ Config };
 use ese_parser::util::reader::{ EseParserError, read_struct };
 
@@ -139,8 +138,9 @@ fn main() {
         }
     };
 
-    //dump_db_file_header(db_file_header);
+    dump_db_file_header(db_file_header);
     let db_info = get_database_file_info(&config).unwrap();
+    println!("{:?}", db_info);
     assert_eq!(db_file_header.format_version, db_info.ulVersion);
     /*
     check_field!("Checksum", (|val: &str| assert_eq!(u32_from_opt(val), db_file_header.checksum) ));
