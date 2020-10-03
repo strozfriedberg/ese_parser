@@ -4,6 +4,47 @@ pub use prettytable::{Table, Row, Cell};
 extern crate hexdump;
 use itertools::Itertools;
 use crate::ese::db_file_header::{ esedb_file_header };
+use std::fmt;
+use crate::ese::esent::{JET_DBINFOMISC, JET_SIGNATURE, JET_LOGTIME};
+
+impl fmt::Debug for JET_LOGTIME {
+    fn fmt(&self, fmt: &mut fmt::Formatter) -> fmt::Result {
+        unsafe {
+            fmt.debug_struct("JET_LOGTIME")
+                .field("bSeconds", &self.bSeconds)
+                .field("bMinutes", &self.bMinutes)
+                .field("bHours", &self.bHours)
+                .field("bDay", &self.bDay)
+                .field("bMonth", &self.bMonth)
+                .field("bYear", &self.bYear)
+                .field("fTimeIsUTC", &self.__bindgen_anon_1.__bindgen_anon_1.fTimeIsUTC())
+                .finish()
+        }
+    }
+}
+
+impl fmt::Debug for JET_SIGNATURE {
+    fn fmt(&self, fmt: &mut fmt::Formatter) -> fmt::Result {
+        unsafe {
+            fmt.debug_struct("JET_SIGNATURE")
+                .field("ulRandom", &self.ulRandom)
+                .field("logtimeCreate", &self.logtimeCreate)
+                .field("szComputerName", &self.szComputerName)
+                .finish()
+        }
+    }
+}
+
+impl fmt::Debug for JET_DBINFOMISC {
+    fn fmt(&self, fmt: &mut fmt::Formatter) -> fmt::Result {
+        fmt.debug_struct("JET_DBINFOMISC")
+            .field("ulVersion", &self.ulVersion)
+            .field("ulUpdate", &self.ulUpdate)
+            .field("signDb", &self.signDb)
+            .finish()
+    }
+}
+
 
 pub fn dump_db_file_header(db_file_header: esedb_file_header) {
     let mut table = Table::new();
@@ -40,13 +81,23 @@ pub fn dump_db_file_header(db_file_header: esedb_file_header) {
             add_row!(stringify!($fld), &s);
         }
     }
+    macro_rules! add_sign_field {
+        ($fld: ident) => {
+            let sign = &db_file_header.$fld;
+            let dt = &sign.logtime_create;
+            let s = format!("Create time:{}/{}/{} {}:{}:{} Rand:{} Computer: {}",
+                                dt.month, dt.day, dt.year as u32 + 1900, dt.hours, dt.minutes, dt.seconds,
+                                sign.random, std::str::from_utf8(&sign.computer_name).unwrap());
+            add_row!(stringify!($dt), &s);
+        }
+    }
 
     add_field!(checksum);
     add_field!(signature);
     add_field!(format_version);
     add_field!(file_type);
     add_hex_field!(database_time);
-    add_hex_field!(database_signature);
+    add_sign_field!(database_signature);
     add_field!(database_state);
     add_64_field!(consistent_postition);
     add_dt_field!(consistent_time);
@@ -55,7 +106,7 @@ pub fn dump_db_file_header(db_file_header: esedb_file_header) {
     add_dt_field!(detach_time);
     add_64_field!(detach_postition);
     add_field!(unknown1);
-    add_hex_field!(log_signature);
+    add_sign_field!(log_signature);
     add_hex_field!(previous_full_backup);
     add_hex_field!(previous_incremental_backup);
     add_hex_field!(current_full_backup);
@@ -68,7 +119,7 @@ pub fn dump_db_file_header(db_file_header: esedb_file_header) {
     add_field!(format_revision);
     add_field!(page_size);
     add_dt_field!(repair_time);
-    add_hex_field!(unknown2);
+    add_sign_field!(unknown2);
     add_dt_field!(scrub_database_time);
     add_dt_field!(scrub_time);
     add_hex_field!(required_log);
