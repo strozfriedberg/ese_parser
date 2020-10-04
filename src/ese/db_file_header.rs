@@ -1,6 +1,6 @@
 //db_file_header.rs
 #![allow( non_camel_case_types, non_upper_case_globals, )]
-
+use strum::Display;
 use crate::ese::ctypes::{ uint8_t, uint32_t/*, uint64_t*/ };
 
 #[derive(Copy, Clone, Debug)]
@@ -24,6 +24,16 @@ pub struct JetSignature {
     pub computer_name: [uint8_t; 16],
 }
 
+#[derive(Copy, Clone, Display, Debug)]
+#[repr(u32)]
+pub enum DbState {
+    JustCreated = 1,
+    DirtyShutdown = 2,
+    CleanShutdown = 3,
+    BeingConverted =4,
+    ForceDetach = 5
+}
+
 pub static  esedb_file_signature: uint32_t = 0x89abcdef;
 
 pub type esedb_file_header_t = esedb_file_header;
@@ -36,7 +46,7 @@ pub struct esedb_file_header {
     pub file_type: uint32_t,
     pub database_time: [uint8_t; 8],
     pub database_signature: JetSignature,
-    pub database_state: uint32_t,
+    pub database_state: DbState,
     pub consistent_postition: [uint8_t; 8],
     pub consistent_time: [uint8_t; 8],
     pub attach_time: [uint8_t; 8],
