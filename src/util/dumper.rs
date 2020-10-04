@@ -3,8 +3,10 @@
 pub use prettytable::{Table, Row, Cell};
 extern crate hexdump;
 use itertools::Itertools;
-use crate::ese::db_file_header::{ esedb_file_header };
 use std::fmt;
+use std::string::ToString;
+
+use crate::ese::db_file_header::{ esedb_file_header };
 use crate::ese::esent::{JET_DBINFOMISC, JET_SIGNATURE, JET_LOGTIME};
 
 impl fmt::Debug for JET_LOGTIME {
@@ -60,10 +62,18 @@ pub fn dump_db_file_header(db_file_header: esedb_file_header) {
         };
     }
 
+    macro_rules! add_enum_field {
+        ($fld: ident) => {
+            let s = format!("{} ({})", db_file_header.$fld, db_file_header.$fld as u8);
+            add_row!(stringify!($fld), &s)
+        };
+    }
+
     macro_rules! add_dt_field {
         ($dt: ident) => {
-            let s = format!("{:0>2}/{:0>2}/{:.4} {:0>2}:{:0>2}:{:0>2}",
-                            db_file_header.$dt[4], db_file_header.$dt[3], 1900 + db_file_header.$dt[5] as u16,
+            let y = if db_file_header.$dt[5] > 0 {1900 + db_file_header.$dt[5] as u16} else {0};
+            let s = format!("{:0>2}/{:0>2}/{:0>4} {:0>2}:{:0>2}:{:0>2}",
+                            db_file_header.$dt[4], db_file_header.$dt[3], y,
                             db_file_header.$dt[2], db_file_header.$dt[1], db_file_header.$dt[0],);
             add_row!(stringify!($dt), &s);
         }
@@ -88,7 +98,7 @@ pub fn dump_db_file_header(db_file_header: esedb_file_header) {
             let s = format!("Create time:{}/{}/{} {}:{}:{} Rand:{} Computer: {}",
                                 dt.month, dt.day, dt.year as u32 + 1900, dt.hours, dt.minutes, dt.seconds,
                                 sign.random, std::str::from_utf8(&sign.computer_name).unwrap());
-            add_row!(stringify!($dt), &s);
+            add_row!(stringify!($fld), &s);
         }
     }
 
@@ -98,7 +108,7 @@ pub fn dump_db_file_header(db_file_header: esedb_file_header) {
     add_field!(file_type);
     add_hex_field!(database_time);
     add_sign_field!(database_signature);
-    add_field!(database_state);
+    add_enum_field!(database_state);
     add_64_field!(consistent_postition);
     add_dt_field!(consistent_time);
     add_dt_field!(attach_time);
