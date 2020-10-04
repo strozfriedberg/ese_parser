@@ -16,3 +16,6 @@ prettytable-rs = "*"
 hexdump = "*"
 itertools = "*"
 regex = "*"
+strum = {version = "*", features = ["derive"]}
+strum_macros = "*"
+
