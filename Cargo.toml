@@ -18,4 +18,5 @@ itertools = "*"
 regex = "*"
 strum = {version = "*", features = ["derive"]}
 strum_macros = "*"
+chrono = "*"
 
