@@ -71,13 +71,10 @@ pub fn dump_db_file_header(db_file_header: esedb_file_header) {
 
     macro_rules! add_dt_field {
         ($dt: ident) => {
-            let y = if db_file_header.$dt[5] > 0 {1900 + db_file_header.$dt[5] as u16} else {0};
-            let s = format!("{:0>2}/{:0>2}/{:0>4} {:0>2}:{:0>2}:{:0>2}",
-                            db_file_header.$dt[4], db_file_header.$dt[3], y,
-                            db_file_header.$dt[2], db_file_header.$dt[1], db_file_header.$dt[0],);
-            add_row!(stringify!($dt), &s);
+            add_row!(stringify!($dt), &db_file_header.$dt.to_string());
         }
     }
+
     macro_rules! add_64_field {
         ($fld: ident) => {
             let s = u64::from_be_bytes(db_file_header.$fld).to_string();
@@ -95,9 +92,8 @@ pub fn dump_db_file_header(db_file_header: esedb_file_header) {
         ($fld: ident) => {
             let sign = &db_file_header.$fld;
             let dt = &sign.logtime_create;
-            let s = format!("Create time:{}/{}/{} {}:{}:{} Rand:{} Computer: {}",
-                                dt.month, dt.day, dt.year as u32 + 1900, dt.hours, dt.minutes, dt.seconds,
-                                sign.random, std::str::from_utf8(&sign.computer_name).unwrap());
+            let s = format!("Create time: {} Rand:{} Computer: {}",
+                                dt.to_string(), sign.random, std::str::from_utf8(&sign.computer_name).unwrap());
             add_row!(stringify!($fld), &s);
         }
     }
