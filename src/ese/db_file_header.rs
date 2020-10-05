@@ -1,38 +1,7 @@
 //db_file_header.rs
 #![allow( non_camel_case_types, non_upper_case_globals, )]
-use strum::Display;
 use crate::ese::ctypes::{ uint8_t, uint32_t/*, uint64_t*/ };
-
-#[derive(Copy, Clone, Debug)]
-#[repr(C)]
-pub struct JetDateTime {
-    pub seconds: uint8_t,
-    pub minutes: uint8_t,
-    pub hours: uint8_t,
-    pub day: uint8_t,
-    pub month: uint8_t,
-    pub year: uint8_t,
-    pub time_is_utc: uint8_t,
-    filler: uint8_t,
-}
-
-#[derive(Copy, Clone, Debug)]
-#[repr(C)]
-pub struct JetSignature {
-    pub random: uint32_t,
-    pub logtime_create: JetDateTime,
-    pub computer_name: [uint8_t; 16],
-}
-
-#[derive(Copy, Clone, Display, Debug)]
-#[repr(u32)]
-pub enum DbState {
-    JustCreated = 1,
-    DirtyShutdown = 2,
-    CleanShutdown = 3,
-    BeingConverted =4,
-    ForceDetach = 5
-}
+use crate::ese::jet;
 
 pub static  esedb_file_signature: uint32_t = 0x89abcdef;
 
@@ -45,8 +14,8 @@ pub struct esedb_file_header {
     pub format_version: uint32_t,
     pub file_type: uint32_t,
     pub database_time: [uint8_t; 8],
-    pub database_signature: JetSignature,
-    pub database_state: DbState,
+    pub database_signature: jet::Signature,
+    pub database_state: jet::DbState,
     pub consistent_postition: [uint8_t; 8],
     pub consistent_time: [uint8_t; 8],
     pub attach_time: [uint8_t; 8],
@@ -54,7 +23,7 @@ pub struct esedb_file_header {
     pub detach_time: [uint8_t; 8],
     pub detach_postition: [uint8_t; 8],
     pub unknown1: uint32_t,
-    pub log_signature: JetSignature,
+    pub log_signature: jet::Signature,
     pub previous_full_backup: [uint8_t; 24],
     pub previous_incremental_backup: [uint8_t; 24],
     pub current_full_backup: [uint8_t; 24],
@@ -68,7 +37,7 @@ pub struct esedb_file_header {
     pub page_size: uint32_t,
     pub repair_count: uint32_t,
     pub repair_time: [uint8_t; 8],
-    pub unknown2: JetSignature,
+    pub unknown2: jet::Signature,
     pub scrub_database_time: [uint8_t; 8],
     pub scrub_time: [uint8_t; 8],
     pub required_log: [uint8_t; 8],
