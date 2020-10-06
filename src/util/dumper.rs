@@ -70,9 +70,19 @@ pub fn dump_db_file_header(db_file_header: esedb_file_header) {
     }
 
     macro_rules! add_dt_field {
-        ($dt: ident) => {
-            add_row!(stringify!($dt), &db_file_header.$dt.to_string());
+        ($fld: ident) => {
+            add_row!(stringify!($fld), &db_file_header.$fld.to_string());
         }
+    }
+
+    macro_rules! add_bk_info_field {
+        ($fld: ident) => {
+            unsafe {
+                let bk = db_file_header.$fld;
+                let s = format!("Log Gen:{}-{} ({:#x}-{:#x}), Mark:{}", bk.gen_low, bk.gen_high, bk.gen_low, bk.gen_high, bk.bk_logtime_mark.to_string());
+                add_row!(stringify!($fld), &s)
+            }
+        };
     }
 
     macro_rules! add_64_field {
@@ -113,9 +123,9 @@ pub fn dump_db_file_header(db_file_header: esedb_file_header) {
     add_64_field!(detach_postition);
     add_field!(unknown1);
     add_sign_field!(log_signature);
-    add_hex_field!(previous_full_backup);
-    add_hex_field!(previous_incremental_backup);
-    add_hex_field!(current_full_backup);
+    add_bk_info_field!(previous_full_backup);
+    add_bk_info_field!(previous_incremental_backup);
+    add_bk_info_field!(current_full_backup);
     add_field!(shadowing_disabled);
     add_field!(last_object_identifier);
     add_field!(index_update_major_version);
@@ -132,7 +142,7 @@ pub fn dump_db_file_header(db_file_header: esedb_file_header) {
     add_field!(upgrade_exchange5_format);
     add_field!(upgrade_free_pages);
     add_field!(upgrade_space_map_pages);
-    add_hex_field!(current_shadow_volume_backup);
+    add_bk_info_field!(current_shadow_volume_backup);
     add_field!(creation_format_version);
     add_field!(creation_format_revision);
     add_hex_field!(unknown3);
@@ -147,8 +157,8 @@ pub fn dump_db_file_header(db_file_header: esedb_file_header) {
     add_dt_field!(bad_checksum_error_time);
     add_field!(old_bad_checksum_error_count);
     add_field!(committed_log);
-    add_hex_field!(previous_shadow_volume_backup);
-    add_hex_field!(previous_differential_backup);
+    add_bk_info_field!(previous_shadow_volume_backup);
+    add_bk_info_field!(previous_differential_backup);
     add_hex_field!(unknown4_1);
     add_hex_field!(unknown4_2);
     add_field!(nls_major_version);
