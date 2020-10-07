@@ -47,7 +47,7 @@ pub fn load_db_file_header(config: &Config) -> Result<esedb_file_header, EsePars
     let mut db_file_header = read_struct::<esedb_file_header, _>(&config.inp_file, SeekFrom::Start(0))
                                         .map_err(EseParserError::Io)?;
 
-    debug!("db_file_header ({:X}): {:0X?}", mem::size_of::<esedb_file_header>(), db_file_header);
+    //debug!("db_file_header ({:X}): {:0X?}", mem::size_of::<esedb_file_header>(), db_file_header);
 
     assert_eq!(db_file_header.signature, esedb_file_signature, "bad file_header.signature");
 
@@ -102,13 +102,13 @@ use std::ffi::{CString};
 use std::os::raw::{c_void, c_ulong};
 use std::mem::{size_of, MaybeUninit};
 use simple_error::SimpleError;
-use ese_parser::ese::esent::{JET_errSuccess, JET_DBINFOMISC, JET_DbInfoMisc, JetGetDatabaseFileInfoA};
+use ese_parser::ese::esent::{JET_errSuccess, JET_DBINFOMISC4, JET_DbInfoMisc, JetGetDatabaseFileInfoA};
 
 #[link(name = "esent")]
-fn get_database_file_info(config: &Config) -> Result<JET_DBINFOMISC, EseParserError> {
+fn get_database_file_info(config: &Config) -> Result<JET_DBINFOMISC4, EseParserError> {
     let filename = CString::new(config.inp_file.as_bytes()).unwrap();
-    let db_info = MaybeUninit::<JET_DBINFOMISC>::zeroed();
-    let res_size = size_of::<JET_DBINFOMISC>() as c_ulong;
+    let db_info = MaybeUninit::<JET_DBINFOMISC4>::zeroed();
+    let res_size = size_of::<JET_DBINFOMISC4>() as c_ulong;
 
     unsafe {
         let ptr: *mut c_void = db_info.as_ptr() as *mut c_void;
