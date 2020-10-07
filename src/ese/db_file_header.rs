@@ -1,27 +1,28 @@
 //db_file_header.rs
-#![allow( non_camel_case_types, non_upper_case_globals, )]
-use crate::ese::ctypes::{ uint8_t, uint32_t/*, uint64_t*/ };
+#![allow( non_camel_case_types, non_upper_case_globals)]
 use crate::ese::jet;
 
+type uint8_t = ::std::os::raw::c_uchar;
+type uint32_t = ::std::os::raw::c_ulong;
 pub static  esedb_file_signature: uint32_t = 0x89abcdef;
 
 pub type esedb_file_header_t = esedb_file_header;
-#[derive(Copy, Clone, Debug)]
+#[derive(Copy, Clone)]
 #[repr(C)]
 pub struct esedb_file_header {
     pub checksum: uint32_t,
     pub signature: uint32_t,
     pub format_version: uint32_t,
     pub file_type: uint32_t,
-    pub database_time: [uint8_t; 8],
+    pub database_time: jet::DbTime,
     pub database_signature: jet::Signature,
     pub database_state: jet::DbState,
-    pub consistent_postition: [uint8_t; 8],
+    pub consistent_postition: jet::LgPos,
     pub consistent_time: jet::DateTime,
     pub attach_time: jet::DateTime,
-    pub attach_postition: [uint8_t; 8],
+    pub attach_postition: jet::LgPos,
     pub detach_time: jet::DateTime,
-    pub detach_postition: [uint8_t; 8],
+    pub detach_postition: jet::LgPos,
     pub unknown1: uint32_t,
     pub log_signature: jet::Signature,
     pub previous_full_backup: jet::BackupInfo,
