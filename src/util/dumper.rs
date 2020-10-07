@@ -3,50 +3,10 @@
 pub use prettytable::{Table, Row, Cell};
 extern crate hexdump;
 use itertools::Itertools;
-use std::fmt;
 use std::string::ToString;
 
 use crate::ese::db_file_header::{ esedb_file_header };
-use crate::ese::esent::{JET_DBINFOMISC, JET_SIGNATURE, JET_LOGTIME};
-
-impl fmt::Debug for JET_LOGTIME {
-    fn fmt(&self, fmt: &mut fmt::Formatter) -> fmt::Result {
-        unsafe {
-            fmt.debug_struct("JET_LOGTIME")
-                .field("bSeconds", &self.bSeconds)
-                .field("bMinutes", &self.bMinutes)
-                .field("bHours", &self.bHours)
-                .field("bDay", &self.bDay)
-                .field("bMonth", &self.bMonth)
-                .field("bYear", &self.bYear)
-                .field("fTimeIsUTC", &self.__bindgen_anon_1.__bindgen_anon_1.fTimeIsUTC())
-                .finish()
-        }
-    }
-}
-
-impl fmt::Debug for JET_SIGNATURE {
-    fn fmt(&self, fmt: &mut fmt::Formatter) -> fmt::Result {
-        unsafe {
-            fmt.debug_struct("JET_SIGNATURE")
-                .field("ulRandom", &self.ulRandom)
-                .field("logtimeCreate", &self.logtimeCreate)
-                .field("szComputerName", &self.szComputerName)
-                .finish()
-        }
-    }
-}
-
-impl fmt::Debug for JET_DBINFOMISC {
-    fn fmt(&self, fmt: &mut fmt::Formatter) -> fmt::Result {
-        fmt.debug_struct("JET_DBINFOMISC")
-            .field("ulVersion", &self.ulVersion)
-            .field("ulUpdate", &self.ulUpdate)
-            .field("signDb", &self.signDb)
-            .finish()
-    }
-}
-
+use crate::ese::jet;
 
 pub fn dump_db_file_header(db_file_header: esedb_file_header) {
     let mut table = Table::new();
@@ -75,6 +35,12 @@ pub fn dump_db_file_header(db_file_header: esedb_file_header) {
         }
     }
 
+    macro_rules! add_db_time_field {
+        ($fld: ident) => {
+            add_row!(stringify!($fld), &db_file_header.$fld.to_string());
+        }
+    }
+
     macro_rules! add_bk_info_field {
         ($fld: ident) => {
             unsafe {
@@ -85,12 +51,16 @@ pub fn dump_db_file_header(db_file_header: esedb_file_header) {
         };
     }
 
-    macro_rules! add_64_field {
+    macro_rules! add_pos_field {
         ($fld: ident) => {
-            let s = u64::from_be_bytes(db_file_header.$fld).to_string();
-            add_row!(stringify!($fld), &s);
+            unsafe {
+                let v = &db_file_header.$fld;
+                let s = format!("ib: {}, isec: {}, l_generation: {}", v.ib, v.isec, v.l_generation);
+                add_row!(stringify!($fld), &s);
+            }
         }
     }
+
     macro_rules! add_hex_field {
         ($fld: ident) => {
             let mut s: String = "".to_string();
@@ -112,15 +82,15 @@ pub fn dump_db_file_header(db_file_header: esedb_file_header) {
     add_field!(signature);
     add_field!(format_version);
     add_field!(file_type);
-    add_hex_field!(database_time);
+    add_db_time_field!(database_time);
     add_sign_field!(database_signature);
     add_enum_field!(database_state);
-    add_64_field!(consistent_postition);
+    add_pos_field!(consistent_postition);
     add_dt_field!(consistent_time);
     add_dt_field!(attach_time);
-    add_64_field!(attach_postition);
+    add_pos_field!(attach_postition);
     add_dt_field!(detach_time);
-    add_64_field!(detach_postition);
+    add_pos_field!(detach_postition);
     add_field!(unknown1);
     add_sign_field!(log_signature);
     add_bk_info_field!(previous_full_backup);
@@ -132,7 +102,10 @@ pub fn dump_db_file_header(db_file_header: esedb_file_header) {
     add_field!(index_update_minor_version);
     add_field!(index_update_build_number);
     add_field!(index_update_service_pack_number);
-    add_field!(format_revision);
+
+    //add_field!(format_revision);
+    add_row!("format_revision", &jet::revision_to_string(db_file_header.format_version, db_file_header.format_revision));
+
     add_field!(page_size);
     add_dt_field!(repair_time);
     add_sign_field!(unknown2);
