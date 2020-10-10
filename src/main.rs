@@ -4,7 +4,6 @@
 extern crate strum;
 
 use std::mem;
-use std::slice;
 use std::io::SeekFrom;
 
 use env_logger;
@@ -39,9 +38,9 @@ macro_rules! expect_eq {
 }
 
 use ese_parser::ese::db_file_header::{ esedb_file_header, esedb_file_signature };
-use ese_parser::util::dumper::{ dump_db_file_header };
 use ese_parser::util::config::{ Config };
 use ese_parser::util::reader::{ EseParserError, read_struct };
+use ese_parser::util::any_as_u8_slice;
 
 pub fn load_db_file_header(config: &Config) -> Result<esedb_file_header, EseParserError> {
     let mut db_file_header = read_struct::<esedb_file_header, _>(&config.inp_file, SeekFrom::Start(0))
@@ -52,9 +51,6 @@ pub fn load_db_file_header(config: &Config) -> Result<esedb_file_header, EsePars
     assert_eq!(db_file_header.signature, esedb_file_signature, "bad file_header.signature");
 
     fn calc_crc32(file_header: &&mut esedb_file_header) -> u32 {
-        unsafe fn any_as_u8_slice<'a, T: Sized>(p: &'a &mut T) -> &'a mut [u8] {
-            slice::from_raw_parts_mut((*p as *const T) as *mut u8, mem::size_of::<T>())
-        }
         let vec8: &mut [u8] = unsafe{ any_as_u8_slice(& file_header) };
         let vec32 = unsafe {
             let length = (vec8.len() - 4) / mem::size_of::<u32>();
@@ -131,7 +127,7 @@ fn main() {
                                                                 });
     info!("file '{}'", config.inp_file);
 
-    let db_file_header = match load_db_file_header(&config) {
+    let mut db_file_header = match load_db_file_header(&config) {
         Ok(x) => x ,
         Err(e) => {
             error!("Application error: {}", e);
@@ -139,22 +135,44 @@ fn main() {
         }
     };
 
-    dump_db_file_header(db_file_header);
-    let db_info = get_database_file_info(&config).unwrap();
-    println!("{:?}", db_info);
-    assert_eq!(db_file_header.format_version, db_info.ulVersion);
-    /*
-    check_field!("Checksum", (|val: &str| assert_eq!(u32_from_opt(val), db_file_header.checksum) ));
-    check_field!("Format ulMagic", (|val: &str| assert_eq!(u32_from_opt(val), db_file_header.signature) ));
-    //check_field!("Format ulVersion", (|val: &str| assert_eq!(u32_from_opt(val), db_file_header.format_version) ));
-    check_field!("Last Consistent", (|val: &str| {
-        let dt = &db_file_header.consistent_time;
-        let s = format!("{:0>2}/{:0>2}/{:.4} {:0>2}:{:0>2}:{:0>2}",
-                dt[4], dt[3], 1900 + dt[5] as u16,
-                dt[2], dt[1], dt[0],);
+    //use ese_parser::util::dumper::{ dump_db_file_header };
+    //dump_db_file_header(db_file_header);
+    let mut db_info = get_database_file_info(&config).unwrap();
+    //println!("{:?}", db_info);
 
-        println!("s {}, val {}", s, val);
-        assert!(val.starts_with(&s))
-    }));
-     */
+    macro_rules! cmp {
+        ($($dbf_fld: ident).+, $($info_fld: ident) . +) => {
+            unsafe {
+                assert_eq!(any_as_u8_slice(&mut &mut db_file_header.$($dbf_fld) . +), any_as_u8_slice(&mut &mut db_info.$($info_fld) . +));
+            }
+        };
+    }
+
+    cmp!(database_signature.random, signDb.ulRandom);
+    cmp!(database_signature.computer_name, signDb.szComputerName);
+    cmp!(database_signature.logtime_create, signDb.logtimeCreate);
+    cmp!(consistent_postition, lgposConsistent);
+    cmp!(consistent_time, logtimeConsistent);
+    cmp!(attach_time, logtimeAttach);
+    cmp!(attach_postition, lgposAttach);
+    cmp!(detach_time, logtimeDetach);
+    cmp!(detach_postition, lgposDetach);
+    //cmp!(dbid, signLog);
+    cmp!(previous_full_backup, bkinfoFullPrev);
+    cmp!(previous_incremental_backup, bkinfoIncPrev);
+    cmp!(current_full_backup, bkinfoFullCur);
+    cmp!(shadowing_disabled, fShadowingDisabled);
+    //cmp!(last_object_identifier, fUpgradeDb);
+    cmp!(index_update_major_version, dwMajorVersion);
+    cmp!(index_update_minor_version, dwMinorVersion);
+    cmp!(index_update_build_number, dwBuildNumber);
+    cmp!(index_update_service_pack_number, lSPNumber);
+    cmp!(page_size, cbPageSize);
+    cmp!(repair_count, ulRepairCount);
+    cmp!(repair_time, logtimeRepair);
+
+    cmp!(committed_log, genMaxRequired);
+
+    cmp!(format_version, ulVersion);
+    assert_eq!(db_file_header.database_state as ::std::os::raw::c_ulong, db_info.dbstate);
 }
