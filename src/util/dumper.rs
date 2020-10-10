@@ -91,7 +91,7 @@ pub fn dump_db_file_header(db_file_header: esedb_file_header) {
     add_pos_field!(attach_postition);
     add_dt_field!(detach_time);
     add_pos_field!(detach_postition);
-    add_field!(unknown1);
+    add_field!(dbid);
     add_sign_field!(log_signature);
     add_bk_info_field!(previous_full_backup);
     add_bk_info_field!(previous_incremental_backup);
@@ -108,7 +108,7 @@ pub fn dump_db_file_header(db_file_header: esedb_file_header) {
 
     add_field!(page_size);
     add_dt_field!(repair_time);
-    add_sign_field!(unknown2);
+    add_field!(repair_count);
     add_dt_field!(scrub_database_time);
     add_dt_field!(scrub_time);
     add_hex_field!(required_log);
