@@ -23,7 +23,7 @@ pub struct esedb_file_header {
     pub attach_postition: jet::LgPos,
     pub detach_time: jet::DateTime,
     pub detach_postition: jet::LgPos,
-    pub unknown1: uint32_t,
+    pub dbid: uint32_t,
     pub log_signature: jet::Signature,
     pub previous_full_backup: jet::BackupInfo,
     pub previous_incremental_backup: jet::BackupInfo,
