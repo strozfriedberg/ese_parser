@@ -3,7 +3,6 @@
 #[macro_use] extern crate log;
 extern crate strum;
 
-use std::mem;
 use std::io::SeekFrom;
 
 use env_logger;
@@ -40,7 +39,7 @@ macro_rules! expect_eq {
 use ese_parser::ese::db_file_header::{ esedb_file_header, esedb_file_signature };
 use ese_parser::util::config::{ Config };
 use ese_parser::util::reader::{ EseParserError, read_struct };
-use ese_parser::util::any_as_u8_slice;
+use ese_parser::util::{ any_as_u8_slice, any_as_u32_slice };
 
 pub fn load_db_file_header(config: &Config) -> Result<esedb_file_header, EseParserError> {
     let mut db_file_header = read_struct::<esedb_file_header, _>(&config.inp_file, SeekFrom::Start(0))
@@ -51,22 +50,8 @@ pub fn load_db_file_header(config: &Config) -> Result<esedb_file_header, EsePars
     assert_eq!(db_file_header.signature, esedb_file_signature, "bad file_header.signature");
 
     fn calc_crc32(file_header: &&mut esedb_file_header) -> u32 {
-        let vec8: &mut [u8] = unsafe{ any_as_u8_slice(& file_header) };
-        let vec32 = unsafe {
-            let length = (vec8.len() - 4) / mem::size_of::<u32>();
-            let capacity = vec8.len() - 4;
-            let ptr = vec8.as_mut_ptr().add(4) as *mut u32;
-
-            Vec::from_raw_parts(ptr, length, capacity)
-        };
-
-        let mut crc32 = 0x89abcdef;
-        for &val in &vec32 {
-            crc32 ^= val;
-        }
-
-        mem::forget(vec32);
-        crc32
+        let vec32: &[u32] = unsafe{ any_as_u32_slice(& file_header) };
+        vec32.iter().skip(1).fold(0x89abcdef as u32, |crc, &val| crc ^ val )
     }
 
     let stored_checksum = db_file_header.checksum;
@@ -101,7 +86,7 @@ use simple_error::SimpleError;
 use ese_parser::ese::esent::{JET_errSuccess, JET_DBINFOMISC4, JET_DbInfoMisc, JetGetDatabaseFileInfoA};
 
 #[link(name = "esent")]
-fn get_database_file_info(config: &Config) -> Result<JET_DBINFOMISC4, EseParserError> {
+fn get_database_file_info(config: &Config) -> Result<JET_DBINFOMISC4, EseParserError> { //TODO: check version
     let filename = CString::new(config.inp_file.as_bytes()).unwrap();
     let db_info = MaybeUninit::<JET_DBINFOMISC4>::zeroed();
     let res_size = size_of::<JET_DBINFOMISC4>() as c_ulong;
