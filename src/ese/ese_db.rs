@@ -1,13 +1,18 @@
-//db_file_header.rs
-#![allow( non_camel_case_types, non_upper_case_globals)]
+//ese_db
+#![allow( non_camel_case_types )]
+use std::fmt;
 use crate::ese::jet;
+use winapi::_core::fmt::{Debug, Formatter};
 
 type uint8_t = ::std::os::raw::c_uchar;
 type uint32_t = ::std::os::raw::c_ulong;
-pub static  esedb_file_signature: uint32_t = 0x89abcdef;
+
+pub static ESEDB_FILE_SIGNATURE: uint32_t = 0x89abcdef;
+pub static ESEDB_FORMAT_REVISION_NEW_RECORD_FORMAT: uint32_t = 0x0b;
+pub static ESEDB_FORMAT_REVISION_EXTENDED_PAGE_HEADER: uint32_t = 0x11;
 
 pub type esedb_file_header_t = esedb_file_header;
-#[derive(Copy, Clone)]
+#[derive(Copy, Clone, Debug)]
 #[repr(C)]
 pub struct esedb_file_header {
     pub checksum: uint32_t,
@@ -75,3 +80,34 @@ pub struct esedb_file_header {
     pub unknown_val: uint32_t,
 }
 
+#[repr(C)]
+#[derive(Copy, Clone, Debug)]
+pub struct esedb_page_header {
+    pub xor_checksum: [u8; 4usize],
+    pub __page_number_ecc_checksum: esedb_page_header__page_number_ecc_checksum,
+    pub database_modification_time: [u8; 8usize],
+    pub previous_page: [u8; 4usize],
+    pub next_page: [u8; 4usize],
+    pub father_data_page_object_identifier: [u8; 4usize],
+    pub available_data_size: [u8; 2usize],
+    pub available_uncommitted_data_size: [u8; 2usize],
+    pub available_data_offset: [u8; 2usize],
+    pub available_page_tag: [u8; 2usize],
+    pub page_flags: [u8; 4usize],
+}
+
+#[repr(C)]
+#[derive(Copy, Clone)]
+pub union esedb_page_header__page_number_ecc_checksum {
+    pub page_number: [u8; 4usize],
+    pub ecc_checksum: [u8; 4usize],
+    _bindgen_union_align: [u8; 4usize],
+}
+
+impl Debug for esedb_page_header__page_number_ecc_checksum {
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+        f.debug_struct("esedb_page_header__page_number_ecc_checksum")
+            .field("page_number of ecc_checksum", unsafe {&self.page_number})
+            .finish()
+    }
+}
