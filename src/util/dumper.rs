@@ -5,7 +5,7 @@ extern crate hexdump;
 use itertools::Itertools;
 use std::string::ToString;
 
-use crate::ese::db_file_header::{ esedb_file_header };
+use crate::ese::ese_db::{ esedb_file_header };
 use crate::ese::jet;
 
 pub fn dump_db_file_header(db_file_header: esedb_file_header) {

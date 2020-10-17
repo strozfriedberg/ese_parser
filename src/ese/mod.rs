@@ -1,4 +1,4 @@
 pub mod ctypes;
-pub mod db_file_header;
+pub mod ese_db;
 pub mod esent;
 pub mod jet;
