@@ -3,83 +3,15 @@
 #[macro_use] extern crate log;
 extern crate strum;
 
-use std::io::SeekFrom;
-
 use env_logger;
 
-macro_rules! expect_eq {
-    ($left:expr, $right:expr) => ({
-        match (&$left, &$right) {
-            (left_val, right_val) => {
-                if !(*left_val == *right_val) {
-                    error!(r#"expectation failed: `({} == {})`
-  left: `{:?}`,
- right: `{:?}`"#, stringify!($left), stringify!($right), &*left_val, &*right_val)
-                }
-            }
-        }
-    });
-    ($left:expr, $right:expr,) => ({
-        expect_eq!($left, $right)
-    });
-    ($left:expr, $right:expr, $($arg:tt)+) => ({
-        match (&($left), &($right)) {
-            (left_val, right_val) => {
-                if !(*left_val == *right_val) {
-                    error!(r#"expectation failed: `({} == {})`
-  left: `{:?}`,
- right: `{:?}`: {}"#, stringify!($left), stringify!($right), &*left_val, &*right_val,
-                           format_args!($($arg)+))
-                }
-            }
-        }
-    });
-}
-
-use ese_parser::ese::db_file_header::{ esedb_file_header, esedb_file_signature };
-use ese_parser::util::config::{ Config };
-use ese_parser::util::reader::{ EseParserError, read_struct };
-use ese_parser::util::{ any_as_u8_slice, any_as_u32_slice };
-
-pub fn load_db_file_header(config: &Config) -> Result<esedb_file_header, EseParserError> {
-    let mut db_file_header = read_struct::<esedb_file_header, _>(&config.inp_file, SeekFrom::Start(0))
-                                        .map_err(EseParserError::Io)?;
-
-    //debug!("db_file_header ({:X}): {:0X?}", mem::size_of::<esedb_file_header>(), db_file_header);
-
-    assert_eq!(db_file_header.signature, esedb_file_signature, "bad file_header.signature");
-
-    fn calc_crc32(file_header: &&mut esedb_file_header) -> u32 {
-        let vec32: &[u32] = unsafe{ any_as_u32_slice(& file_header) };
-        vec32.iter().skip(1).fold(0x89abcdef as u32, |crc, &val| crc ^ val )
-    }
-
-    let stored_checksum = db_file_header.checksum;
-    let checksum = calc_crc32(&&mut db_file_header);
-    expect_eq!(stored_checksum, checksum, "wrong checksum");
-
-    let backup_file_header = read_struct::<esedb_file_header, _>(&config.inp_file, SeekFrom::Start(db_file_header.page_size as u64))
-        .map_err(EseParserError::Io)?;
-
-    if db_file_header.format_revision == 0 {
-        db_file_header.format_revision = backup_file_header.format_revision;
-    }
-
-    expect_eq!(db_file_header.format_revision, backup_file_header.format_revision, "mismatch in format revision");
-
-    if db_file_header.page_size == 0 {
-        db_file_header.page_size = backup_file_header.page_size;
-    }
-
-    expect_eq!(db_file_header.page_size, backup_file_header.page_size, "mismatch in page size");
-    expect_eq!(db_file_header.format_version, 0x620, "unsupported format version");
-
-    Ok(db_file_header)
-}
+use ese_parser::util::config::Config;
+use ese_parser::util::reader::{ EseParserError, load_db_file_header };
+use ese_parser::util::any_as_u8_slice;
 
 //use std::str;
 use std::process;
-use std::ffi::{CString};
+use std::ffi::CString;
 use std::os::raw::{c_void, c_ulong};
 use std::mem::{size_of, MaybeUninit};
 use simple_error::SimpleError;
