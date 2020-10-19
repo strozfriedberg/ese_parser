@@ -18,35 +18,6 @@ impl fmt::Display for EseParserError {
     }
 }
 
-macro_rules! expect_eq {
-    ($left:expr, $right:expr) => ({
-        match (&$left, &$right) {
-            (left_val, right_val) => {
-                if !(*left_val == *right_val) {
-                    error!(r#"expectation failed: `({} == {})`
-  left: `{:?}`,
- right: `{:?}`"#, stringify!($left), stringify!($right), &*left_val, &*right_val)
-                }
-            }
-        }
-    });
-    ($left:expr, $right:expr,) => ({
-        expect_eq!($left, $right)
-    });
-    ($left:expr, $right:expr, $($arg:tt)+) => ({
-        match (&($left), &($right)) {
-            (left_val, right_val) => {
-                if !(*left_val == *right_val) {
-                    error!(r#"expectation failed: `({} == {})`
-  left: `{:?}`,
- right: `{:?}`: {}"#, stringify!($left), stringify!($right), &*left_val, &*right_val,
-                           format_args!($($arg)+))
-                }
-            }
-        }
-    });
-}
-
 //https://stackoverflow.com/questions/38334994/how-to-read-a-c-struct-from-a-binary-file-in-rust
 use std::io::{self, BufReader, Read, Seek, SeekFrom};
 use std::fs::File;
@@ -107,3 +78,13 @@ pub fn load_db_file_header(config: &Config) -> Result<esedb_file_header, EsePars
     Ok(db_file_header)
 }
 
+use crate::ese::ese_db::{esedb_page_header};
+
+pub fn load_page_header(config: &Config, db_file_header: &esedb_file_header, page_number: u64) -> Result<esedb_page_header, EseParserError> {
+    let page_offset = (page_number + 1) * (db_file_header.page_size as u64);
+    let mut db_page_header = read_struct::<esedb_page_header, _>(&config.inp_file, SeekFrom::Start(page_offset))
+        .map_err(EseParserError::Io)?;
+    let TODO_checksum = 0;
+
+    Ok(db_page_header)
+}
