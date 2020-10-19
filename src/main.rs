@@ -3,11 +3,10 @@
 #[macro_use] extern crate log;
 extern crate strum;
 
-use env_logger;
+mod util;
+mod ese;
 
-use ese_parser::util::config::Config;
-use ese_parser::util::reader::{ EseParserError, load_db_file_header };
-use ese_parser::util::any_as_u8_slice;
+use env_logger;
 
 //use std::str;
 use std::process;
@@ -15,7 +14,12 @@ use std::ffi::CString;
 use std::os::raw::{c_void, c_ulong};
 use std::mem::{size_of, MaybeUninit};
 use simple_error::SimpleError;
-use ese_parser::ese::esent::{JET_errSuccess, JET_DBINFOMISC4, JET_DbInfoMisc, JetGetDatabaseFileInfoA};
+
+use crate::util::config::Config;
+use crate::util::reader::{ EseParserError, load_db_file_header, load_page_header };
+use crate::util::any_as_u8_slice;
+
+use crate::ese::esent::{JET_errSuccess, JET_DBINFOMISC4, JET_DbInfoMisc, JetGetDatabaseFileInfoA};
 
 #[link(name = "esent")]
 fn get_database_file_info(config: &Config) -> Result<JET_DBINFOMISC4, EseParserError> { //TODO: check version
@@ -92,4 +96,7 @@ fn main() {
 
     cmp!(format_version, ulVersion);
     assert_eq!(db_file_header.database_state as ::std::os::raw::c_ulong, db_info.dbstate);
+
+    let page0 = load_page_header(&config, &db_file_header, 0);
+    println!("Page 0: {:?}", page0);
 }
