@@ -1,8 +1,7 @@
 ﻿//jet.rs
-#![allow( non_camel_case_types )]
+#![allow( non_camel_case_types, dead_code )]
 
-use std::mem;
-use chrono;
+use std::{mem, fmt};
 use chrono::TimeZone;
 use chrono::naive::{NaiveDate, NaiveTime};
 use winapi::um::timezoneapi::{GetTimeZoneInformation/*, FileTimeToSystemTime*/};
@@ -23,13 +22,13 @@ pub struct DbTime {
     pub padding: uint16_t,
 }
 
-impl DbTime {
-    pub fn to_string(self) -> String {
+impl fmt::Display for DbTime {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         if let Some(t) = NaiveTime::from_hms_opt(self.hours as u32, self.minutes as u32, self.seconds as u32) {
-            t.to_string()
+            write!(f, "{}", t)
         }
         else {
-            format!("Bad DbTime: {:?}", self)
+            write!(f, "Bad DbTime: {:?}", self)
         }
     }
 }
@@ -47,36 +46,29 @@ pub struct DateTime {
     pub os_snapshot: uint8_t,
 }
 
-impl DateTime {
-    pub fn to_string(self) -> String {
+impl fmt::Display for DateTime {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         if self.year > 0 {
-            let dt: OsDateTime = self.into();
-            dt.to_string()
+            let ndt = NaiveDate::from_ymd(self.year as i32 + 1900, self.month as u32, self.day as u32)
+                .and_hms(self.hours as u32, self.minutes as u32, self.seconds as u32);
+            let offset = if self.time_is_utc != 0 {
+                0
+            }
+            else {
+                unsafe{
+                    let mut tz = mem::zeroed();
+                    GetTimeZoneInformation(&mut tz);
+                    -60 * (tz.Bias + tz.StandardBias)
+                }
+            };
+            let dt: OsDateTime = OsDateTime::from(chrono::FixedOffset::east(offset).from_local_datetime(&ndt).unwrap());
+
+            write!(f, "{}", dt)
         } else {
-            "".to_string()
+            write!(f, "")
         }
     }
 }
-
-impl Into<OsDateTime> for DateTime {
-    fn into(self) -> OsDateTime {
-        let ndt = NaiveDate::from_ymd(self.year as i32 + 1900, self.month as u32, self.day as u32)
-                    .and_hms(self.hours as u32, self.minutes as u32, self.seconds as u32);
-        let offset = if self.time_is_utc != 0 {
-                                0
-                            }
-                            else {
-                                unsafe{
-                                    let mut tz = mem::zeroed();
-                                    GetTimeZoneInformation(&mut tz);
-                                    -60 * (tz.Bias + tz.StandardBias)
-                                }
-                            };
-
-        OsDateTime::from(chrono::FixedOffset::east(offset).from_local_datetime(&ndt).unwrap())
-    }
-}
-
 
 #[derive(Copy, Clone, Debug)]
 #[repr(C)]
