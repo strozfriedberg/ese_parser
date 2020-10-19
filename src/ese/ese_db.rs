@@ -1,5 +1,5 @@
 //ese_db
-#![allow( non_camel_case_types )]
+#![allow( non_camel_case_types, dead_code )]
 use std::fmt;
 use crate::ese::jet;
 use winapi::_core::fmt::{Debug, Formatter};
@@ -11,7 +11,6 @@ pub static ESEDB_FILE_SIGNATURE: uint32_t = 0x89abcdef;
 pub static ESEDB_FORMAT_REVISION_NEW_RECORD_FORMAT: uint32_t = 0x0b;
 pub static ESEDB_FORMAT_REVISION_EXTENDED_PAGE_HEADER: uint32_t = 0x11;
 
-pub type esedb_file_header_t = esedb_file_header;
 #[derive(Copy, Clone, Debug)]
 #[repr(C)]
 pub struct esedb_file_header {
@@ -79,6 +78,21 @@ pub struct esedb_file_header {
     pub unknown_flags: uint32_t,
     pub unknown_val: uint32_t,
 }
+
+pub type LIBESEDB_PAGE_FLAGS = libc::c_uint;
+pub const LIBESEDB_PAGE_FLAG_0x10000: LIBESEDB_PAGE_FLAGS = 65536;
+pub const LIBESEDB_PAGE_FLAG_0x8000: LIBESEDB_PAGE_FLAGS = 32768;
+pub const LIBESEDB_PAGE_FLAG_IS_SCRUBBED: LIBESEDB_PAGE_FLAGS = 16384;
+pub const LIBESEDB_PAGE_FLAG_IS_NEW_RECORD_FORMAT: LIBESEDB_PAGE_FLAGS = 8192;
+pub const LIBESEDB_PAGE_FLAG_0x0800: LIBESEDB_PAGE_FLAGS = 2048;
+pub const LIBESEDB_PAGE_FLAG_0x0400: LIBESEDB_PAGE_FLAGS = 1024;
+pub const LIBESEDB_PAGE_FLAG_IS_LONG_VALUE: LIBESEDB_PAGE_FLAGS = 128;
+pub const LIBESEDB_PAGE_FLAG_IS_INDEX: LIBESEDB_PAGE_FLAGS = 64;
+pub const LIBESEDB_PAGE_FLAG_IS_SPACE_TREE: LIBESEDB_PAGE_FLAGS = 32;
+pub const LIBESEDB_PAGE_FLAG_IS_EMPTY: LIBESEDB_PAGE_FLAGS = 8;
+pub const LIBESEDB_PAGE_FLAG_IS_PARENT: LIBESEDB_PAGE_FLAGS = 4;
+pub const LIBESEDB_PAGE_FLAG_IS_LEAF: LIBESEDB_PAGE_FLAGS = 2;
+pub const LIBESEDB_PAGE_FLAG_IS_ROOT: LIBESEDB_PAGE_FLAGS = 1;
 
 #[repr(C)]
 #[derive(Copy, Clone, Debug)]
