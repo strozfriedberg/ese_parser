@@ -82,7 +82,7 @@ use crate::ese::ese_db::{esedb_page_header};
 
 pub fn load_page_header(config: &Config, db_file_header: &esedb_file_header, page_number: u64) -> Result<esedb_page_header, EseParserError> {
     let page_offset = (page_number + 1) * (db_file_header.page_size as u64);
-    let mut db_page_header = read_struct::<esedb_page_header, _>(&config.inp_file, SeekFrom::Start(page_offset))
+    let db_page_header = read_struct::<esedb_page_header, _>(&config.inp_file, SeekFrom::Start(page_offset))
         .map_err(EseParserError::Io)?;
     let TODO_checksum = 0;
 
