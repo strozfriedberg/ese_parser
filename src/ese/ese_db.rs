@@ -5,6 +5,7 @@ use crate::ese::jet;
 use winapi::_core::fmt::{Debug, Formatter};
 
 type uint8_t = ::std::os::raw::c_uchar;
+type uint16_t = ::std::os::raw::c_ushort;
 type uint32_t = ::std::os::raw::c_ulong;
 
 pub static ESEDB_FILE_SIGNATURE: uint32_t = 0x89abcdef;
@@ -80,12 +81,12 @@ pub struct esedb_file_header {
 }
 
 pub type LIBESEDB_PAGE_FLAGS = libc::c_uint;
-pub const LIBESEDB_PAGE_FLAG_0x10000: LIBESEDB_PAGE_FLAGS = 65536;
-pub const LIBESEDB_PAGE_FLAG_0x8000: LIBESEDB_PAGE_FLAGS = 32768;
+pub const LIBESEDB_PAGE_FLAG_0X10000: LIBESEDB_PAGE_FLAGS = 65536;
+pub const LIBESEDB_PAGE_FLAG_0X8000: LIBESEDB_PAGE_FLAGS = 32768;
 pub const LIBESEDB_PAGE_FLAG_IS_SCRUBBED: LIBESEDB_PAGE_FLAGS = 16384;
 pub const LIBESEDB_PAGE_FLAG_IS_NEW_RECORD_FORMAT: LIBESEDB_PAGE_FLAGS = 8192;
-pub const LIBESEDB_PAGE_FLAG_0x0800: LIBESEDB_PAGE_FLAGS = 2048;
-pub const LIBESEDB_PAGE_FLAG_0x0400: LIBESEDB_PAGE_FLAGS = 1024;
+pub const LIBESEDB_PAGE_FLAG_0X0800: LIBESEDB_PAGE_FLAGS = 2048;
+pub const LIBESEDB_PAGE_FLAG_0X0400: LIBESEDB_PAGE_FLAGS = 1024;
 pub const LIBESEDB_PAGE_FLAG_IS_LONG_VALUE: LIBESEDB_PAGE_FLAGS = 128;
 pub const LIBESEDB_PAGE_FLAG_IS_INDEX: LIBESEDB_PAGE_FLAGS = 64;
 pub const LIBESEDB_PAGE_FLAG_IS_SPACE_TREE: LIBESEDB_PAGE_FLAGS = 32;
@@ -97,24 +98,24 @@ pub const LIBESEDB_PAGE_FLAG_IS_ROOT: LIBESEDB_PAGE_FLAGS = 1;
 #[repr(C)]
 #[derive(Copy, Clone, Debug)]
 pub struct esedb_page_header {
-    pub xor_checksum: [u8; 4usize],
+    pub xor_checksum: uint32_t,
     pub __page_number_ecc_checksum: esedb_page_header__page_number_ecc_checksum,
-    pub database_modification_time: [u8; 8usize],
-    pub previous_page: [u8; 4usize],
-    pub next_page: [u8; 4usize],
-    pub father_data_page_object_identifier: [u8; 4usize],
-    pub available_data_size: [u8; 2usize],
-    pub available_uncommitted_data_size: [u8; 2usize],
-    pub available_data_offset: [u8; 2usize],
-    pub available_page_tag: [u8; 2usize],
-    pub page_flags: [u8; 4usize],
+    pub database_modification_time: jet::DateTime,
+    pub previous_page: uint32_t,
+    pub next_page: uint32_t,
+    pub father_data_page_object_identifier: uint32_t,
+    pub available_data_size: uint16_t,
+    pub available_uncommitted_data_size: uint16_t,
+    pub available_data_offset: uint16_t,
+    pub available_page_tag: uint16_t,
+    pub page_flags: uint32_t,
 }
 
 #[repr(C)]
 #[derive(Copy, Clone)]
 pub union esedb_page_header__page_number_ecc_checksum {
-    pub page_number: [u8; 4usize],
-    pub ecc_checksum: [u8; 4usize],
+    pub page_number: uint32_t,
+    pub ecc_checksum: uint32_t,
     _bindgen_union_align: [u8; 4usize],
 }
 
