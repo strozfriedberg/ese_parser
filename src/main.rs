@@ -19,9 +19,9 @@ use crate::util::config::Config;
 use crate::util::reader::{ EseParserError, load_db_file_header, load_page_header };
 use crate::util::any_as_u8_slice;
 
+/*
 use crate::ese::esent::{JET_errSuccess, JET_DBINFOMISC4, JET_DbInfoMisc, JetGetDatabaseFileInfoA};
 
-#[link(name = "esent")]
 fn get_database_file_info(config: &Config) -> Result<JET_DBINFOMISC4, EseParserError> { //TODO: check version
     let filename = CString::new(config.inp_file.as_bytes()).unwrap();
     let db_info = MaybeUninit::<JET_DBINFOMISC4>::zeroed();
@@ -39,6 +39,7 @@ fn get_database_file_info(config: &Config) -> Result<JET_DBINFOMISC4, EseParserE
         }
     }
 }
+*/
 
 fn main() {
     env_logger::init();
@@ -56,6 +57,7 @@ fn main() {
         }
     };
 
+/*
     //use ese_parser::util::dumper::{ dump_db_file_header };
     //dump_db_file_header(db_file_header);
     let mut db_info = get_database_file_info(&config).unwrap();
@@ -96,7 +98,9 @@ fn main() {
 
     cmp!(format_version, ulVersion);
     assert_eq!(db_file_header.database_state as ::std::os::raw::c_ulong, db_info.dbstate);
-
-    let page0 = load_page_header(&config, &db_file_header, 0);
-    println!("Page 0: {:?}", page0);
+*/
+    for i in 0..4 {
+        let page = load_page_header(&config, &db_file_header, i);
+        println!("Page {}: {:?}", i, page);
+    }
 }
