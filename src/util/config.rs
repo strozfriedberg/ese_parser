@@ -36,4 +36,17 @@ impl Config {
 
         Ok(Config { inp_file, report_file : "".to_string()/*report_file.unwrap().to_string()*/ })
     }
+
+
+    pub fn new_from_env(env_key: &str) -> Result<Config, String> {
+        let path = std::env::var(env_key);
+
+        if let Ok(inp_file) = path {
+            if !inp_file.is_empty() {
+                return Ok(Config { inp_file, report_file: "".to_string() });
+            }
+        }
+
+        Err(format!("'{}' environment variable is not defined", env_key))
+    }
 }
