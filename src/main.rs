@@ -16,8 +16,9 @@ use std::mem::{size_of, MaybeUninit};
 use simple_error::SimpleError;
 
 use crate::util::config::Config;
-use crate::util::reader::{ EseParserError, load_db_file_header, load_page_header };
+use crate::util::reader::{ EseParserError, load_db_file_header };
 use crate::util::any_as_u8_slice;
+use crate::ese::ese_db::EsePageHeader;
 
 /*
 use crate::ese::esent::{JET_errSuccess, JET_DBINFOMISC4, JET_DbInfoMisc, JetGetDatabaseFileInfoA};
@@ -100,7 +101,7 @@ fn main() {
     assert_eq!(db_file_header.database_state as ::std::os::raw::c_ulong, db_info.dbstate);
 */
     for i in 0..4 {
-        let page = load_page_header(&config, &db_file_header, i);
+        let page = EsePageHeader::new(&config, &db_file_header, i);
         println!("Page {}: {:?}", i, page);
     }
 }
