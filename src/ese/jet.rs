@@ -7,9 +7,10 @@ use chrono::naive::{NaiveDate, NaiveTime};
 use winapi::um::timezoneapi::{GetTimeZoneInformation/*, FileTimeToSystemTime*/};
 use strum::Display;
 
-type uint8_t = ::std::os::raw::c_uchar;
-type uint16_t = ::std::os::raw::c_short;
-type uint32_t = ::std::os::raw::c_ulong;
+pub type uint8_t = ::std::os::raw::c_uchar;
+pub type uint16_t = ::std::os::raw::c_short;
+pub type uint32_t = ::std::os::raw::c_ulong;
+pub type uint64_t = ::std::os::raw::c_ulonglong;
 
 type OsDateTime = chrono::DateTime<chrono::Utc>;
 
