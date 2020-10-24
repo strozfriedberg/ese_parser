@@ -1,5 +1,6 @@
 //util\mod.rs
 pub mod config;
+pub mod dumper;
 
 use std::mem;
 use std::slice;
