@@ -100,6 +100,7 @@ fn main() {
     cmp!(format_version, ulVersion);
     assert_eq!(db_file_header.database_state as ::std::os::raw::c_ulong, db_info.dbstate);
 */
+    use crate::util::dumper;
     for i in 0..4 {
         let page = EsePageHeader::new(&config, &db_file_header, i);
         println!("Page {}: {:?}", i, page);
