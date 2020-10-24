@@ -95,28 +95,40 @@ pub const LIBESEDB_PAGE_FLAG_IS_ROOT: LIBESEDB_PAGE_FLAGS = 1;
 
 #[repr(C)]
 #[derive(Copy, Clone, Debug)]
-struct PageHeaderOld {
+pub struct PageHeaderOld {
     pub xor_checksum: uint32_t,
     pub page_number: uint32_t,
+    pub database_modification_time: jet::DateTime,
+    pub previous_page: uint32_t,
+    pub next_page: uint32_t,
+    pub father_data_page_object_identifier: uint32_t,
+    pub available_data_size: uint16_t,
+    pub available_uncommitted_data_size: uint16_t,
+    pub available_data_offset: uint16_t,
+    pub available_page_tag: uint16_t,
+    pub page_flags: uint32_t,
 }
 
 #[repr(C)]
 #[derive(Copy, Clone, Debug)]
-struct PageHeader0x0b {
+pub struct PageHeader0x0b {
     pub xor_checksum: uint32_t,
     pub ecc_checksum: uint32_t,
+    pub database_modification_time: jet::DateTime,
+    pub previous_page: uint32_t,
+    pub next_page: uint32_t,
+    pub father_data_page_object_identifier: uint32_t,
+    pub available_data_size: uint16_t,
+    pub available_uncommitted_data_size: uint16_t,
+    pub available_data_offset: uint16_t,
+    pub available_page_tag: uint16_t,
+    pub page_flags: uint32_t,
 }
 
 #[repr(C)]
 #[derive(Copy, Clone, Debug)]
-struct PageHeader0x11 {
+pub struct PageHeader0x11 {
     pub checksum: uint64_t,
-}
-
-#[repr(C)]
-#[derive(Copy, Clone, Debug)]
-struct PageHeaderCommon {
-        specific: [uint8_t; 8],
     pub database_modification_time: jet::DateTime,
     pub previous_page: uint32_t,
     pub next_page: uint32_t,
@@ -130,15 +142,6 @@ struct PageHeaderCommon {
 
 #[repr(C)]
 #[derive(Copy, Clone)]
-union esedb_page_header {
-    pub page_header_old: PageHeaderOld,
-    pub page_header_0x0b: PageHeader0x0b,
-    pub page_header_0x11: PageHeader0x11,
-    pub page_header_common: PageHeaderCommon,
-}
-
-#[repr(C)]
-#[derive(Copy, Clone)]
 pub struct  PageHeaderExt0x11 {
     pub checksum1: uint64_t,
     pub checksum2: uint64_t,
@@ -147,46 +150,28 @@ pub struct  PageHeaderExt0x11 {
     pub unknown: uint64_t,
 }
 
+#[repr(C)]
+#[derive(Copy, Clone)]
+pub enum esedb_page_header {
+    page_header_old (PageHeaderOld),
+    page_header_0x0b (PageHeader0x0b),
+    page_header_0x11 (PageHeader0x11),
+}
+
 pub struct EsePageHeader {
     db_file_header: esedb_file_header,
-    page_header: esedb_page_header,
+    pub page_header: esedb_page_header,
 }
 
 use crate::util::config::Config;
-use crate::util::reader::{EseParserError, read_struct};
+use crate::util::reader::{EseParserError, read_struct, load_page_header};
 use std::io::SeekFrom;
-
-fn load_page_header(config: &Config, db_file_header: &esedb_file_header, page_number: u64) -> Result<esedb_page_header, EseParserError> {
-    let page_offset = (page_number + 1) * (db_file_header.page_size as u64);
-    let db_page_header = read_struct::<esedb_page_header, _>(&config.inp_file, SeekFrom::Start(page_offset))
-        .map_err(EseParserError::Io)?;
-    let TODO_checksum = 0;
-
-    Ok(db_page_header)
-}
 
 impl EsePageHeader {
     pub fn new(config: &Config, db_file_header: &esedb_file_header, page_number: u64) -> EsePageHeader {
         let page_header = load_page_header(config, db_file_header, page_number).unwrap();
-
-        EsePageHeader{ db_file_header: db_file_header.clone(),
+        EsePageHeader{  db_file_header: db_file_header.clone(),
                         page_header: page_header }
-    }
-}
-
-impl Debug for EsePageHeader {
-    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
-        unsafe {
-            if self.db_file_header.format_revision < 0x0000000b {
-                write!(f, "{:?} {:?}", self.page_header.page_header_old, self.page_header.page_header_common)
-            }
-            else if self.db_file_header.format_revision < 0x00000011 {
-                write!(f, "{:?} {:?}", self.page_header.page_header_0x0b, self.page_header.page_header_common)
-            }
-            else {
-                write!(f, "{:?} {:?}", self.page_header.page_header_0x11, self.page_header.page_header_common)
-            }
-        }
     }
 }
 
