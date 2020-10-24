@@ -17,7 +17,7 @@ use std::mem::{size_of, MaybeUninit};
 use simple_error::SimpleError;
 use ese_parser::ese::esent::{JET_errSuccess, JET_DBINFOMISC4, JET_DbInfoMisc, JetGetDatabaseFileInfoA};
 use ese_parser::util::dumper::dump_db_file_header;
-
+/*
 #[link(name = "esent")]
 pub fn get_database_file_info(config: &Config) -> Result<JET_DBINFOMISC4, EseParserError> {
     let filename = CString::new(config.inp_file.as_bytes()).unwrap();
@@ -36,6 +36,7 @@ pub fn get_database_file_info(config: &Config) -> Result<JET_DBINFOMISC4, EsePar
         }
     }
 }
+*/
 
 fn main() {
     env_logger::init();
@@ -55,6 +56,7 @@ fn main() {
 
     //use ese_parser::util::dumper::{ dump_db_file_header };
     dump_db_file_header(db_file_header);
+/*
     let mut db_info = get_database_file_info(&config).unwrap();
     //println!("{:?}", db_info);
 
@@ -93,4 +95,5 @@ fn main() {
 
     cmp!(format_version, ulVersion);
     assert_eq!(db_file_header.database_state as ::std::os::raw::c_ulong, db_info.dbstate);
+*/
 }
