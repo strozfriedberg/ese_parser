@@ -1,22 +1,24 @@
 ﻿//test_load_db_file_header.rs
+
+use std::io::{self, Write};
+use std::process::Command;
+use std::str;
+use std::path::PathBuf;
+use regex::Regex;
+
 use env_logger;
 
 use crate::util::config::Config;
 use crate::util::reader::load_db_file_header;
-//use crate::util::any_as_u8_slice;
-use std::io::{self, Write};
-use std::process::Command;
-use std::str;
-use regex::Regex;
 
-const ENV_VAR_TEST_FILE: &str = "TEST_ESE_TESTING_FILE";
+const TEST_FILE: &str = r"data\DataStore.edb";
 
 #[test]
 fn test_load_db_file_header() {
 
     env_logger::init();
 
-    let config = match Config::new_from_env(ENV_VAR_TEST_FILE){
+    let config = match Config::new_for_file(&PathBuf::from(TEST_FILE), &""){
         Ok(x) => x,
         Err(e) => panic!("Could not create config: {}", e),
     };
@@ -27,7 +29,7 @@ fn test_load_db_file_header() {
     };
 
     let output = Command::new("esentutl")
-        .args(&["/mh", &config.inp_file])
+        .args(&["/mh", config.inp_file.to_str().unwrap()])
         .output()
         .expect("failed to execute process");
     let text = str::from_utf8(&output.stdout).unwrap();
@@ -58,9 +60,19 @@ fn test_load_db_file_header() {
         return 0;
     }
 
+    use crate::ese::jet::DbState;
+    fn db_state_to_string(state: DbState) -> & 'static str {
+        match state {
+            DbState::JustCreated => "Just Created",
+            DbState::DirtyShutdown => "Dirty Shutdown",
+            DbState::CleanShutdown => "Clean Shutdown",
+            DbState::BeingConverted => "Being Converted",
+            DbState::ForceDetach => "Force Detach",
+        }
+    }
     check_field!("Checksum", (|val: &str| assert_eq!(u32_from_opt(val), db_file_header.checksum) ));
     check_field!("Format ulMagic", (|val: &str| assert_eq!(u32_from_opt(val), db_file_header.signature) ));
-    //check_field!("Format ulVersion", (|val: &str| assert_eq!(u32_from_opt(val), db_file_header.format_version) ));
+    check_field!("State", (|val: &str| assert_eq!(val, db_state_to_string(db_file_header.database_state) )));
     check_field!("Last Consistent", (|val: &str| {
         let dt = &db_file_header.consistent_time;
         let s = format!("{:0>2}/{:0>2}/{:.4} {:0>2}:{:0>2}:{:0>2}",
