@@ -5,7 +5,7 @@ extern crate hexdump;
 use itertools::Itertools;
 use std::string::ToString;
 
-use crate::ese::ese_db::{esedb_file_header, EsePageHeader, PageHeaderOld, PageHeader0x0b, PageHeader0x11};
+use crate::ese::ese_db::{esedb_file_header, EsePageHeader, PageHeaderOld, PageHeader0x0b, PageHeader0x11, esedb_page_header};
 use crate::ese::jet;
 use std::fmt;
 use std::fmt::{Display, Formatter, Debug};
@@ -152,28 +152,27 @@ pub fn dump_page_header(page_header: EsePageHeader) {
     let mut table = Table::new();
 }
 
+/*
 impl Display for EsePageHeader {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         match self.page_header {
-            page_header_old(page) => write!(f, "{}", page),
-            PageHeader0x0b(page) => write!(f, "{}", page),
-            PageHeader0x11(page) => write!(f, "{}", page),
+            esedb_page_header::page_header_old(page) => write!(f, "{}", page),
+            esedb_page_header::page_header_0x0b(page) => write!(f, "{}", page),
+            esedb_page_header::page_header_0x11(page) => write!(f, "{}", page),
             _ => write!(f, "Unknown page header"),
         }
     }
 }
+*/
 
 impl Debug for EsePageHeader {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
-        unimplemented!()
-    //     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
-    //         match self.page_header {
-    //             PageHeaderOld(page) => write!(f, "{:?}", page),
-    //             PageHeader0x0b(page) => write!(f, "{:?}", page),
-    //             PageHeader0x11(page) => write!(f, "{:?}", page),
-    //             _ => write!(f, "Unknown page header"),
-    //         }
-    //     }
+        match self.page_header {
+            esedb_page_header::page_header_old(page) => write!(f, "{:?}", page),
+            esedb_page_header::page_header_0x0b(page) => write!(f, "{:?}", page),
+            esedb_page_header::page_header_0x11(page) => write!(f, "{:?}", page),
+            _ => write!(f, "Unknown page header"),
+        }
     }
 }
 
