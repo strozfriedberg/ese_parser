@@ -1,4 +1,4 @@
-﻿//test_load_db_file_header.rs
+//test_load_db_file_header.rs
 
 use std::io::{self, Write};
 use std::process::Command;

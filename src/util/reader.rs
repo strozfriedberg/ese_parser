@@ -1,4 +1,4 @@
-﻿//reader.rs
+//reader.rs
 
 use simple_error::SimpleError;
 use std::fmt;

@@ -1,4 +1,4 @@
-﻿//dumper.rs
+//dumper.rs
 
 pub use prettytable::{Table, Row, Cell};
 extern crate hexdump;
