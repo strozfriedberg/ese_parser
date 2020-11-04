@@ -1,4 +1,3 @@
-#![feature(maybe_uninit_ref)]
 #![allow(non_camel_case_types,  clippy::mut_from_ref, clippy::cast_ptr_alignment)]
 #[macro_use] extern crate log;
 extern crate strum;
