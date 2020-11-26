@@ -42,7 +42,7 @@ fn main() {
     let config = Config::new().unwrap_or_else(|err| {  error!("Problem parsing arguments: {}", err);
                                                                    process::exit(1);
                                                                 });
-    info!("file '{}'", config.inp_file);
+    info!("file '{}'", config.inp_file.display());
 
     let db_file_header = match load_db_file_header(&config) {
         Ok(x) => x ,
