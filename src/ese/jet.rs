@@ -1,4 +1,4 @@
-﻿//jet.rs
+//jet.rs
 #![allow( non_camel_case_types, dead_code )]
 
 use std::{mem, fmt};

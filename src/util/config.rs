@@ -3,10 +3,11 @@
 use std::borrow::Cow;
 use log::{ debug };
 use clap::{ Arg, App };
+use std::path::PathBuf;
 
 pub struct Config {
-    pub inp_file: String,
-    pub report_file: String,
+    pub inp_file: PathBuf,
+    pub report_file: PathBuf,
 }
 
 impl Config {
@@ -35,6 +36,27 @@ impl Config {
             _ => &""
         };
 
-        Ok(Config { inp_file, report_file : report_file.unwrap().to_string() })
+        Config::new_for_file(&PathBuf::from(inp_file), &"")
+    }
+
+
+    pub fn new_from_env(env_key: &str) -> Result<Config, String> {
+        let path = std::env::var(env_key);
+
+        if let Ok(inp_file) = path {
+            if !inp_file.is_empty() {
+                return Config::new_for_file(&PathBuf::from(inp_file), &"");
+            }
+        }
+
+        Err(format!("'{}' environment variable is not defined", env_key))
+    }
+
+    pub fn new_for_file(inp_file: &PathBuf, report_file: &str) -> Result<Config, String> {
+        if inp_file.is_file() {
+            return Ok(Config { inp_file: inp_file.canonicalize().unwrap(), report_file: PathBuf::from(report_file) });
+        }
+
+        Err(format!("{} is not a file", inp_file.display()))
     }
 }
