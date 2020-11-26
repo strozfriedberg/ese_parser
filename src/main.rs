@@ -8,16 +8,10 @@ mod ese;
 
 use env_logger;
 
-//use std::str;
 use std::process;
-use std::ffi::CString;
-use std::os::raw::{c_void, c_ulong};
-use std::mem::{size_of, MaybeUninit};
-use simple_error::SimpleError;
 
 use crate::util::config::Config;
-use crate::util::reader::{ EseParserError, load_db_file_header };
-use crate::util::any_as_u8_slice;
+use crate::util::reader::{ load_db_file_header };
 use crate::ese::ese_db::EsePageHeader;
 
 /*
@@ -50,7 +44,7 @@ fn main() {
                                                                 });
     info!("file '{}'", config.inp_file);
 
-    let mut db_file_header = match load_db_file_header(&config) {
+    let db_file_header = match load_db_file_header(&config) {
         Ok(x) => x ,
         Err(e) => {
             error!("Application error: {}", e);
@@ -100,7 +94,6 @@ fn main() {
     cmp!(format_version, ulVersion);
     assert_eq!(db_file_header.database_state as ::std::os::raw::c_ulong, db_info.dbstate);
 */
-    use crate::util::dumper;
     for i in 0..4 {
         let page = EsePageHeader::new(&config, &db_file_header, i);
         println!("Page {}: {:?}", i, page);

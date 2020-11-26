@@ -1,8 +1,7 @@
 //ese_db
 #![allow( non_camel_case_types, dead_code )]
-use std::fmt;
 use crate::ese::jet;
-use winapi::_core::fmt::{Debug, Formatter};
+use winapi::_core::fmt::Debug;
 
 use jet::{ uint8_t, uint16_t, uint32_t, uint64_t };
 
@@ -164,8 +163,7 @@ pub struct EsePageHeader {
 }
 
 use crate::util::config::Config;
-use crate::util::reader::{EseParserError, read_struct, load_page_header};
-use std::io::SeekFrom;
+use crate::util::reader::load_page_header;
 
 impl EsePageHeader {
     pub fn new(config: &Config, db_file_header: &esedb_file_header, page_number: u64) -> EsePageHeader {

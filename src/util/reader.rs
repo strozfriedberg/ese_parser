@@ -81,26 +81,24 @@ pub fn load_db_file_header(config: &Config) -> Result<esedb_file_header, EsePars
 pub fn load_page_header(config: &Config, db_file_header: &esedb_file_header, page_number: u64) -> Result<esedb_page_header, EseParserError> {
     let page_offset = (page_number + 1) * (db_file_header.page_size as u64);
 
-    unsafe {
-        if db_file_header.format_revision < 0x0000000b {
-            let db_page_header = read_struct::<PageHeaderOld, _>(&config.inp_file, SeekFrom::Start(page_offset))
-                .map_err(EseParserError::Io)?;
-            let TODO_checksum = 0;
-            Ok(esedb_page_header::page_header_old(db_page_header))
-        }
-        else if db_file_header.format_revision < 0x00000011 {
-            let db_page_header = read_struct::<PageHeader0x0b, _>(&config.inp_file, SeekFrom::Start(page_offset))
-                .map_err(EseParserError::Io)?;
-            let TODO_checksum = 0;
-            Ok(esedb_page_header::page_header_0x0b(db_page_header))
-        }
-        else {
+    if db_file_header.format_revision < 0x0000000b {
+        let db_page_header = read_struct::<PageHeaderOld, _>(&config.inp_file, SeekFrom::Start(page_offset))
+            .map_err(EseParserError::Io)?;
+        let TODO_checksum = 0;
+        Ok(esedb_page_header::page_header_old(db_page_header))
+    }
+    else if db_file_header.format_revision < 0x00000011 {
+        let db_page_header = read_struct::<PageHeader0x0b, _>(&config.inp_file, SeekFrom::Start(page_offset))
+            .map_err(EseParserError::Io)?;
+        let TODO_checksum = 0;
+        Ok(esedb_page_header::page_header_0x0b(db_page_header))
+    }
+    else {
 
-            let db_page_header = read_struct::<PageHeader0x11, _>(&config.inp_file, SeekFrom::Start(page_offset))
-                .map_err(EseParserError::Io)?;
-            let TODO_checksum = 0;
-            Ok(esedb_page_header::page_header_0x11(db_page_header))
-        }
+        let db_page_header = read_struct::<PageHeader0x11, _>(&config.inp_file, SeekFrom::Start(page_offset))
+            .map_err(EseParserError::Io)?;
+        let TODO_checksum = 0;
+        Ok(esedb_page_header::page_header_0x11(db_page_header))
     }
 }
 

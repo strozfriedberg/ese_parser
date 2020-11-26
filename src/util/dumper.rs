@@ -2,13 +2,11 @@
 
 pub use prettytable::{Table, Row, Cell};
 extern crate hexdump;
-use itertools::Itertools;
 use std::string::ToString;
 
-use crate::ese::ese_db::{esedb_file_header, EsePageHeader, PageHeaderOld, PageHeader0x0b, PageHeader0x11, esedb_page_header};
+use crate::ese::ese_db::{esedb_file_header, EsePageHeader, esedb_page_header};
 use crate::ese::jet;
-use std::fmt;
-use std::fmt::{Display, Formatter, Debug};
+use std::fmt::{self, Formatter, Debug};
 
 pub fn dump_db_file_header(db_file_header: esedb_file_header) {
     let mut table = Table::new();
@@ -66,7 +64,7 @@ pub fn dump_db_file_header(db_file_header: esedb_file_header) {
     macro_rules! add_hex_field {
         ($fld: ident) => {
             let mut s: String = "".to_string();
-            hexdump::hexdump_iter(&db_file_header.$fld).foreach(|line| { s.push_str(&line); s.push_str("\n"); } );
+            hexdump::hexdump_iter(&db_file_header.$fld).for_each(|line| { s.push_str(&line); s.push_str("\n"); } );
             add_row!(stringify!($fld), &s);
         }
     }
@@ -171,7 +169,6 @@ impl Debug for EsePageHeader {
             esedb_page_header::page_header_old(page) => write!(f, "{:?}", page),
             esedb_page_header::page_header_0x0b(page) => write!(f, "{:?}", page),
             esedb_page_header::page_header_0x11(page) => write!(f, "{:?}", page),
-            _ => write!(f, "Unknown page header"),
         }
     }
 }

@@ -1,5 +1,6 @@
 //config.rs
 #![allow(deprecated)]
+use std::borrow::Cow;
 use log::{ debug };
 use clap::{ Arg, App };
 
@@ -9,7 +10,7 @@ pub struct Config {
 }
 
 impl Config {
-    pub fn new() -> Result<Config, &'static str> {
+    pub fn new() -> Result<Config, Cow<'static, str>> {
         let matches = App::new("ESE DB dump")
             .version("0.1.0")
             .arg(Arg::with_name("in")
@@ -34,6 +35,6 @@ impl Config {
             _ => &""
         };
 
-        Ok(Config { inp_file, report_file : "".to_string()/*report_file.unwrap().to_string()*/ })
+        Ok(Config { inp_file, report_file : report_file.unwrap().to_string() })
     }
 }
