@@ -1,6 +1,6 @@
 //config.rs
 #![allow(deprecated)]
-use std::borrow::Cow;
+//use std::borrow::Cow;
 use log::{ debug };
 use clap::{ Arg, App };
 use std::path::PathBuf;
@@ -11,7 +11,7 @@ pub struct Config {
 }
 
 impl Config {
-    pub fn new() -> Result<Config, Cow<'static, str>> {
+    pub fn new() -> Result<Config, String> {
         let matches = App::new("ESE DB dump")
             .version("0.1.0")
             .arg(Arg::with_name("in")
