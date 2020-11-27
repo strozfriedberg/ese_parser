@@ -1,6 +1,6 @@
 //config.rs
 #![allow(deprecated)]
-//use std::borrow::Cow;
+use std::borrow::Cow;
 use log::{ debug };
 use clap::{ Arg, App };
 use std::path::PathBuf;
@@ -11,7 +11,7 @@ pub struct Config {
 }
 
 impl Config {
-    pub fn new() -> Result<Config, String> {
+    pub fn new() -> Result<Config, Cow<'static, str>> {
         let matches = App::new("ESE DB dump")
             .version("0.1.0")
             .arg(Arg::with_name("in")
@@ -40,7 +40,7 @@ impl Config {
     }
 
 
-    pub fn new_from_env(env_key: &str) -> Result<Config, String> {
+    pub fn new_from_env(env_key: &str) -> Result<Config, Cow<'static, str>> {
         let path = std::env::var(env_key);
 
         if let Ok(inp_file) = path {
@@ -49,14 +49,14 @@ impl Config {
             }
         }
 
-        Err(format!("'{}' environment variable is not defined", env_key))
+        Err(format!("'{}' environment variable is not defined", env_key).into())
     }
 
-    pub fn new_for_file(inp_file: &PathBuf, report_file: &str) -> Result<Config, String> {
+    pub fn new_for_file(inp_file: &PathBuf, report_file: &str) -> Result<Config, Cow<'static, str>> {
         if inp_file.is_file() {
             return Ok(Config { inp_file: inp_file.canonicalize().unwrap(), report_file: PathBuf::from(report_file) });
         }
 
-        Err(format!("{} is not a file", inp_file.display()))
+        Err(format!("{} is not a file", inp_file.display()).into())
     }
 }
