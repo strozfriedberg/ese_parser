@@ -1,6 +1,7 @@
 #![feature(maybe_uninit_ref)]
 #![allow(non_camel_case_types,  clippy::mut_from_ref, clippy::cast_ptr_alignment)]
 #[macro_use] extern crate log;
+#[macro_use] extern crate bitflags;
 extern crate strum;
 
 mod util;
@@ -39,9 +40,10 @@ fn get_database_file_info(config: &Config) -> Result<JET_DBINFOMISC4, EseParserE
 fn main() {
     env_logger::init();
 
-    let config = Config::new().unwrap_or_else(|err| {  error!("Problem parsing arguments: {}", err);
-                                                                   process::exit(1);
-                                                                });
+    let config = Config::new()
+                        .unwrap_or_else(|err| { error!("Problem parsing arguments: {}", err);
+                                                         process::exit(1);
+                                                       });
     info!("file '{}'", config.inp_file.display());
 
     let db_file_header = match load_db_file_header(&config) {
@@ -51,6 +53,11 @@ fn main() {
             process::exit(1);
         }
     };
+
+    for i in 0..4 {
+        let page = EsePageHeader::new(&config, &db_file_header, i);
+        println!("Page {}: {:?}", i, page);
+    }
 
 /*
     //use ese_parser::util::dumper::{ dump_db_file_header };
@@ -94,8 +101,4 @@ fn main() {
     cmp!(format_version, ulVersion);
     assert_eq!(db_file_header.database_state as ::std::os::raw::c_ulong, db_info.dbstate);
 */
-    for i in 0..4 {
-        let page = EsePageHeader::new(&config, &db_file_header, i);
-        println!("Page {}: {:?}", i, page);
-    }
 }
