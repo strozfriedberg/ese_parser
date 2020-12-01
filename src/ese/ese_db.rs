@@ -1,5 +1,6 @@
 //ese_db
 #![allow( non_camel_case_types, dead_code )]
+use bitflags::bitflags;
 use crate::ese::jet;
 use winapi::_core::fmt::Debug;
 
@@ -77,20 +78,19 @@ pub struct esedb_file_header {
     pub unknown_val: uint32_t,
 }
 
-pub type LIBESEDB_PAGE_FLAGS = libc::c_uint;
-pub const LIBESEDB_PAGE_FLAG_0X10000: LIBESEDB_PAGE_FLAGS = 65536;
-pub const LIBESEDB_PAGE_FLAG_0X8000: LIBESEDB_PAGE_FLAGS = 32768;
-pub const LIBESEDB_PAGE_FLAG_IS_SCRUBBED: LIBESEDB_PAGE_FLAGS = 16384;
-pub const LIBESEDB_PAGE_FLAG_IS_NEW_RECORD_FORMAT: LIBESEDB_PAGE_FLAGS = 8192;
-pub const LIBESEDB_PAGE_FLAG_0X0800: LIBESEDB_PAGE_FLAGS = 2048;
-pub const LIBESEDB_PAGE_FLAG_0X0400: LIBESEDB_PAGE_FLAGS = 1024;
-pub const LIBESEDB_PAGE_FLAG_IS_LONG_VALUE: LIBESEDB_PAGE_FLAGS = 128;
-pub const LIBESEDB_PAGE_FLAG_IS_INDEX: LIBESEDB_PAGE_FLAGS = 64;
-pub const LIBESEDB_PAGE_FLAG_IS_SPACE_TREE: LIBESEDB_PAGE_FLAGS = 32;
-pub const LIBESEDB_PAGE_FLAG_IS_EMPTY: LIBESEDB_PAGE_FLAGS = 8;
-pub const LIBESEDB_PAGE_FLAG_IS_PARENT: LIBESEDB_PAGE_FLAGS = 4;
-pub const LIBESEDB_PAGE_FLAG_IS_LEAF: LIBESEDB_PAGE_FLAGS = 2;
-pub const LIBESEDB_PAGE_FLAG_IS_ROOT: LIBESEDB_PAGE_FLAGS = 1;
+bitflags! {
+    pub struct PageFlags: u32 {
+        const IS_SCRUBBED           = 0b100000000000000;
+        const IS_NEW_RECORD_FORMAT  = 0b010000000000000;
+        const IS_LONG_VALUE         = 0b000000010000000;
+        const IS_INDEX              = 0b000000001000000;
+        const IS_SPACE_TREE         = 0b000000000100000;
+        const IS_EMPTY              = 0b000000000001000;
+        const IS_PARENT             = 0b000000000000100;
+        const IS_LEAF               = 0b000000000000010;
+        const IS_ROOT               = 0b000000000000001;
+    }
+}
 
 #[repr(C)]
 #[derive(Copy, Clone, Debug)]
@@ -105,7 +105,7 @@ pub struct PageHeaderOld {
     pub available_uncommitted_data_size: uint16_t,
     pub available_data_offset: uint16_t,
     pub available_page_tag: uint16_t,
-    pub page_flags: uint32_t,
+    pub page_flags: PageFlags,
 }
 
 #[repr(C)]
@@ -121,7 +121,7 @@ pub struct PageHeader0x0b {
     pub available_uncommitted_data_size: uint16_t,
     pub available_data_offset: uint16_t,
     pub available_page_tag: uint16_t,
-    pub page_flags: uint32_t,
+    pub page_flags: PageFlags,
 }
 
 #[repr(C)]
@@ -136,7 +136,7 @@ pub struct PageHeader0x11 {
     pub available_uncommitted_data_size: uint16_t,
     pub available_data_offset: uint16_t,
     pub available_page_tag: uint16_t,
-    pub page_flags: uint32_t,
+    pub page_flags: PageFlags,
 }
 
 #[repr(C)]
