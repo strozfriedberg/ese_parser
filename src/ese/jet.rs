@@ -1,7 +1,10 @@
 //jet.rs
 #![allow( non_camel_case_types, dead_code )]
+use crate::ese::ese_db;
 
+use bitflags::bitflags;
 use std::{mem, fmt};
+use std::rc::Rc;
 use chrono::TimeZone;
 use chrono::naive::{NaiveDate, NaiveTime};
 use winapi::um::timezoneapi::{GetTimeZoneInformation/*, FileTimeToSystemTime*/};
@@ -13,6 +16,27 @@ pub type uint32_t = ::std::os::raw::c_ulong;
 pub type uint64_t = ::std::os::raw::c_ulonglong;
 
 type OsDateTime = chrono::DateTime<chrono::Utc>;
+
+bitflags! {
+    pub struct PageFlags: uint32_t {
+        const UNKNOWN_8000          = 0b1000000000000000;
+        const IS_SCRUBBED           = 0b0100000000000000;
+        const IS_NEW_RECORD_FORMAT  = 0b0010000000000000;
+        const UNKNOWN_1000          = 0b0001000000000000;
+        const UNKNOWN_800           = 0b0000100000000000;
+        const UNKNOWN_400           = 0b0000010000000000;
+        const UNKNOWN_200           = 0b0000001000000000;
+        const UNKNOWN_100           = 0b0000000100000000;
+        const IS_LONG_VALUE         = 0b0000000010000000;
+        const IS_INDEX              = 0b0000000001000000;
+        const IS_SPACE_TREE         = 0b0000000000100000;
+        const UNKNOWN_10            = 0b0000000000010000;
+        const IS_EMPTY              = 0b0000000000001000;
+        const IS_PARENT             = 0b0000000000000100;
+        const IS_LEAF               = 0b0000000000000010;
+        const IS_ROOT               = 0b0000000000000001;
+    }
+}
 
 #[derive(Copy, Clone, Debug)]
 #[repr(C)]
@@ -105,6 +129,33 @@ pub struct BackupInfo {
     pub gen_low: ::std::os::raw::c_ulong,
     pub gen_high: ::std::os::raw::c_ulong,
 }
+
+#[derive(Debug)]
+pub struct DbFile {
+    file_header: ese_db::FileHeader,
+}
+
+pub struct PageHeader {
+    db_file_header: Rc<ese_db::FileHeader>,
+    pub page_header: ese_db::page_header,
+}
+
+use crate::util::config::Config;
+use crate::util::reader::load_page_header;
+
+impl PageHeader {
+    pub fn new(config: &Config, db_file_header: &ese_db::FileHeader, page_number: u64) -> PageHeader {
+        let page_header = load_page_header(config, db_file_header, page_number).unwrap();
+        PageHeader { db_file_header: Rc::new(*db_file_header), page_header: page_header }
+    }
+}
+
+#[derive(Debug)]
+pub struct DbPage {
+    pub page_number: uint32_t,
+    pub page_header: PageHeader,
+}
+
 
 pub fn revision_to_string(version: uint32_t, revision: uint32_t) -> String {
     let s = match (version, revision) {
