@@ -1,15 +1,16 @@
 //dumper.rs
 
-pub use prettytable::{Table, Row, Cell};
+use prettytable::{Row, Cell};
+use comfy_table;
 extern crate hexdump;
 use std::string::ToString;
 
-use crate::ese::ese_db::{esedb_file_header, EsePageHeader, esedb_page_header};
+use crate::ese::ese_db::{FileHeader, page_header};
 use crate::ese::jet;
 use std::fmt::{self, Formatter, Debug};
 
-pub fn dump_db_file_header(db_file_header: esedb_file_header) {
-    let mut table = Table::new();
+pub fn dump_db_file_header(db_file_header: FileHeader) {
+    let mut table = prettytable::Table::new();
 
     macro_rules! add_row {
         ($fld: expr, $val: expr) => {table.add_row(Row::new(vec![Cell::new($fld), Cell::new($val)]))}
@@ -146,29 +147,53 @@ pub fn dump_db_file_header(db_file_header: esedb_file_header) {
     table.printstd();
 }
 
-pub fn dump_page_header(page_header: EsePageHeader) {
-    let mut table = Table::new();
-}
+pub fn dump_page_header(page_header: &jet::PageHeader) {
+    let mut table = comfy_table::Table::new();
 
-/*
-impl Display for EsePageHeader {
-    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
-        match self.page_header {
-            esedb_page_header::page_header_old(page) => write!(f, "{}", page),
-            esedb_page_header::page_header_0x0b(page) => write!(f, "{}", page),
-            esedb_page_header::page_header_0x11(page) => write!(f, "{}", page),
-            _ => write!(f, "Unknown page header"),
+    macro_rules! add_row {
+        ($fld: expr, $val: expr) => {
+            table.add_row(vec![comfy_table::Cell::new($fld), comfy_table::Cell::new($val)])
         }
     }
-}
-*/
 
-impl Debug for EsePageHeader {
+    match page_header.page_header {
+        page_header::page_header_old(page) => {
+            println!("{:?}", page)
+        },
+        page_header::page_header_0x0b(page) => {
+            println!("{:?}", page)
+        },
+        page_header::page_header_0x11(page) => {
+            macro_rules! add_field {
+                ($fld: ident) => {
+                    let s = format!("{:?}", page.$fld);
+                    add_row!(stringify!($fld), &s)
+                };
+            }
+
+            add_field!(checksum);
+            add_field!(database_modification_time);
+            add_field!(previous_page);
+            add_field!(next_page);
+            add_field!(father_data_page_object_identifier);
+            add_field!(available_data_size);
+            add_field!(available_uncommitted_data_size);
+            add_field!(available_data_offset);
+            add_field!(available_page_tag);
+            add_field!(page_flags);
+        },
+    }
+
+    println!("{}", table);
+
+}
+
+impl Debug for jet::PageHeader {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         match self.page_header {
-            esedb_page_header::page_header_old(page) => write!(f, "{:?}", page),
-            esedb_page_header::page_header_0x0b(page) => write!(f, "{:?}", page),
-            esedb_page_header::page_header_0x11(page) => write!(f, "{:?}", page),
+            page_header::page_header_old(page) => write!(f, "{:?}", page),
+            page_header::page_header_0x0b(page) => write!(f, "{:?}", page),
+            page_header::page_header_0x11(page) => write!(f, "{:?}", page),
         }
     }
 }
