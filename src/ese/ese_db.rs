@@ -1,18 +1,17 @@
 //ese_db
 #![allow( non_camel_case_types, dead_code )]
-use bitflags::bitflags;
 use crate::ese::jet;
 use winapi::_core::fmt::Debug;
 
-use jet::{ uint8_t, uint16_t, uint32_t, uint64_t };
+use jet::{ uint8_t, uint16_t, uint32_t, uint64_t, PageFlags };
 
-pub static ESEDB_FILE_SIGNATURE: uint32_t = 0x89abcdef;
-pub static ESEDB_FORMAT_REVISION_NEW_RECORD_FORMAT: uint32_t = 0x0b;
-pub static ESEDB_FORMAT_REVISION_EXTENDED_PAGE_HEADER: uint32_t = 0x11;
+pub const ESEDB_FILE_SIGNATURE: uint32_t = 0x89abcdef;
+pub const ESEDB_FORMAT_REVISION_NEW_RECORD_FORMAT: uint32_t = 0x0b;
+pub const ESEDB_FORMAT_REVISION_EXTENDED_PAGE_HEADER: uint32_t = 0x11;
 
 #[derive(Copy, Clone, Debug)]
 #[repr(C)]
-pub struct esedb_file_header {
+pub struct FileHeader {
     pub checksum: uint32_t,
     pub signature: uint32_t,
     pub format_version: uint32_t,
@@ -78,20 +77,6 @@ pub struct esedb_file_header {
     pub unknown_val: uint32_t,
 }
 
-bitflags! {
-    pub struct PageFlags: u32 {
-        const IS_SCRUBBED           = 0b100000000000000;
-        const IS_NEW_RECORD_FORMAT  = 0b010000000000000;
-        const IS_LONG_VALUE         = 0b000000010000000;
-        const IS_INDEX              = 0b000000001000000;
-        const IS_SPACE_TREE         = 0b000000000100000;
-        const IS_EMPTY              = 0b000000000001000;
-        const IS_PARENT             = 0b000000000000100;
-        const IS_LEAF               = 0b000000000000010;
-        const IS_ROOT               = 0b000000000000001;
-    }
-}
-
 #[repr(C)]
 #[derive(Copy, Clone, Debug)]
 pub struct PageHeaderOld {
@@ -151,25 +136,9 @@ pub struct  PageHeaderExt0x11 {
 
 #[repr(C)]
 #[derive(Copy, Clone)]
-pub enum esedb_page_header {
+pub enum page_header {
     page_header_old (PageHeaderOld),
     page_header_0x0b (PageHeader0x0b),
     page_header_0x11 (PageHeader0x11),
-}
-
-pub struct EsePageHeader {
-    db_file_header: esedb_file_header,
-    pub page_header: esedb_page_header,
-}
-
-use crate::util::config::Config;
-use crate::util::reader::load_page_header;
-
-impl EsePageHeader {
-    pub fn new(config: &Config, db_file_header: &esedb_file_header, page_number: u64) -> EsePageHeader {
-        let page_header = load_page_header(config, db_file_header, page_number).unwrap();
-        EsePageHeader{  db_file_header: db_file_header.clone(),
-                        page_header: page_header }
-    }
 }
 
