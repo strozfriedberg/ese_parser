@@ -39,18 +39,19 @@ pub fn read_struct<T, P: AsRef<Path>>(path: P, file_offset: SeekFrom) -> io::Res
 }
 
 use crate::util::config::Config;
-use crate::ese::ese_db::{esedb_file_header, ESEDB_FILE_SIGNATURE, esedb_page_header, PageHeaderOld, PageHeader0x0b, PageHeader0x11};
+use crate::ese::ese_db;
+use crate::ese::ese_db::{ESEDB_FILE_SIGNATURE, page_header, PageHeaderOld, PageHeader0x0b, PageHeader0x11};
 use crate::util::any_as_u32_slice;
 
-pub fn load_db_file_header(config: &Config) -> Result<esedb_file_header, EseParserError> {
-    let mut db_file_header = read_struct::<esedb_file_header, _>(&config.inp_file, SeekFrom::Start(0))
+pub fn load_db_file_header(config: &Config) -> Result<ese_db::FileHeader, EseParserError> {
+    let mut db_file_header = read_struct::<ese_db::FileHeader, _>(&config.inp_file, SeekFrom::Start(0))
         .map_err(EseParserError::Io)?;
 
     //debug!("db_file_header ({:X}): {:0X?}", mem::size_of::<esedb_file_header>(), db_file_header);
 
     assert_eq!(db_file_header.signature, ESEDB_FILE_SIGNATURE, "bad file_header.signature");
 
-    fn calc_crc32(file_header: &&mut esedb_file_header) -> u32 {
+    fn calc_crc32(file_header: &&mut ese_db::FileHeader) -> u32 {
         let vec32: &[u32] = unsafe{ any_as_u32_slice(& file_header) };
         vec32.iter().skip(1).fold(0x89abcdef as u32, |crc, &val| crc ^ val )
     }
@@ -59,7 +60,7 @@ pub fn load_db_file_header(config: &Config) -> Result<esedb_file_header, EsePars
     let checksum = calc_crc32(&&mut db_file_header);
     expect_eq!(stored_checksum, checksum, "wrong checksum");
 
-    let backup_file_header = read_struct::<esedb_file_header, _>(&config.inp_file, SeekFrom::Start(db_file_header.page_size as u64))
+    let backup_file_header = read_struct::<ese_db::FileHeader, _>(&config.inp_file, SeekFrom::Start(db_file_header.page_size as u64))
         .map_err(EseParserError::Io)?;
 
     if db_file_header.format_revision == 0 {
@@ -78,27 +79,26 @@ pub fn load_db_file_header(config: &Config) -> Result<esedb_file_header, EsePars
     Ok(db_file_header)
 }
 
-pub fn load_page_header(config: &Config, db_file_header: &esedb_file_header, page_number: u64) -> Result<esedb_page_header, EseParserError> {
+pub fn load_page_header(config: &Config, db_file_header: &ese_db::FileHeader, page_number: u64) -> Result<page_header, EseParserError> {
     let page_offset = (page_number + 1) * (db_file_header.page_size as u64);
 
     if db_file_header.format_revision < 0x0000000b {
         let db_page_header = read_struct::<PageHeaderOld, _>(&config.inp_file, SeekFrom::Start(page_offset))
             .map_err(EseParserError::Io)?;
-        let TODO_checksum = 0;
-        Ok(esedb_page_header::page_header_old(db_page_header))
+        //let TODO_checksum = 0;
+        Ok(page_header::page_header_old(db_page_header))
     }
     else if db_file_header.format_revision < 0x00000011 {
         let db_page_header = read_struct::<PageHeader0x0b, _>(&config.inp_file, SeekFrom::Start(page_offset))
             .map_err(EseParserError::Io)?;
-        let TODO_checksum = 0;
-        Ok(esedb_page_header::page_header_0x0b(db_page_header))
+        //let TODO_checksum = 0;
+        Ok(page_header::page_header_0x0b(db_page_header))
     }
     else {
-
         let db_page_header = read_struct::<PageHeader0x11, _>(&config.inp_file, SeekFrom::Start(page_offset))
             .map_err(EseParserError::Io)?;
-        let TODO_checksum = 0;
-        Ok(esedb_page_header::page_header_0x11(db_page_header))
+        //let TODO_checksum = 0;
+        Ok(page_header::page_header_0x11(db_page_header))
     }
 }
 
