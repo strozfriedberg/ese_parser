@@ -1,8 +1,14 @@
 //reader.rs
 
-use simple_error::SimpleError;
 use std::fmt;
+use std::io::{self, BufReader, Read, Seek, SeekFrom};
+use std::fs::File;
+use std::path::Path;
+use std::mem::{self};
+use std::slice;
+use simple_error::SimpleError;
 use log::error;
+use crate::ese::jet;
 
 #[derive(Debug)]
 pub enum EseParserError {
@@ -19,12 +25,6 @@ impl fmt::Display for EseParserError {
 }
 
 //https://stackoverflow.com/questions/38334994/how-to-read-a-c-struct-from-a-binary-file-in-rust
-use std::io::{self, BufReader, Read, Seek, SeekFrom};
-use std::fs::File;
-use std::path::Path;
-use std::mem::{self};
-use std::slice;
-
 pub fn read_struct<T, P: AsRef<Path>>(path: P, file_offset: SeekFrom) -> io::Result<T> {
     let path = path.as_ref();
     let struct_size = mem::size_of::<T>();
@@ -79,16 +79,16 @@ pub fn load_db_file_header(config: &Config) -> Result<ese_db::FileHeader, EsePar
     Ok(db_file_header)
 }
 
-pub fn load_page_header(config: &Config, db_file_header: &ese_db::FileHeader, page_number: u64) -> Result<page_header, EseParserError> {
-    let page_offset = (page_number + 1) * (db_file_header.page_size as u64);
+pub fn load_page_header(config: &Config, io_handle: &jet::IoHandle, page_number: u64) -> Result<page_header, EseParserError> {
+    let page_offset = (page_number + 1) * (io_handle.page_size as u64);
 
-    if db_file_header.format_revision < 0x0000000b {
+    if io_handle.format_revision < 0x0000000b {
         let db_page_header = read_struct::<PageHeaderOld, _>(&config.inp_file, SeekFrom::Start(page_offset))
             .map_err(EseParserError::Io)?;
         //let TODO_checksum = 0;
         Ok(page_header::page_header_old(db_page_header))
     }
-    else if db_file_header.format_revision < 0x00000011 {
+    else if io_handle.format_revision < 0x00000011 {
         let db_page_header = read_struct::<PageHeader0x0b, _>(&config.inp_file, SeekFrom::Start(page_offset))
             .map_err(EseParserError::Io)?;
         //let TODO_checksum = 0;
