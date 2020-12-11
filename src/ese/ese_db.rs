@@ -15,7 +15,7 @@ pub struct FileHeader {
     pub checksum: uint32_t,
     pub signature: uint32_t,
     pub format_version: uint32_t,
-    pub file_type: uint32_t,
+    pub file_type: jet::FileType,
     pub database_time: jet::DbTime,
     pub database_signature: jet::Signature,
     pub database_state: jet::DbState,
