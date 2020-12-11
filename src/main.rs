@@ -13,6 +13,7 @@ use std::process;
 
 use crate::util::config::Config;
 use crate::util::reader::{ load_db_file_header };
+use crate::ese::jet;
 
 /*
 use crate::ese::esent::{JET_errSuccess, JET_DBINFOMISC4, JET_DbInfoMisc, JetGetDatabaseFileInfoA};
@@ -53,8 +54,9 @@ fn main() {
         }
     };
 
-    for i in 1..4 {
-        let page = crate::ese::jet::PageHeader::new(&config, &db_file_header, i);
+    let io_handle = jet::IoHandle::new(&db_file_header);
+    for i in 1..6 {
+        let page = crate::ese::jet::PageHeader::new(&config, &io_handle, i);
         println!("Page {}:", i);
         util::dumper::dump_page_header(&page);
     }
