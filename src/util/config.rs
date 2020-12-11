@@ -40,7 +40,7 @@ impl Config {
     }
 
 
-    pub fn new_from_env(env_key: &str) -> Result<Config, Cow<'static, str>> {
+    pub fn _new_from_env(env_key: &str) -> Result<Config, Cow<'static, str>> {
         let path = std::env::var(env_key);
 
         if let Ok(inp_file) = path {

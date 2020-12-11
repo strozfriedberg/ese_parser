@@ -9,7 +9,7 @@ use crate::ese::ese_db::{FileHeader, page_header};
 use crate::ese::jet;
 use std::fmt::{self, Formatter, Debug};
 
-pub fn dump_db_file_header(db_file_header: FileHeader) {
+pub fn _dump_db_file_header(db_file_header: FileHeader) {
     let mut table = prettytable::Table::new();
 
     macro_rules! add_row {
@@ -18,7 +18,7 @@ pub fn dump_db_file_header(db_file_header: FileHeader) {
 
     macro_rules! add_field {
         ($fld: ident) => {
-            let s = format!("{:#x}", db_file_header.$fld);
+            let s = format!("{}", db_file_header.$fld);
             add_row!(stringify!($fld), &s)
         };
     }
