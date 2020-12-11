@@ -10,10 +10,15 @@ use chrono::naive::{NaiveDate, NaiveTime};
 use winapi::um::timezoneapi::{GetTimeZoneInformation/*, FileTimeToSystemTime*/};
 use strum::Display;
 
+use crate::util::config::Config;
+use crate::util::reader::load_page_header;
+
 pub type uint8_t = ::std::os::raw::c_uchar;
 pub type uint16_t = ::std::os::raw::c_short;
 pub type uint32_t = ::std::os::raw::c_ulong;
 pub type uint64_t = ::std::os::raw::c_ulonglong;
+pub type off64_t = ::std::os::raw::c_longlong;
+pub type size64_t = uint64_t;
 
 type OsDateTime = chrono::DateTime<chrono::Utc>;
 
@@ -113,6 +118,13 @@ pub enum DbState {
     ForceDetach = 5
 }
 
+#[derive(Copy, Clone, Display, Debug)]
+#[repr(u32)]
+pub enum FileType {
+    Database = 0,
+    StreamingFile = 1,
+}
+
 #[repr(C, packed)]
 #[derive(Debug, Copy, Clone)]
 pub struct LgPos {
@@ -136,17 +148,13 @@ pub struct DbFile {
 }
 
 pub struct PageHeader {
-    db_file_header: Rc<ese_db::FileHeader>,
     pub page_header: ese_db::page_header,
 }
 
-use crate::util::config::Config;
-use crate::util::reader::load_page_header;
-
 impl PageHeader {
-    pub fn new(config: &Config, db_file_header: &ese_db::FileHeader, page_number: u64) -> PageHeader {
-        let page_header = load_page_header(config, db_file_header, page_number).unwrap();
-        PageHeader { db_file_header: Rc::new(*db_file_header), page_header: page_header }
+    pub fn new(config: &Config, io_handle: &IoHandle, page_number: u64) -> PageHeader {
+        let page_header = load_page_header(config, io_handle, page_number).unwrap();
+        PageHeader { page_header: page_header }
     }
 }
 
@@ -154,6 +162,44 @@ impl PageHeader {
 pub struct DbPage {
     pub page_number: uint32_t,
     pub page_header: PageHeader,
+}
+
+#[derive(Copy, Clone)]
+#[repr(C)]
+pub struct IoHandle {
+    pub file_type: FileType,
+    pub format_version: uint32_t,
+    pub format_revision: uint32_t,
+    pub creation_format_version: uint32_t,
+    pub creation_format_revision: uint32_t,
+    pub pages_data_offset: off64_t,
+    pub pages_data_size: size64_t,
+    pub page_size: uint32_t,
+    pub last_page_number: uint32_t,
+    pub ascii_codepage: libc::c_int,
+    pub abort: libc::c_int,
+}
+
+impl IoHandle {
+    pub fn new(db_file_header: &ese_db::FileHeader) -> IoHandle {
+        let pages_data_offset: off64_t = (db_file_header.page_size * 2) as off64_t;
+
+        IoHandle {
+            file_type: db_file_header.file_type,
+            format_version: db_file_header.format_version,
+            format_revision: db_file_header.format_revision,
+            creation_format_version: db_file_header.creation_format_version,
+            creation_format_revision: db_file_header.creation_format_revision,
+            page_size: db_file_header.page_size,
+
+            pages_data_offset: pages_data_offset,
+            pages_data_size: pages_data_offset as u64,
+            last_page_number: (pages_data_offset / db_file_header.page_size as i64) as u32,
+
+            ascii_codepage: 0,
+            abort: 0
+        }
+    }
 }
 
 
