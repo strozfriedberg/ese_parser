@@ -14,7 +14,7 @@ pub const ESEDB_FORMAT_REVISION_EXTENDED_PAGE_HEADER: uint32_t = 0x11;
 pub struct FileHeader {
     pub checksum: uint32_t,
     pub signature: uint32_t,
-    pub format_version: uint32_t,
+    pub format_version: jet::FormatVersion,
     pub file_type: jet::FileType,
     pub database_time: jet::DbTime,
     pub database_signature: jet::Signature,
@@ -36,7 +36,7 @@ pub struct FileHeader {
     pub index_update_minor_version: uint32_t,
     pub index_update_build_number: uint32_t,
     pub index_update_service_pack_number: uint32_t,
-    pub format_revision: uint32_t,
+    pub format_revision: jet::FormatRevision,
     pub page_size: uint32_t,
     pub repair_count: uint32_t,
     pub repair_time: jet::DateTime,
