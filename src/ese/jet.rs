@@ -12,6 +12,8 @@ use strum::Display;
 
 use crate::util::config::Config;
 use crate::util::reader::load_page_header;
+//use std::path::Display;
+use bitflags::_core::fmt::Formatter;
 
 pub type uint8_t = ::std::os::raw::c_uchar;
 pub type uint16_t = ::std::os::raw::c_short;
@@ -21,6 +23,13 @@ pub type off64_t = ::std::os::raw::c_longlong;
 pub type size64_t = uint64_t;
 
 type OsDateTime = chrono::DateTime<chrono::Utc>;
+
+#[derive(Copy, Clone, Debug)]
+pub struct FormatVersion(pub(crate) uint32_t);
+impl std::fmt::Display for FormatVersion { fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result { write!(f, "{}", self.0)  } }
+#[derive(Copy, Clone, Debug)]
+pub struct FormatRevision(pub(crate) uint32_t);
+impl std::fmt::Display for FormatRevision { fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result { write!(f, "{}", self.0)  } }
 
 bitflags! {
     pub struct PageFlags: uint32_t {
@@ -41,6 +50,30 @@ bitflags! {
         const IS_LEAF               = 0b0000000000000010;
         const IS_ROOT               = 0b0000000000000001;
     }
+}
+
+#[derive(Copy, Clone, Debug)]
+pub enum FixedPageNumber {
+    Database        = 1,
+    Catalog         = 4,
+    CatalogBackup   = 24,
+}
+
+#[derive(Copy, Clone, Display, Debug)]
+#[repr(u32)]
+pub enum DbState {
+    JustCreated = 1,
+    DirtyShutdown = 2,
+    CleanShutdown = 3,
+    BeingConverted =4,
+    ForceDetach = 5
+}
+
+#[derive(Copy, Clone, Display, Debug)]
+#[repr(u32)]
+pub enum FileType {
+    Database = 0,
+    StreamingFile = 1,
 }
 
 #[derive(Copy, Clone, Debug)]
@@ -108,23 +141,6 @@ pub struct Signature {
     pub computer_name: [uint8_t; 16],
 }
 
-#[derive(Copy, Clone, Display, Debug)]
-#[repr(u32)]
-pub enum DbState {
-    JustCreated = 1,
-    DirtyShutdown = 2,
-    CleanShutdown = 3,
-    BeingConverted =4,
-    ForceDetach = 5
-}
-
-#[derive(Copy, Clone, Display, Debug)]
-#[repr(u32)]
-pub enum FileType {
-    Database = 0,
-    StreamingFile = 1,
-}
-
 #[repr(C, packed)]
 #[derive(Debug, Copy, Clone)]
 pub struct LgPos {
@@ -147,29 +163,12 @@ pub struct DbFile {
     file_header: ese_db::FileHeader,
 }
 
-pub struct PageHeader {
-    pub page_header: ese_db::page_header,
-}
-
-impl PageHeader {
-    pub fn new(config: &Config, io_handle: &IoHandle, page_number: u64) -> PageHeader {
-        let page_header = load_page_header(config, io_handle, page_number).unwrap();
-        PageHeader { page_header: page_header }
-    }
-}
-
-#[derive(Debug)]
-pub struct DbPage {
-    pub page_number: uint32_t,
-    pub page_header: PageHeader,
-}
-
 #[derive(Copy, Clone)]
 #[repr(C)]
 pub struct IoHandle {
     pub file_type: FileType,
-    pub format_version: uint32_t,
-    pub format_revision: uint32_t,
+    pub format_version: FormatVersion,
+    pub format_revision: FormatRevision,
     pub creation_format_version: uint32_t,
     pub creation_format_revision: uint32_t,
     pub pages_data_offset: off64_t,
@@ -202,9 +201,73 @@ impl IoHandle {
     }
 }
 
+pub struct PageHeader {
+    pub page_header: ese_db::page_header,
+}
 
-pub fn revision_to_string(version: uint32_t, revision: uint32_t) -> String {
-    let s = match (version, revision) {
+impl PageHeader {
+    pub fn new(config: &Config, io_handle: &IoHandle, page_number: u64) -> PageHeader {
+        let page_header = load_page_header(config, io_handle, page_number).unwrap();
+        PageHeader { page_header: page_header }
+    }
+}
+
+#[derive(Debug)]
+pub struct DbPage {
+    pub page_number: uint32_t,
+    pub page_header: PageHeader,
+}
+
+#[derive(Copy, Clone)]
+#[repr(C)]
+pub union C2RustUnnamed {
+    pub father_data_page_number: uint32_t,
+    pub column_type: uint32_t,
+}
+
+#[derive(Copy, Clone)]
+#[repr(C)]
+pub struct CatalogDefinition {
+    pub father_data_page_object_identifier: uint32_t,
+    pub type_0: uint16_t,
+    pub identifier: uint32_t,
+    pub c2rust_unnamed: C2RustUnnamed,
+    pub size: uint32_t,
+    pub codepage: uint32_t,
+    pub lcmap_flags: uint32_t,
+    pub name: *mut uint8_t,
+    pub name_size: uint32_t,
+    pub template_name: *mut uint8_t,
+    pub template_name_size: uint32_t,
+    pub default_value: *mut uint8_t,
+    pub default_value_size: uint32_t,
+}
+
+#[derive(Clone)]
+#[repr(C)]
+pub struct TableDefinition {
+    pub table_catalog_definition: Rc<CatalogDefinition>,
+    pub long_value_catalog_definition: Rc<CatalogDefinition>,
+    pub callback_catalog_definition: Rc<CatalogDefinition>,
+    //pub column_catalog_definition_array: *mut libcdata_array_t,
+    //pub index_catalog_definition_array: *mut libcdata_array_t,
+}
+
+pub struct PageTree {
+    //pub io_handle: *mut libesedb_io_handle_t,
+    pub object_identifier: uint32_t,
+    pub root_page_number: uint32_t,
+    pub table_definition: TableDefinition,
+    pub template_table_definition: TableDefinition,
+    // pub pages_vector: *mut libfdata_vector_t,
+    // pub pages_cache: *mut libfcache_cache_t,
+    // pub root_page_header: *mut libesedb_root_page_header_t,
+    // pub leaf_page_descriptors_tree: *mut libcdata_btree_t,
+    pub number_of_leaf_values: uint32_t,
+}
+
+pub fn revision_to_string(version: FormatVersion, revision: FormatRevision) -> String {
+    let s = match (version.0, revision.0) {
                     (0x00000620, 0x00000000) => "Original operating system Beta format (April 22, 1997)",
                     (0x00000620, 0x00000001) => "Add columns in the catalog for conditional indexing and OLD (May 29, 1997)",
                     (0x00000620, 0x00000002) => "Add the fLocalizedText flag in IDB (July 5, 1997), Revert revision in order for ESE97 to remain forward-compatible (January 28, 1998)",
@@ -222,7 +285,7 @@ pub fn revision_to_string(version: uint32_t, revision: uint32_t) -> String {
                     (0x00000623, 0x00000000) => "New Space Manager (May 15, 1999)",
                     _ => "Unknown",
                 };
-    format!("{:#x}, {:#x}: {}", version, revision, s)
+    format!("{:#x}, {:#x}: {}", version.0, revision.0, s)
 }
 
 /*
