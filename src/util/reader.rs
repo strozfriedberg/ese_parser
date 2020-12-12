@@ -63,18 +63,18 @@ pub fn load_db_file_header(config: &Config) -> Result<ese_db::FileHeader, EsePar
     let backup_file_header = read_struct::<ese_db::FileHeader, _>(&config.inp_file, SeekFrom::Start(db_file_header.page_size as u64))
         .map_err(EseParserError::Io)?;
 
-    if db_file_header.format_revision == 0 {
+    if db_file_header.format_revision.0 == 0 {
         db_file_header.format_revision = backup_file_header.format_revision;
     }
 
-    expect_eq!(db_file_header.format_revision, backup_file_header.format_revision, "mismatch in format revision");
+    expect_eq!(db_file_header.format_revision.0, backup_file_header.format_revision.0, "mismatch in format revision");
 
     if db_file_header.page_size == 0 {
         db_file_header.page_size = backup_file_header.page_size;
     }
 
     expect_eq!(db_file_header.page_size, backup_file_header.page_size, "mismatch in page size");
-    expect_eq!(db_file_header.format_version, 0x620, "unsupported format version");
+    expect_eq!(db_file_header.format_version.0, 0x620, "unsupported format version");
 
     Ok(db_file_header)
 }
@@ -82,13 +82,13 @@ pub fn load_db_file_header(config: &Config) -> Result<ese_db::FileHeader, EsePar
 pub fn load_page_header(config: &Config, io_handle: &jet::IoHandle, page_number: u64) -> Result<page_header, EseParserError> {
     let page_offset = (page_number + 1) * (io_handle.page_size as u64);
 
-    if io_handle.format_revision < 0x0000000b {
+    if io_handle.format_revision.0 < 0x0000000b {
         let db_page_header = read_struct::<PageHeaderOld, _>(&config.inp_file, SeekFrom::Start(page_offset))
             .map_err(EseParserError::Io)?;
         //let TODO_checksum = 0;
         Ok(page_header::page_header_old(db_page_header))
     }
-    else if io_handle.format_revision < 0x00000011 {
+    else if io_handle.format_revision.0 < 0x00000011 {
         let db_page_header = read_struct::<PageHeader0x0b, _>(&config.inp_file, SeekFrom::Start(page_offset))
             .map_err(EseParserError::Io)?;
         //let TODO_checksum = 0;
