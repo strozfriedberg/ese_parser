@@ -59,14 +59,63 @@ pub enum FixedPageNumber {
     CatalogBackup   = 24,
 }
 
+#[derive(Copy, Clone, Debug)]
+pub enum FixedFDPNumber {
+    Database        = 1,
+    Catalog         = 2,
+    CatalogBackup   = 3,
+}
+
+#[derive(Copy, Clone, Debug)]
+pub enum CatalogType {
+    Table           = 1,
+    Column          = 2,
+    Index           = 3,
+    LongValue       = 4,
+    Callback        = 5,
+}
+
+#[derive(Copy, Clone, Debug)]
+pub enum ColumnType {
+    Nil             = 0,
+    Bit             = 1,
+    UnsignedByte    = 2,
+    Short           = 3,
+    Long            = 4,
+    Currency        = 5,
+    IEEESingle      = 6,
+    IEEEDouble      = 7,
+    DateTime        = 8,
+    Binary          = 9,
+    Text            = 10,
+    LongBinary      = 11,
+    LongText        = 12,
+    SLV             = 13,
+    UnsignedLong    = 14,
+    LongLong        = 15,
+    GUID            = 16,
+    UnsignedShort   = 17,
+    Max             = 18,
+}
+
+bitflags! {
+    pub struct TaggedDataTypeFlag : uint16_t {
+        const VARIABLE_SIZE = 0b00000001;
+        const COMPRESSED    = 0b00000010;
+        const STORED        = 0b00000100;
+        const MULTI_VALUE   = 0b00001000;
+        const WHO_KNOWS     = 0b00010000;
+    }
+}
+
 #[derive(Copy, Clone, Display, Debug)]
 #[repr(u32)]
 pub enum DbState {
-    JustCreated = 1,
-    DirtyShutdown = 2,
-    CleanShutdown = 3,
-    BeingConverted =4,
-    ForceDetach = 5
+    JustCreated     = 1,
+    DirtyShutdown   = 2,
+    CleanShutdown   = 3,
+    BeingConverted  = 4,
+    ForceDetach     = 5
 }
 
 #[derive(Copy, Clone, Display, Debug)]
@@ -206,16 +255,25 @@ pub struct PageHeader {
 }
 
 impl PageHeader {
-    pub fn new(config: &Config, io_handle: &IoHandle, page_number: u64) -> PageHeader {
+    pub fn new(config: &Config, io_handle: &IoHandle, page_number: u32) -> PageHeader {
         let page_header = load_page_header(config, io_handle, page_number).unwrap();
         PageHeader { page_header: page_header }
     }
 }
 
-#[derive(Debug)]
 pub struct DbPage {
     pub page_number: uint32_t,
     pub page_header: PageHeader,
+    pub page_tags: Vec<ese_db::PageValue>,
+}
+
+impl DbPage {
+    pub fn new(config: &Config, io_handle: &IoHandle, page_number: u32) -> DbPage {
+        let page_header = PageHeader::new(config, io_handle, page_number);
+        //page_header.page_header.
+        let db_page = DbPage{page_number: page_number, page_header: page_header, page_tags: vec![] };
+        db_page
+    }
 }
 
 #[derive(Copy, Clone)]
