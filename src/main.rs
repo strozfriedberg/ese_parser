@@ -55,10 +55,12 @@ fn main() {
     };
 
     let io_handle = jet::IoHandle::new(&db_file_header);
-    for i in 1..6 {
-        let page = crate::ese::jet::PageHeader::new(&config, &io_handle, i);
-        println!("Page {}:", i);
-        util::dumper::dump_page_header(&page);
+    let pages = [jet::FixedPageNumber::Database, jet::FixedPageNumber::Catalog];
+
+    for i in pages.iter() {
+        let page_header = crate::ese::jet::PageHeader::new(&config, &io_handle, *i as u32);
+        println!("Page {:?}:", i);
+        util::dumper::dump_page_header(&page_header);
     }
 
 /*
