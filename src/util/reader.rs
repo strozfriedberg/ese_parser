@@ -3,7 +3,7 @@
 use std::fmt;
 use std::io::{self, BufReader, Read, Seek, SeekFrom};
 use std::fs::File;
-use std::path::Path;
+use std::path::{Path, PathBuf};
 use std::mem::{self};
 use std::slice;
 use simple_error::SimpleError;
@@ -40,7 +40,7 @@ pub fn read_struct<T, P: AsRef<Path>>(path: P, file_offset: SeekFrom) -> io::Res
 
 use crate::util::config::Config;
 use crate::ese::ese_db;
-use crate::ese::ese_db::{ESEDB_FILE_SIGNATURE, page_header, PageHeaderOld, PageHeader0x0b, PageHeader0x11};
+use crate::ese::ese_db::{ESEDB_FILE_SIGNATURE, page_header, PageHeaderOld, PageHeader0x0b, PageHeader0x11, PageHeaderCommon, PageHeaderExt0x11};
 use crate::util::any_as_u32_slice;
 
 pub fn load_db_file_header(config: &Config) -> Result<ese_db::FileHeader, EseParserError> {
@@ -79,26 +79,42 @@ pub fn load_db_file_header(config: &Config) -> Result<ese_db::FileHeader, EsePar
     Ok(db_file_header)
 }
 
-pub fn load_page_header(config: &Config, io_handle: &jet::IoHandle, page_number: u64) -> Result<page_header, EseParserError> {
-    let page_offset = (page_number + 1) * (io_handle.page_size as u64);
+pub fn load_page_header(config: &Config, io_handle: &jet::IoHandle, page_number: u32) -> Result<page_header, EseParserError> {
+    let page_offset = ((page_number + 1) * (io_handle.page_size)) as u64;
+    let path = &config.inp_file;
+
+    fn load<T>(path: &PathBuf, offs: u64) -> io::Result<T> {
+        read_struct::<T, _> (path, SeekFrom::Start(offs))
+    }
 
     if io_handle.format_revision.0 < 0x0000000b {
-        let db_page_header = read_struct::<PageHeaderOld, _>(&config.inp_file, SeekFrom::Start(page_offset))
-            .map_err(EseParserError::Io)?;
+        let header = load::<PageHeaderOld>(path,page_offset).map_err(EseParserError::Io)?;
+        let common = load::<PageHeaderCommon>(path,page_offset + mem::size_of_val(&header) as u64).map_err(EseParserError::Io)?;
+
         //let TODO_checksum = 0;
-        Ok(page_header::page_header_old(db_page_header))
+        Ok(page_header::old(header, common))
     }
     else if io_handle.format_revision.0 < 0x00000011 {
-        let db_page_header = read_struct::<PageHeader0x0b, _>(&config.inp_file, SeekFrom::Start(page_offset))
-            .map_err(EseParserError::Io)?;
+        let header = load::<PageHeader0x0b>(path,page_offset).map_err(EseParserError::Io)?;
+        let common = load::<PageHeaderCommon>(path,page_offset + mem::size_of_val(&header) as u64).map_err(EseParserError::Io)?;
+
         //let TODO_checksum = 0;
-        Ok(page_header::page_header_0x0b(db_page_header))
+        Ok(page_header::x0b(header, common))
     }
     else {
-        let db_page_header = read_struct::<PageHeader0x11, _>(&config.inp_file, SeekFrom::Start(page_offset))
-            .map_err(EseParserError::Io)?;
+        let header = load::<PageHeader0x11>(path,page_offset).map_err(EseParserError::Io)?;
+        let common = load::<PageHeaderCommon>(path,page_offset + mem::size_of_val(&header) as u64).map_err(EseParserError::Io)?;
+
         //let TODO_checksum = 0;
-        Ok(page_header::page_header_0x11(db_page_header))
+        if io_handle.page_size > 8192 {
+            let offs = mem::size_of_val(&header) + mem::size_of_val(&common);
+            let ext = load::<PageHeaderExt0x11>(path,page_offset + offs as u64).map_err(EseParserError::Io)?;
+
+            Ok(page_header::x11_ext(header, common, ext))
+        }
+        else {
+            Ok(page_header::x11(header, common))
+        }
     }
 }
 
