@@ -157,30 +157,17 @@ pub fn dump_page_header(page_header: &jet::PageHeader) {
     }
 
     match page_header.page_header {
-        page_header::page_header_old(page) => {
-            println!("{:?}", page)
+        page_header::old (pg_hdr, pg_common) => {
+            println!("{:?} {:?}", pg_hdr, pg_common)
         },
-        page_header::page_header_0x0b(page) => {
-            println!("{:?}", page)
+        page_header::x0b(pg_hdr, pg_common) => {
+            println!("{:?} {:?}", pg_hdr, pg_common)
         },
-        page_header::page_header_0x11(page) => {
-            macro_rules! add_field {
-                ($fld: ident) => {
-                    let s = format!("{:?}", page.$fld);
-                    add_row!(stringify!($fld), &s)
-                };
-            }
-
-            add_field!(checksum);
-            add_field!(database_modification_time);
-            add_field!(previous_page);
-            add_field!(next_page);
-            add_field!(father_data_page_object_identifier);
-            add_field!(available_data_size);
-            add_field!(available_uncommitted_data_size);
-            add_field!(available_data_offset);
-            add_field!(available_page_tag);
-            add_field!(page_flags);
+        page_header::x11(pg_hdr, pg_common) => {
+            println!("{:?} {:?}", pg_hdr, pg_common)
+        },
+        page_header::x11_ext(pg_hdr, pg_common, pg_ext) => {
+            println!("{:?} {:?} {:?}", pg_hdr, pg_common, pg_ext)
         },
     }
 
@@ -188,13 +175,15 @@ pub fn dump_page_header(page_header: &jet::PageHeader) {
 
 }
 
-impl Debug for jet::PageHeader {
+/*impl Debug for jet::PageHeader {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         match self.page_header {
-            page_header::page_header_old(page) => write!(f, "{:?}", page),
-            page_header::page_header_0x0b(page) => write!(f, "{:?}", page),
-            page_header::page_header_0x11(page) => write!(f, "{:?}", page),
+            page_header::old(page) => write!(f, "{:?}", page),
+            page_header::x0b(page) => write!(f, "{:?}", page),
+            page_header::x11(page, ..) => write!(f, "{:?}", page),
         }
     }
 }
+
+ */
 
