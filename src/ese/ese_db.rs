@@ -82,15 +82,6 @@ pub struct FileHeader {
 pub struct PageHeaderOld {
     pub xor_checksum: uint32_t,
     pub page_number: uint32_t,
-    pub database_modification_time: jet::DateTime,
-    pub previous_page: uint32_t,
-    pub next_page: uint32_t,
-    pub father_data_page_object_identifier: uint32_t,
-    pub available_data_size: uint16_t,
-    pub available_uncommitted_data_size: uint16_t,
-    pub available_data_offset: uint16_t,
-    pub available_page_tag: uint16_t,
-    pub page_flags: PageFlags,
 }
 
 #[repr(C)]
@@ -98,6 +89,18 @@ pub struct PageHeaderOld {
 pub struct PageHeader0x0b {
     pub xor_checksum: uint32_t,
     pub ecc_checksum: uint32_t,
+}
+
+#[repr(C)]
+#[derive(Copy, Clone, Debug)]
+pub struct PageHeader0x11 {
+    pub checksum: uint64_t,
+    pub database_modification_time: jet::DateTime,
+}
+
+#[repr(C)]
+#[derive(Copy, Clone, Debug)]
+pub struct PageHeaderCommon {
     pub database_modification_time: jet::DateTime,
     pub previous_page: uint32_t,
     pub next_page: uint32_t,
@@ -111,21 +114,6 @@ pub struct PageHeader0x0b {
 
 #[repr(C)]
 #[derive(Copy, Clone, Debug)]
-pub struct PageHeader0x11 {
-    pub checksum: uint64_t,
-    pub database_modification_time: jet::DateTime,
-    pub previous_page: uint32_t,
-    pub next_page: uint32_t,
-    pub father_data_page_object_identifier: uint32_t,
-    pub available_data_size: uint16_t,
-    pub available_uncommitted_data_size: uint16_t,
-    pub available_data_offset: uint16_t,
-    pub available_page_tag: uint16_t,
-    pub page_flags: PageFlags,
-}
-
-#[repr(C)]
-#[derive(Copy, Clone)]
 pub struct  PageHeaderExt0x11 {
     pub checksum1: uint64_t,
     pub checksum2: uint64_t,
@@ -137,8 +125,17 @@ pub struct  PageHeaderExt0x11 {
 #[repr(C)]
 #[derive(Copy, Clone)]
 pub enum page_header {
-    page_header_old (PageHeaderOld),
-    page_header_0x0b (PageHeader0x0b),
-    page_header_0x11 (PageHeader0x11),
+    old (PageHeaderOld, PageHeaderCommon),
+    x0b (PageHeader0x0b, PageHeaderCommon),
+    x11 (PageHeader0x11, PageHeaderCommon),
+    x11_ext (PageHeader0x11, PageHeaderCommon, PageHeaderExt0x11),
 }
 
+#[derive(Copy, Clone)]
+#[repr(C)]
+pub struct PageValue {
+    pub data: *mut uint8_t,
+    pub size: uint16_t,
+    pub offset: uint16_t,
+    pub flags: uint8_t,
+}
