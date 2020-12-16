@@ -1,0 +1,13 @@
+[package]
+name = "ese_parser_lib"
+version = "0.1.0"
+edition = "2018"
+
+[lib]
+name = "ese_parser_lib"
+test = true
+
+[dependencies]
+libc = "0.2"
+winapi = { version = "0.3", features = ["timezoneapi"] }
+simple-error = "*"
