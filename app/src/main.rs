@@ -303,8 +303,6 @@ fn dump_tables(dbpath: &str) {
 
 #[test]
 fn test_edb_table_all_values() {
-    //dump_tables("C:\\temp\\ese\\test.db");
-
     let mut jdb : EseAPI = EseDb::init();
 
     match jdb.load("C:\\temp\\ese\\test.db") {
