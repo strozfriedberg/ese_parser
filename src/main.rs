@@ -2,6 +2,7 @@
 #![allow(non_camel_case_types,  clippy::mut_from_ref, clippy::cast_ptr_alignment)]
 #[macro_use] extern crate log;
 //#[macro_use] extern crate bitflags;
+#[macro_use] extern crate bitfield;
 extern crate strum;
 
 mod util;
@@ -13,7 +14,7 @@ use std::process;
 
 use crate::util::config::Config;
 use crate::util::reader::{ load_db_file_header };
-use crate::ese::jet;
+use crate::ese::{jet, ese_db};
 
 /*
 use crate::ese::esent::{JET_errSuccess, JET_DBINFOMISC4, JET_DbInfoMisc, JetGetDatabaseFileInfoA};
@@ -58,9 +59,9 @@ fn main() {
     let pages = [jet::FixedPageNumber::Database, jet::FixedPageNumber::Catalog];
 
     for i in pages.iter() {
-        let page_header = crate::ese::jet::PageHeader::new(&config, &io_handle, *i as u32);
+        let db_page = jet::DbPage::new(&config, &io_handle, *i as u32);
         println!("Page {:?}:", i);
-        util::dumper::dump_page_header(&page_header);
+        util::dumper::dump_page_header(&db_page.page_header);
     }
 
 /*
