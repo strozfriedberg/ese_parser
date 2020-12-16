@@ -5,9 +5,9 @@ use comfy_table;
 extern crate hexdump;
 use std::string::ToString;
 
-use crate::ese::ese_db::{FileHeader, page_header};
-use crate::ese::jet;
-use std::fmt::{self, Formatter, Debug};
+use crate::ese::ese_db::{FileHeader, PageHeader};
+use crate::ese::{jet, ese_db};
+use std::fmt::{self, /*Formatter,*/ Debug};
 
 pub fn _dump_db_file_header(db_file_header: FileHeader) {
     let mut table = prettytable::Table::new();
@@ -147,26 +147,26 @@ pub fn _dump_db_file_header(db_file_header: FileHeader) {
     table.printstd();
 }
 
-pub fn dump_page_header(page_header: &jet::PageHeader) {
+pub fn dump_page_header(page_header: &ese_db::PageHeader) {
     let mut table = comfy_table::Table::new();
 
-    macro_rules! add_row {
-        ($fld: expr, $val: expr) => {
-            table.add_row(vec![comfy_table::Cell::new($fld), comfy_table::Cell::new($val)])
-        }
-    }
+    // macro_rules! add_row {
+    //     ($fld: expr, $val: expr) => {
+    //         table.add_row(vec![comfy_table::Cell::new($fld), comfy_table::Cell::new($val)])
+    //     }
+    // }
 
-    match page_header.page_header {
-        page_header::old (pg_hdr, pg_common) => {
+    match page_header {
+        PageHeader::old (pg_hdr, pg_common) => {
             println!("{:?} {:?}", pg_hdr, pg_common)
         },
-        page_header::x0b(pg_hdr, pg_common) => {
+        PageHeader::x0b(pg_hdr, pg_common) => {
             println!("{:?} {:?}", pg_hdr, pg_common)
         },
-        page_header::x11(pg_hdr, pg_common) => {
+        PageHeader::x11(pg_hdr, pg_common) => {
             println!("{:?} {:?}", pg_hdr, pg_common)
         },
-        page_header::x11_ext(pg_hdr, pg_common, pg_ext) => {
+        PageHeader::x11_ext(pg_hdr, pg_common, pg_ext) => {
             println!("{:?} {:?} {:?}", pg_hdr, pg_common, pg_ext)
         },
     }
