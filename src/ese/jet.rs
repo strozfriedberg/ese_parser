@@ -11,9 +11,10 @@ use winapi::um::timezoneapi::{GetTimeZoneInformation/*, FileTimeToSystemTime*/};
 use strum::Display;
 
 use crate::util::config::Config;
-use crate::util::reader::load_page_header;
+use crate::util::reader::{load_page_header, load_page_tags};
 //use std::path::Display;
 use bitflags::_core::fmt::Formatter;
+use crate::ese::ese_db::PageHeader;
 
 pub type uint8_t = ::std::os::raw::c_uchar;
 pub type uint16_t = ::std::os::raw::c_short;
@@ -250,29 +251,28 @@ impl IoHandle {
     }
 }
 
-pub struct PageHeader {
-    pub page_header: ese_db::page_header,
-}
-
-impl PageHeader {
-    pub fn new(config: &Config, io_handle: &IoHandle, page_number: u32) -> PageHeader {
-        let page_header = load_page_header(config, io_handle, page_number).unwrap();
-        PageHeader { page_header: page_header }
-    }
-}
-
 pub struct DbPage {
     pub page_number: uint32_t,
-    pub page_header: PageHeader,
-    pub page_tags: Vec<ese_db::PageValue>,
+    pub page_header: ese_db::PageHeader,
+    pub page_tags: Vec<ese_db::PageTag>,
 }
 
 impl DbPage {
     pub fn new(config: &Config, io_handle: &IoHandle, page_number: u32) -> DbPage {
-        let page_header = PageHeader::new(config, io_handle, page_number);
-        //page_header.page_header.
-        let db_page = DbPage{page_number: page_number, page_header: page_header, page_tags: vec![] };
+        let page_header = load_page_header(config, io_handle, page_number).unwrap();
+        let mut db_page = DbPage{page_number: page_number, page_header: page_header, page_tags: vec![] };
+
+        db_page.page_tags = load_page_tags(config, io_handle, &db_page).unwrap();
         db_page
+    }
+
+    pub fn get_available_page_tag(&self) -> usize {
+        match self.page_header {
+            PageHeader::old(_, common) => common.available_page_tag as usize,
+            PageHeader::x0b(_, common) => common.available_page_tag as usize,
+            PageHeader::x11(_, common) => common.available_page_tag as usize,
+            PageHeader::x11_ext(_, common, _) => common.available_page_tag as usize,
+        }
     }
 }
 
