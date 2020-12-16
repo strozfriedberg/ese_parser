@@ -27,9 +27,9 @@ impl fmt::Display for EseParserError {
 //https://stackoverflow.com/questions/38334994/how-to-read-a-c-struct-from-a-binary-file-in-rust
 pub fn read_struct<T, P: AsRef<Path>>(path: P, file_offset: SeekFrom) -> io::Result<T> {
     let path = path.as_ref();
-    let struct_size = mem::size_of::<T>();
     let mut reader = BufReader::new(File::open(path)?);
     reader.seek(file_offset)?;
+    let struct_size = mem::size_of::<T>();
     let mut r : T = unsafe { mem::zeroed() };
     unsafe {
         let buffer = slice::from_raw_parts_mut(&mut r as *mut _ as *mut u8, struct_size);
@@ -38,10 +38,12 @@ pub fn read_struct<T, P: AsRef<Path>>(path: P, file_offset: SeekFrom) -> io::Res
     Ok(r)
 }
 
+
 use crate::util::config::Config;
 use crate::ese::ese_db;
-use crate::ese::ese_db::{ESEDB_FILE_SIGNATURE, page_header, PageHeaderOld, PageHeader0x0b, PageHeader0x11, PageHeaderCommon, PageHeaderExt0x11};
+use crate::ese::ese_db::{ESEDB_FILE_SIGNATURE, PageHeader, PageHeaderOld, PageHeader0x0b, PageHeader0x11, PageHeaderCommon, PageHeaderExt0x11, PageTag, PageTag0x11};
 use crate::util::any_as_u32_slice;
+use std::mem::size_of;
 
 pub fn load_db_file_header(config: &Config) -> Result<ese_db::FileHeader, EseParserError> {
     let mut db_file_header = read_struct::<ese_db::FileHeader, _>(&config.inp_file, SeekFrom::Start(0))
@@ -79,7 +81,7 @@ pub fn load_db_file_header(config: &Config) -> Result<ese_db::FileHeader, EsePar
     Ok(db_file_header)
 }
 
-pub fn load_page_header(config: &Config, io_handle: &jet::IoHandle, page_number: u32) -> Result<page_header, EseParserError> {
+pub fn load_page_header(config: &Config, io_handle: &jet::IoHandle, page_number: u32) -> Result<PageHeader, EseParserError> {
     let page_offset = ((page_number + 1) * (io_handle.page_size)) as u64;
     let path = &config.inp_file;
 
@@ -92,29 +94,49 @@ pub fn load_page_header(config: &Config, io_handle: &jet::IoHandle, page_number:
         let common = load::<PageHeaderCommon>(path,page_offset + mem::size_of_val(&header) as u64).map_err(EseParserError::Io)?;
 
         //let TODO_checksum = 0;
-        Ok(page_header::old(header, common))
+        Ok(PageHeader::old(header, common))
     }
     else if io_handle.format_revision.0 < 0x00000011 {
         let header = load::<PageHeader0x0b>(path,page_offset).map_err(EseParserError::Io)?;
         let common = load::<PageHeaderCommon>(path,page_offset + mem::size_of_val(&header) as u64).map_err(EseParserError::Io)?;
 
         //let TODO_checksum = 0;
-        Ok(page_header::x0b(header, common))
+        Ok(PageHeader::x0b(header, common))
     }
     else {
         let header = load::<PageHeader0x11>(path,page_offset).map_err(EseParserError::Io)?;
         let common = load::<PageHeaderCommon>(path,page_offset + mem::size_of_val(&header) as u64).map_err(EseParserError::Io)?;
 
         //let TODO_checksum = 0;
-        if io_handle.page_size > 8192 {
+        if io_handle.page_size > 8 * 1024 {
             let offs = mem::size_of_val(&header) + mem::size_of_val(&common);
             let ext = load::<PageHeaderExt0x11>(path,page_offset + offs as u64).map_err(EseParserError::Io)?;
 
-            Ok(page_header::x11_ext(header, common, ext))
+            Ok(PageHeader::x11_ext(header, common, ext))
         }
         else {
-            Ok(page_header::x11(header, common))
+            Ok(PageHeader::x11(header, common))
         }
     }
 }
 
+pub fn load_page_tags(config: &Config, io_handle: &jet::IoHandle, db_page: &jet::DbPage) -> Result<Vec<PageTag>, EseParserError> {
+    let page_offset = (db_page.page_number + 1) * io_handle.page_size;
+    let mut tags_offset = (page_offset + io_handle.page_size - 4) as u64;;
+    let path = &config.inp_file;
+    let mut tags = Vec::<PageTag>::new();
+
+    for _ in &[0, db_page.get_available_page_tag()] {
+        if io_handle.format_revision.0 >= 0x00000011 && io_handle.page_size > 8 * 1024 {
+            let tag = read_struct::<ese_db::PageTag0x11<_>, _> (path, SeekFrom::Start(tags_offset)).map_err(EseParserError::Io)?;
+            tags.push(PageTag::x11(tag));
+        }
+        else {
+            let tag = read_struct::<ese_db::PageTagOld<_>, _> (path, SeekFrom::Start(tags_offset)).map_err(EseParserError::Io)?;
+            tags.push(PageTag::old(tag));
+        }
+        tags_offset -= 4;
+    }
+
+    Ok(tags)
+}
