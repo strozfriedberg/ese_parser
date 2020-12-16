@@ -1,5 +1,8 @@
 //ese_db
 #![allow( non_camel_case_types, dead_code )]
+
+use bitfield::bitfield;
+
 use crate::ese::jet;
 use winapi::_core::fmt::Debug;
 
@@ -95,7 +98,6 @@ pub struct PageHeader0x0b {
 #[derive(Copy, Clone, Debug)]
 pub struct PageHeader0x11 {
     pub checksum: uint64_t,
-    pub database_modification_time: jet::DateTime,
 }
 
 #[repr(C)]
@@ -124,18 +126,35 @@ pub struct  PageHeaderExt0x11 {
 
 #[repr(C)]
 #[derive(Copy, Clone)]
-pub enum page_header {
+pub enum PageHeader {
     old (PageHeaderOld, PageHeaderCommon),
     x0b (PageHeader0x0b, PageHeaderCommon),
     x11 (PageHeader0x11, PageHeaderCommon),
     x11_ext (PageHeader0x11, PageHeaderCommon, PageHeaderExt0x11),
 }
 
-#[derive(Copy, Clone)]
-#[repr(C)]
-pub struct PageValue {
-    pub data: *mut uint8_t,
-    pub size: uint16_t,
-    pub offset: uint16_t,
-    pub flags: uint8_t,
+bitfield! {
+    pub struct PageTagOld(MSB0 [u8]);
+    impl Debug;
+    u16;
+    get_offset, _: 12, 0;
+    get_flags, _: 15, 13;
+    u16;
+    get_size, _: 15, 0;
+}
+
+bitfield! {
+    pub struct PageTag0x11(MSB0 [u8]);
+    impl Debug;
+    u16;
+    get_offset, _: 14, 0;
+    get_flag1, _: 15;
+    u16;
+    get_size, _: 14, 0;
+    get_flag2, _: 15;
+}
+
+pub enum PageTag {
+    old(PageTagOld<u32>),
+    x11(PageTag0x11<u32>),
 }
