@@ -14,7 +14,7 @@ use crate::util::config::Config;
 use crate::util::reader::{load_page_header, load_page_tags};
 //use std::path::Display;
 use bitflags::_core::fmt::Formatter;
-use crate::ese::ese_db::PageHeader;
+use crate::ese::ese_db::{PageHeader, PageTag};
 
 pub type uint8_t = ::std::os::raw::c_uchar;
 pub type uint16_t = ::std::os::raw::c_short;
@@ -275,6 +275,23 @@ impl DbPage {
         }
     }
 }
+
+impl PageTag {
+    pub fn size(&self) -> u32 {
+        match self {
+            PageTag::old(x) => x.size(),
+            PageTag::x11(x) => x.size(),
+        }
+    }
+
+    pub fn offset(&self) -> u32 {
+        match self {
+            PageTag::old(x) => x.offset(),
+            PageTag::x11(x) => x.offset(),
+        }
+    }
+}
+
 
 #[derive(Copy, Clone)]
 #[repr(C)]
