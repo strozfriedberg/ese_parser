@@ -62,6 +62,12 @@ fn main() {
         let db_page = jet::DbPage::new(&config, &io_handle, *i as u32);
         println!("Page {:?}:", i);
         util::dumper::dump_page_header(&db_page.page_header);
+
+        for tag in &db_page.page_tags {
+            let size = tag.size();
+            let offset = tag.offset();
+            println!("offset: {}, size: {}", offset, size);
+        }
     }
 
 /*
