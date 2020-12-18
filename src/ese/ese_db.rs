@@ -134,27 +134,25 @@ pub enum PageHeader {
 }
 
 bitfield! {
-    pub struct PageTagOld(MSB0 [u8]);
+    pub struct PageTagOld(u32);
     impl Debug;
-    u16;
-    get_offset, _: 12, 0;
-    get_flags, _: 15, 13;
-    u16;
-    get_size, _: 15, 0;
+    u32;
+    pub offset, _: 31, 16;
+    pub flags, _: 15, 13;
+    pub size, _: 12, 0;
 }
 
 bitfield! {
-    pub struct PageTag0x11(MSB0 [u8]);
+    pub struct PageTag0x11(u32);
     impl Debug;
-    u16;
-    get_offset, _: 14, 0;
-    get_flag1, _: 15;
-    u16;
-    get_size, _: 14, 0;
-    get_flag2, _: 15;
+    u32;
+    pub flag1, _: 31;
+    pub offset, _: 30, 16;
+    pub flag2, _: 15;
+    pub size, _: 14, 0;
 }
 
 pub enum PageTag {
-    old(PageTagOld<u32>),
-    x11(PageTag0x11<u32>),
+    old(PageTagOld),
+    x11(PageTag0x11),
 }
