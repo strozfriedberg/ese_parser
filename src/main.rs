@@ -1,8 +1,6 @@
 #![feature(maybe_uninit_ref)]
 #![allow(non_camel_case_types,  clippy::mut_from_ref, clippy::cast_ptr_alignment)]
 #[macro_use] extern crate log;
-//#[macro_use] extern crate bitflags;
-#[macro_use] extern crate bitfield;
 extern crate strum;
 
 mod util;
@@ -14,9 +12,6 @@ use std::process;
 
 use crate::util::config::Config;
 use crate::util::reader::{ load_db_file_header };
-use crate::ese::{jet, ese_db};
-use std::process::Command;
-use std::io::{Cursor, BufRead};
 
 /*
 use crate::ese::esent::{JET_errSuccess, JET_DBINFOMISC4, JET_DbInfoMisc, JetGetDatabaseFileInfoA};
@@ -56,99 +51,6 @@ fn main() {
             process::exit(1);
         }
     };
-
-    let io_handle = jet::IoHandle::new(&db_file_header);
-    let pages = [jet::FixedPageNumber::Database, jet::FixedPageNumber::Catalog];
-
-    for i in pages.iter() {
-        let db_page = jet::DbPage::new(&config, &io_handle, *i as u32);
-        println!("Page {:?}:", i);
-        util::dumper::dump_page_header(&db_page.page_header);
-
-        for pg_tag in &db_page.page_tags {
-            let size = pg_tag.size();
-            let offset = pg_tag.offset();
-            println!("offset: {:#x} ({}), size: {:#x} ({})", offset, offset, size, size);
-
-            {
-                use nom::{
-                    error, error::{VerboseError},
-                    bytes, bytes::complete::{tag, is_not},
-                    sequence::{terminated, separated_pair},
-                };
-                type Res<T, U> = nom::IResult<T, U, VerboseError<T>>;
-
-                fn find_tag(line: &str) -> Res<&str, &str> {
-                    error::context(
-                        "find_tag",
-                        tag("TAG ")
-                    ) (line)
-                }
-
-                fn find_data(line: &str) -> Res<&str, &str> {
-                    error::context(
-                        "find_data",
-                        bytes::complete::is_not("c")
-                    ) (line)
-                }
-
-                fn extract_data(line: &str) -> Res<&str, &str> {
-                    match find_data(line) {
-                        Ok((data, _)) => terminated(is_not(" "), tag(" "))(data),
-                        Err(e) => Err(e)
-                    }
-                }
-
-                fn get_hex_value(data: &str, val_name: &str) -> u32 {
-                    fn find<'a>(what: &'a str, line: &'a str) -> Res<&'a str, &'a str> {
-                        tag(what)(line)
-                    }
-                    match find (val_name, data) {
-                        Ok((val, _)) => u32::from_str_radix(val, 16).unwrap(),
-                        _ => 0
-                    }
-                }
-
-                #[derive(Debug)]
-                struct Tag {
-                    pub offset: u32,
-                    pub flags: u32,
-                    pub size: u32,
-                }
-                fn fill_tag(data: &str) -> Tag {
-                    fn split(line: &str) -> Res<&str, (&str, &str)> {
-                        separated_pair(is_not(","), tag(","), is_not(","))(line)
-                    }
-                    match split(data) {
-                        Ok((_, (cb, ib))) => {
-                            let size = get_hex_value(cb, "cb:0x");
-                            let offset = get_hex_value(ib, "ib:0x");
-                            Tag{ size: size, offset: offset, flags: 0}
-                        },
-                        Err(e) => panic!("{:?}", e)
-                    }
-                }
-
-                let output = Command::new("esentutl")
-                    .args(&["/ms", config.inp_file.to_str().unwrap(), &format!("/p{}",*i as u32)])
-                    .output()
-                    .expect("failed to execute process");
-                let mut file = Cursor::new(output.stdout);
-                for line in file.lines() {
-                    match find_tag(&line.unwrap()[..]) {
-                        Ok((res, _)) =>  {
-                                let (rem, data) = extract_data(&res).unwrap();
-                                //println!("rem: '{}', data: '{}'", rem, data);
-                                let tag = fill_tag(data);
-                                println!("{:?}", tag);
-                            },
-                        _ => {}
-                        }
-                    }
-
-            }
-        }
-    }
 
 /*
     //use ese_parser::util::dumper::{ dump_db_file_header };
