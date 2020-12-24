@@ -10,13 +10,12 @@ use env_logger;
 
 use crate::util::config::Config;
 use crate::util::reader::load_db_file_header;
-
-const TEST_FILE: &str = r"data\DataStore.edb";
+use crate::tests::settings::*;
 
 #[test]
 fn test_load_db_file_header() {
 
-    env_logger::init();
+    let _ = env_logger::try_init().or::<()>(Ok(()));
 
     let config = match Config::new_for_file(&PathBuf::from(TEST_FILE), &""){
         Ok(x) => x,
