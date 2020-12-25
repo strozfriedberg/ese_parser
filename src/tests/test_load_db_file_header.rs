@@ -3,32 +3,17 @@
 use std::io::{self, Write};
 use std::process::Command;
 use std::str;
-use std::path::PathBuf;
 use regex::Regex;
 
-use env_logger;
-
-use crate::util::config::Config;
-use crate::util::reader::load_db_file_header;
-use crate::tests::settings::*;
+use crate::tests::lib::*;
 
 #[test]
 fn test_load_db_file_header() {
-
-    let _ = env_logger::try_init().or::<()>(Ok(()));
-
-    let config = match Config::new_for_file(&PathBuf::from(TEST_FILE), &""){
-        Ok(x) => x,
-        Err(e) => panic!("Could not create config: {}", e),
-    };
-
-    let db_file_header = match load_db_file_header(&config) {
-        Ok(x) => x,
-        Err(e) => panic!("Application error: {}", e),
-    };
+    let entourage = Entourage::new();
+    let db_file_header = entourage.db_file_header;
 
     let output = Command::new("esentutl")
-        .args(&["/mh", config.inp_file.to_str().unwrap()])
+        .args(&["/mh", entourage.config.inp_file.to_str().unwrap()])
         .output()
         .expect("failed to execute process");
     let text = str::from_utf8(&output.stdout).unwrap();

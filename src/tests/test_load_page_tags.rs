@@ -1,29 +1,16 @@
 //test_load_page_tags.rs
 
-use crate::util::config::Config;
-use crate::tests::settings::*;
-use crate::util::reader::load_db_file_header;
+use crate::tests::lib::*;
 use crate::ese::jet;
 use std::process::Command;
 use std::io::{Cursor, BufRead};
-use std::path::PathBuf;
-
 
 #[test]
 fn test_load_page_tags() {
-    let _ = env_logger::try_init().or::<()>(Ok(()));
+    let entourage = Entourage::new();
+    let config = entourage.config;
 
-    let config = match Config::new_for_file(&PathBuf::from(TEST_FILE), &""){
-        Ok(x) => x,
-        Err(e) => panic!("Could not create config: {}", e),
-    };
-
-    let db_file_header = match load_db_file_header(&config) {
-        Ok(x) => x,
-        Err(e) => panic!("Application error: {}", e),
-    };
-
-    let io_handle = jet::IoHandle::new(&db_file_header);
+    let io_handle = jet::IoHandle::new(&entourage.db_file_header);
     let pages = [jet::FixedPageNumber::Database, jet::FixedPageNumber::Catalog];
 
     for pg_no in pages.iter() {
