@@ -147,7 +147,7 @@ pub fn _dump_db_file_header(db_file_header: FileHeader) {
     table.printstd();
 }
 
-pub fn dump_page_header(page_header: &ese_db::PageHeader) {
+pub fn _dump_page_header(page_header: &ese_db::PageHeader) {
     let table = comfy_table::Table::new();
 
     // macro_rules! add_row {

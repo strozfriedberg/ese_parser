@@ -11,7 +11,7 @@ use env_logger;
 use std::process;
 
 use crate::util::config::Config;
-use crate::util::reader::{ load_db_file_header };
+//use crate::util::reader::{ load_db_file_header };
 
 /*
 use crate::ese::esent::{JET_errSuccess, JET_DBINFOMISC4, JET_DbInfoMisc, JetGetDatabaseFileInfoA};
@@ -44,14 +44,14 @@ fn main() {
                                                        });
     info!("file '{}'", config.inp_file.display());
 
-    let db_file_header = match load_db_file_header(&config) {
-        Ok(x) => x ,
-        Err(e) => {
-            error!("Application error: {}", e);
-            process::exit(1);
-        }
-    };
-
+    // let db_file_header = match load_db_file_header(&config) {
+    //     Ok(x) => x ,
+    //     Err(e) => {
+    //         error!("Application error: {}", e);
+    //         process::exit(1);
+    //     }
+    // };
+    //
 /*
     //use ese_parser::util::dumper::{ dump_db_file_header };
     //dump_db_file_header(db_file_header);

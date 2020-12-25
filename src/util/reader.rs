@@ -13,7 +13,7 @@ use crate::ese::jet;
 use crate::util::config::Config;
 use crate::ese::ese_db;
 use crate::ese::ese_db::{ESEDB_FILE_SIGNATURE, PageHeader, PageHeaderOld, PageHeader0x0b, PageHeader0x11, PageHeaderCommon, PageHeaderExt0x11, PageTag};
-use crate::util::any_as_u32_slice;
+use crate::util::_any_as_u32_slice;
 //use std::mem::size_of;
 
 
@@ -54,7 +54,7 @@ pub fn load_db_file_header(config: &Config) -> Result<ese_db::FileHeader, EsePar
     assert_eq!(db_file_header.signature, ESEDB_FILE_SIGNATURE, "bad file_header.signature");
 
     fn calc_crc32(file_header: &&mut ese_db::FileHeader) -> u32 {
-        let vec32: &[u32] = unsafe{ any_as_u32_slice(& file_header) };
+        let vec32: &[u32] = unsafe{ _any_as_u32_slice(& file_header) };
         vec32.iter().skip(1).fold(0x89abcdef as u32, |crc, &val| crc ^ val )
     }
 
