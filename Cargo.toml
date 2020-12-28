@@ -21,6 +21,6 @@ strum_macros = "*"
 chrono = "*"
 winapi = { version = "0.3", features = ["timezoneapi"] }
 bitflags = "*"
-comfy-table = { path = "comfy-table" }
+comfy-table = "*"
 bitfield = "*"
 nom = "*"
