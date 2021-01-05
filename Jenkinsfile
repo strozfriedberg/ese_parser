@@ -8,7 +8,7 @@ pipeline {
         script {
           sh 'cd lib && cargo build && cargo build --release && cargo test'
           sh 'cd app && cargo build && cargo build --release && cargo test'
-          sh 'cd python && cargo build && cargo build --release && cargo test && build_wheel.bat && test.bat'
+          bat 'cd python & cargo build & cargo build --release & build_wheel.bat & test.bat'
         }
       }
     }
