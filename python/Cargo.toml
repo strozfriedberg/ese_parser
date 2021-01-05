@@ -1,0 +1,19 @@
+[package]
+name = "rustlib"
+version = "0.1.0"
+edition = "2018"
+authors = ["Oleh"]
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[lib]
+name = "rustlib_module"
+crate-type = ["cdylib"]
+
+[dependencies]
+ese_parser_lib = { path = "../lib" }
+simple-error = "*"
+
+[dependencies.pyo3]
+version = "0.13.0"
+features = ["extension-module"]
