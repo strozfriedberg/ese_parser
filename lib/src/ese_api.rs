@@ -94,7 +94,7 @@ impl EseDb for EseAPI {
         None
     }
 
-    fn error_to_string(&self, err: JET_ERR) -> String {
+    fn error_to_string(&self, err: i32) -> String {
         let mut v : Vec<u8> = Vec::new();
         v.resize(256, 0);
         unsafe {
@@ -108,7 +108,7 @@ impl EseDb for EseAPI {
         }
     }
 
-    fn open_table(&self, table: &str) -> Result<JET_TABLEID, SimpleError> {
+    fn open_table(&self, table: &str) -> Result<u64, SimpleError> {
         let tbl = CString::new(table).unwrap();
         let mut tableid : JET_TABLEID = 0;
         unsafe {
@@ -121,14 +121,14 @@ impl EseDb for EseAPI {
         }
     }
 
-    fn close_table(&self, table: JET_TABLEID) -> bool {
+    fn close_table(&self, table: u64) -> bool {
         unsafe {
             let res = JetCloseTable(self.sesid, table);
             res != 0
         }
     }
 
-    fn get_column_str(&self, table: JET_TABLEID, column: JET_COLUMNID, size: u32) -> Result<Option<String>, SimpleError> {
+    fn get_column_str(&self, table: u64, column: u32, size: u32) -> Result<Option<String>, SimpleError> {
         let mut bytes : c_ulong = 0;
         let mut v : Vec<u8> = Vec::new();
         v.resize(size as usize, 0);
@@ -152,7 +152,7 @@ impl EseDb for EseAPI {
         }
     }
 
-    fn get_column<T>(&self, table: JET_TABLEID, column: JET_COLUMNID) -> Result<Option<T>, SimpleError> {
+    fn get_column<T>(&self, table: u64, column: u32) -> Result<Option<T>, SimpleError> {
         let mut bytes : c_ulong = 0;
         let size : c_ulong = size_of::<T>() as u32;
         let mut v = MaybeUninit::<T>::zeroed();
@@ -172,7 +172,7 @@ impl EseDb for EseAPI {
         }
     }
 
-    fn get_column_dyn2(&self, table: JET_TABLEID, column: JET_COLUMNID, data: &mut[u8], size: usize)
+    fn get_column_dyn2(&self, table: u64, column: u32, data: &mut[u8], size: usize)
         -> Result<u32, SimpleError> {
         let mut bytes : c_ulong = 0;
         unsafe {
@@ -190,7 +190,7 @@ impl EseDb for EseAPI {
         }
     }
 
-    fn get_column_dyn(&self, table: JET_TABLEID, column: JET_COLUMNID, size: usize) -> Result< Option<Vec<u8>>, SimpleError> {
+    fn get_column_dyn(&self, table: u64, column: u32, size: usize) -> Result< Option<Vec<u8>>, SimpleError> {
         let mut v : Vec<u8> = Vec::new();
         v.resize(size, 0);
         match self.get_column_dyn2(table, column, v.as_mut_slice(), size) {
@@ -200,7 +200,7 @@ impl EseDb for EseAPI {
                     return Ok(None);
                 }
                 if s > size as u32 {
-                    return Err(SimpleError::new(format!("wrong size {}, expected {}", s, size)));
+                    return Err(SimpleError::new(format!("wrong size     {}, expected {}", s, size)));
                 }
                 v.truncate(s as usize);
                 Ok(Some(v))
@@ -208,7 +208,7 @@ impl EseDb for EseAPI {
         }
     }
 
-    fn get_column_dyn_varlen(&self, table: JET_TABLEID, column: JET_COLUMNID) -> Result< Option<Vec<u8>>, SimpleError> {
+    fn get_column_dyn_varlen(&self, table: u64, column: u32) -> Result< Option<Vec<u8>>, SimpleError> {
         let mut vres : Vec<u8> = Vec::new();
 
         loop {
@@ -239,7 +239,7 @@ impl EseDb for EseAPI {
         Ok(Some(vres))
     }
 
-    fn move_row(&self, table: JET_TABLEID, crow: u32) -> bool {
+    fn move_row(&self, table: u64, crow: u32) -> bool {
         unsafe {
             let res = JetMove(self.sesid, table, crow as std::os::raw::c_long, 0);
             res == 0
