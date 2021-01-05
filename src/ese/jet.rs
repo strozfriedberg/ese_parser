@@ -25,10 +25,10 @@ pub type size64_t = uint64_t;
 
 type OsDateTime = chrono::DateTime<chrono::Utc>;
 
-#[derive(Copy, Clone, Debug)]
+#[derive(Copy, Clone, Default, Debug)]
 pub struct FormatVersion(pub(crate) uint32_t);
 impl std::fmt::Display for FormatVersion { fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result { write!(f, "{}", self.0)  } }
-#[derive(Copy, Clone, Debug)]
+#[derive(Copy, Clone, Default, Debug)]
 pub struct FormatRevision(pub(crate) uint32_t);
 impl std::fmt::Display for FormatRevision { fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result { write!(f, "{}", self.0)  } }
 
@@ -112,12 +112,18 @@ bitflags! {
 #[derive(Copy, Clone, Display, Debug)]
 #[repr(u32)]
 pub enum DbState {
+    impossible      = 0,
     JustCreated     = 1,
     DirtyShutdown   = 2,
     CleanShutdown   = 3,
     BeingConverted  = 4,
     ForceDetach     = 5
 }
+
+impl Default for DbState {
+    fn default() -> Self { DbState::impossible }
+}
+
 
 #[derive(Copy, Clone, Display, Debug)]
 #[repr(u32)]
@@ -126,7 +132,11 @@ pub enum FileType {
     StreamingFile = 1,
 }
 
-#[derive(Copy, Clone, Debug)]
+impl Default for FileType {
+    fn default() -> Self { FileType::Database }
+}
+
+#[derive(Copy, Clone, Default, Debug)]
 #[repr(C)]
 pub struct DbTime {
     pub hours: uint16_t,
@@ -146,7 +156,7 @@ impl fmt::Display for DbTime {
     }
 }
 
-#[derive(Copy, Clone, Debug)]
+#[derive(Copy, Clone, Default, Debug)]
 #[repr(C)]
 pub struct DateTime {
     pub seconds: uint8_t,
@@ -183,7 +193,7 @@ impl fmt::Display for DateTime {
     }
 }
 
-#[derive(Copy, Clone, Debug)]
+#[derive(Copy, Clone, Default, Debug)]
 #[repr(C)]
 pub struct Signature {
     pub random: uint32_t,
@@ -192,7 +202,7 @@ pub struct Signature {
 }
 
 #[repr(C, packed)]
-#[derive(Debug, Copy, Clone)]
+#[derive(Debug, Copy, Default, Clone)]
 pub struct LgPos {
     pub ib: ::std::os::raw::c_ushort,
     pub isec: ::std::os::raw::c_ushort,
@@ -200,7 +210,7 @@ pub struct LgPos {
 }
 
 #[repr(C, packed)]
-#[derive(Debug, Copy, Clone)]
+#[derive(Debug, Copy, Default, Clone)]
 pub struct BackupInfo {
     pub lg_pos_mark: LgPos,
     pub bk_logtime_mark: DateTime,

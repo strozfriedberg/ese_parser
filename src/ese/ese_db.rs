@@ -12,7 +12,7 @@ pub const ESEDB_FILE_SIGNATURE: uint32_t = 0x89abcdef;
 pub const ESEDB_FORMAT_REVISION_NEW_RECORD_FORMAT: uint32_t = 0x0b;
 pub const ESEDB_FORMAT_REVISION_EXTENDED_PAGE_HEADER: uint32_t = 0x11;
 
-#[derive(Copy, Clone, Debug)]
+#[derive(Copy, Clone, Default, Debug)]
 #[repr(C)]
 pub struct FileHeader {
     pub checksum: uint32_t,
