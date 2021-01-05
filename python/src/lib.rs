@@ -327,7 +327,7 @@ impl PyEseDb {
 }
 
 #[pymodule]
-fn rustlib_module(_py: Python<'_>, m: &PyModule) -> PyResult<()> {
+fn ese_parser(_py: Python<'_>, m: &PyModule) -> PyResult<()> {
     m.add_class::<PyEseDb>()?;
     Ok(())
 }

@@ -1,5 +1,5 @@
 [package]
-name = "rustlib"
+name = "ese_parser"
 version = "0.1.0"
 edition = "2018"
 authors = ["Oleh"]
@@ -7,7 +7,7 @@ authors = ["Oleh"]
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [lib]
-name = "rustlib_module"
+name = "ese_parser"
 crate-type = ["cdylib"]
 
 [dependencies]

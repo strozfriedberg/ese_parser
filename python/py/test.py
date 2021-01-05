@@ -1,9 +1,9 @@
-import rustlib_module
+import ese_parser
 import unittest, datetime
 
 class TestEseDbMethods(unittest.TestCase):
 	def test_test_db(self):
-		edb = rustlib_module.PyEseDb()
+		edb = ese_parser.PyEseDb()
 		edb.load("../lib/testdata/test.edb")
 		tables = edb.get_tables()
 		self.assertEqual(tables, ['MSysObjects', 'MSysObjectsShadow', 'MSysObjids', 'MSysLocales', 'TestTable'])

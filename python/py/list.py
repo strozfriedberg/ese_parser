@@ -1,6 +1,6 @@
-import rustlib_module
+import ese_parser
 
-edb = rustlib_module.PyEseDb()
+edb = ese_parser.PyEseDb()
 edb.load("../lib/testdata/test.edb")
 tables = edb.get_tables()
 print("tables: {}".format(tables))

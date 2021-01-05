@@ -1,0 +1,1 @@
+maturin build --interpreter python --release
