@@ -47,6 +47,7 @@ fn test_load_db_file_header() {
     use crate::ese::jet::DbState;
     fn db_state_to_string(state: DbState) -> & 'static str {
         match state {
+            DbState::impossible => "impossible",
             DbState::JustCreated => "Just Created",
             DbState::DirtyShutdown => "Dirty Shutdown",
             DbState::CleanShutdown => "Clean Shutdown",
