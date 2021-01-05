@@ -6,7 +6,7 @@ use crate::util::config::Config;
 use crate::util::reader::load_db_file_header;
 use crate::ese::ese_db::FileHeader;
 
-pub(crate) const TEST_FILE: &str = r"data\DataStore.edb";
+pub(crate) const TEST_FILE: &str = r"data\test.edb";
 
 pub(crate) struct Entourage {
     pub(crate) config: Config,
