@@ -1,4 +1,3 @@
-//#![feature(maybe_uninit_ref)]
 #![allow(non_upper_case_globals, non_snake_case, non_camel_case_types, clippy::mut_from_ref, clippy::cast_ptr_alignment)]
 
 use std::env;

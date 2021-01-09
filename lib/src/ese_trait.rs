@@ -25,8 +25,6 @@ pub trait EseDb {
     fn get_column_str(&self, table: u64, column: u32, size: u32)
         -> Result<Option<String>, SimpleError>;
     fn get_column<T>(&self, table: u64, column: u32) -> Result<Option<T>, SimpleError>;
-    fn get_column_dyn2(&self, table: u64, column: u32, data: &mut[u8], size: usize)
-        -> Result<u32, SimpleError>;
     fn get_column_dyn(&self, table: u64, column: u32, size: usize)
         -> Result< Option<Vec<u8>>, SimpleError>;
     fn get_column_dyn_varlen(&self, table: u64, column: u32)
