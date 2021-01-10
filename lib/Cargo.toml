@@ -7,6 +7,9 @@ edition = "2018"
 name = "ese_parser_lib"
 test = true
 
+[build-dependencies]
+bindgen = "0.56.0"
+
 [dependencies]
 libc = "0.2"
 winapi = { version = "0.3", features = ["timezoneapi"] }
