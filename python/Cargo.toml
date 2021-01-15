@@ -15,5 +15,5 @@ ese_parser_lib = { path = "../lib" }
 simple-error = "*"
 
 [dependencies.pyo3]
-version = "0.13.0"
+version = "0.13.1"
 features = ["extension-module"]
