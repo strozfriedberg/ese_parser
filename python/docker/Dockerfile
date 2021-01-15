@@ -1,0 +1,15 @@
+FROM rust
+
+RUN apt-get update && \
+	apt-get install -y mingw-w64 && \
+	rustup target add x86_64-pc-windows-gnu && \
+	rustup toolchain install stable-x86_64-pc-windows-gnu
+
+RUN apt install -y llvm-dev libclang-dev clang
+
+RUN apt-get install -y python3 curl && \
+	curl https://bootstrap.pypa.io/get-pip.py -o get-pip.py && \
+	python3 get-pip.py && \
+	rm get-pip.py
+
+RUN pip install maturin
