@@ -13,7 +13,6 @@ use strum::Display;
 use crate::util::config::Config;
 use crate::util::reader::{load_page_header, load_page_tags};
 //use std::path::Display;
-use bitflags::_core::fmt::Formatter;
 use crate::ese::ese_db::{PageHeader, PageTag};
 
 pub type uint8_t = ::std::os::raw::c_uchar;
@@ -25,12 +24,8 @@ pub type size64_t = uint64_t;
 
 type OsDateTime = chrono::DateTime<chrono::Utc>;
 
-#[derive(Copy, Clone, Default, Debug)]
-pub struct FormatVersion(pub(crate) uint32_t);
-impl std::fmt::Display for FormatVersion { fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result { write!(f, "{}", self.0)  } }
-#[derive(Copy, Clone, Default, Debug)]
-pub struct FormatRevision(pub(crate) uint32_t);
-impl std::fmt::Display for FormatRevision { fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result { write!(f, "{}", self.0)  } }
+pub type FormatVersion = uint32_t;
+pub type FormatRevision = uint32_t;
 
 bitflags! {
     pub struct PageFlags: uint32_t {
@@ -352,7 +347,7 @@ pub struct PageTree {
 }
 
 pub fn revision_to_string(version: FormatVersion, revision: FormatRevision) -> String {
-    let s = match (version.0, revision.0) {
+    let s = match (version, revision) {
                     (0x00000620, 0x00000000) => "Original operating system Beta format (April 22, 1997)",
                     (0x00000620, 0x00000001) => "Add columns in the catalog for conditional indexing and OLD (May 29, 1997)",
                     (0x00000620, 0x00000002) => "Add the fLocalizedText flag in IDB (July 5, 1997), Revert revision in order for ESE97 to remain forward-compatible (January 28, 1998)",
@@ -370,7 +365,7 @@ pub fn revision_to_string(version: FormatVersion, revision: FormatRevision) -> S
                     (0x00000623, 0x00000000) => "New Space Manager (May 15, 1999)",
                     _ => "Unknown",
                 };
-    format!("{:#x}, {:#x}: {}", version.0, revision.0, s)
+    format!("{:#x}, {:#x}: {}", version, revision, s)
 }
 
 /*
