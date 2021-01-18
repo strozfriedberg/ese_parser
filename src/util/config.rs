@@ -11,6 +11,8 @@ pub struct Config {
 }
 
 impl Config {
+    //due "warning: associated function is never used: `new`" while main.rs:43
+    #[allow(dead_code)]
     pub fn new() -> Result<Config, Cow<'static, str>> {
         let matches = App::new("ESE DB dump")
             .version("0.1.0")
@@ -52,6 +54,8 @@ impl Config {
         Err(format!("'{}' environment variable is not defined", env_key).into())
     }
 
+    //due "warning: associated function is never used: `new_for_file`" while config.rs:41
+    #[allow(dead_code)]
     pub fn new_for_file(inp_file: &PathBuf, report_file: &str) -> Result<Config, Cow<'static, str>> {
         if inp_file.is_file() {
             return Ok(Config { inp_file: inp_file.canonicalize().unwrap(), report_file: PathBuf::from(report_file) });
