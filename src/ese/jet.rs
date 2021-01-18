@@ -251,7 +251,7 @@ impl IoHandle {
             creation_format_revision: db_file_header.creation_format_revision,
             page_size: db_file_header.page_size,
 
-            pages_data_offset: pages_data_offset,
+            pages_data_offset,
             pages_data_size: pages_data_offset as u64,
             last_page_number: (pages_data_offset / db_file_header.page_size as i64) as u32,
 
@@ -270,7 +270,7 @@ pub struct DbPage {
 impl DbPage {
     pub fn new(config: &Config, io_handle: &IoHandle, page_number: u32) -> DbPage {
         let page_header = load_page_header(config, io_handle, page_number).unwrap();
-        let mut db_page = DbPage{page_number: page_number, page_header: page_header, page_tags: vec![] };
+        let mut db_page = DbPage{page_number, page_header, page_tags: vec![] };
 
         db_page.page_tags = load_page_tags(config, io_handle, &db_page).unwrap();
         db_page
