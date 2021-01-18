@@ -6,12 +6,14 @@ extern crate strum;
 mod util;
 mod ese;
 
-use env_logger;
+//use env_logger;
 
 use std::process;
 
-use crate::util::config::Config;
-//use crate::util::reader::{ load_db_file_header };
+use ese_parser::util::config::Config;
+use ese_parser::util::reader::load_db_file_header;
+use ese_parser::util::reader::load_page_tags;
+use ese_parser::ese::jet;
 
 /*
 use crate::ese::esent::{JET_errSuccess, JET_DBINFOMISC4, JET_DbInfoMisc, JetGetDatabaseFileInfoA};
@@ -44,54 +46,58 @@ fn main() {
                                                        });
     info!("file '{}'", config.inp_file.display());
 
-    // let db_file_header = match load_db_file_header(&config) {
-    //     Ok(x) => x ,
-    //     Err(e) => {
-    //         error!("Application error: {}", e);
-    //         process::exit(1);
-    //     }
-    // };
-    //
-/*
+    let db_file_header = match load_db_file_header(&config) {
+        Ok(x) => x ,
+        Err(e) => {
+            error!("Application error: {}", e);
+            process::exit(1);
+        }
+    };
+
     //use ese_parser::util::dumper::{ dump_db_file_header };
     //dump_db_file_header(db_file_header);
-    let mut db_info = get_database_file_info(&config).unwrap();
-    //println!("{:?}", db_info);
-
-    macro_rules! cmp {
-        ($($dbf_fld: ident).+, $($info_fld: ident) . +) => {
-            unsafe {
-                assert_eq!(any_as_u8_slice(&mut &mut db_file_header.$($dbf_fld) . +), any_as_u8_slice(&mut &mut db_info.$($info_fld) . +));
-            }
-        };
+    let io_handle = jet::IoHandle::new(&db_file_header);
+    let db_page = jet::DbPage::new(&config, &io_handle, jet::FixedPageNumber::Database as u32);
+    let pg_tags = load_page_tags(&config, &io_handle, &db_page).unwrap();
+    for pg_tag in pg_tags {
+        println!("{:?}", pg_tag);
     }
 
-    cmp!(database_signature.random, signDb.ulRandom);
-    cmp!(database_signature.computer_name, signDb.szComputerName);
-    cmp!(database_signature.logtime_create, signDb.logtimeCreate);
-    cmp!(consistent_postition, lgposConsistent);
-    cmp!(consistent_time, logtimeConsistent);
-    cmp!(attach_time, logtimeAttach);
-    cmp!(attach_postition, lgposAttach);
-    cmp!(detach_time, logtimeDetach);
-    cmp!(detach_postition, lgposDetach);
-    //cmp!(dbid, signLog);
-    cmp!(previous_full_backup, bkinfoFullPrev);
-    cmp!(previous_incremental_backup, bkinfoIncPrev);
-    cmp!(current_full_backup, bkinfoFullCur);
-    cmp!(shadowing_disabled, fShadowingDisabled);
-    //cmp!(last_object_identifier, fUpgradeDb);
-    cmp!(index_update_major_version, dwMajorVersion);
-    cmp!(index_update_minor_version, dwMinorVersion);
-    cmp!(index_update_build_number, dwBuildNumber);
-    cmp!(index_update_service_pack_number, lSPNumber);
-    cmp!(page_size, cbPageSize);
-    cmp!(repair_count, ulRepairCount);
-    cmp!(repair_time, logtimeRepair);
+/*
+        macro_rules! cmp {
+            ($($dbf_fld: ident).+, $($info_fld: ident) . +) => {
+                unsafe {
+                    assert_eq!(any_as_u8_slice(&mut &mut db_file_header.$($dbf_fld) . +), any_as_u8_slice(&mut &mut db_info.$($info_fld) . +));
+                }
+            };
+        }
 
-    cmp!(committed_log, genMaxRequired);
+        cmp!(database_signature.random, signDb.ulRandom);
+        cmp!(database_signature.computer_name, signDb.szComputerName);
+        cmp!(database_signature.logtime_create, signDb.logtimeCreate);
+        cmp!(consistent_postition, lgposConsistent);
+        cmp!(consistent_time, logtimeConsistent);
+        cmp!(attach_time, logtimeAttach);
+        cmp!(attach_postition, lgposAttach);
+        cmp!(detach_time, logtimeDetach);
+        cmp!(detach_postition, lgposDetach);
+        //cmp!(dbid, signLog);
+        cmp!(previous_full_backup, bkinfoFullPrev);
+        cmp!(previous_incremental_backup, bkinfoIncPrev);
+        cmp!(current_full_backup, bkinfoFullCur);
+        cmp!(shadowing_disabled, fShadowingDisabled);
+        //cmp!(last_object_identifier, fUpgradeDb);
+        cmp!(index_update_major_version, dwMajorVersion);
+        cmp!(index_update_minor_version, dwMinorVersion);
+        cmp!(index_update_build_number, dwBuildNumber);
+        cmp!(index_update_service_pack_number, lSPNumber);
+        cmp!(page_size, cbPageSize);
+        cmp!(repair_count, ulRepairCount);
+        cmp!(repair_time, logtimeRepair);
 
-    cmp!(format_version, ulVersion);
-    assert_eq!(db_file_header.database_state as ::std::os::raw::c_ulong, db_info.dbstate);
-*/
+        cmp!(committed_log, genMaxRequired);
+
+        cmp!(format_version, ulVersion);
+        assert_eq!(db_file_header.database_state as ::std::os::raw::c_ulong, db_info.dbstate);
+    */
 }
