@@ -6,27 +6,27 @@ use std::fs::File;
 use std::path::{Path, PathBuf};
 use std::mem::{self};
 use std::slice;
-use simple_error::SimpleError;
+//use simple_error::SimpleError;
 use log::error;
 use crate::ese::jet;
 
 use crate::util::config::Config;
 use crate::ese::ese_db;
 use crate::ese::ese_db::{ESEDB_FILE_SIGNATURE, PageHeader, PageHeaderOld, PageHeader0x0b, PageHeader0x11, PageHeaderCommon, PageHeaderExt0x11, PageTag};
-use crate::util::_any_as_u32_slice;
+use crate::util::_any_as_slice;
 //use std::mem::size_of;
 
 
 #[derive(Debug)]
 pub enum EseParserError {
     Io(io::Error),
-    Parse(SimpleError),
+    //Parse(SimpleError),
 }
 impl fmt::Display for EseParserError {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match *self {
             EseParserError::Io(ref err) => write!(f, "IO error: {}", err),
-            EseParserError::Parse(ref err) => write!(f, "Parse error: {}", err),
+            //EseParserError::Parse(ref err) => write!(f, "Parse error: {}", err),
         }
     }
 }
@@ -45,7 +45,9 @@ pub fn read_struct<T, P: AsRef<Path>>(path: P, file_offset: SeekFrom) -> io::Res
     Ok(r)
 }
 
-pub fn load_db_file_header(config: &Config) -> Result<ese_db::FileHeader, EseParserError> {
+// due "warning: function is never used: `load_db_file_header`" while main.rs:49
+#[allow(dead_code)]
+pub fn load_db_file_header(config: & Config) -> Result<ese_db::FileHeader, EseParserError> {
     let mut db_file_header = read_struct::<ese_db::FileHeader, _>(&config.inp_file, SeekFrom::Start(0))
         .map_err(EseParserError::Io)?;
 
@@ -54,8 +56,8 @@ pub fn load_db_file_header(config: &Config) -> Result<ese_db::FileHeader, EsePar
     assert_eq!(db_file_header.signature, ESEDB_FILE_SIGNATURE, "bad file_header.signature");
 
     fn calc_crc32(file_header: &&mut ese_db::FileHeader) -> u32 {
-        let vec32: &[u32] = unsafe{ _any_as_u32_slice(& file_header) };
-        vec32.iter().skip(1).fold(0x89abcdef as u32, |crc, &val| crc ^ val )
+        let vec32: &[u32] = unsafe{ _any_as_slice::<u32, _>(& file_header) };
+        vec32.iter().skip(1).fold(0x89abcdef, |crc, &val| crc ^ val )
     }
 
     let stored_checksum = db_file_header.checksum;
