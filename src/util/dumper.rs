@@ -1,13 +1,13 @@
 //dumper.rs
 
 use prettytable::{Row, Cell};
-use comfy_table;
+//use comfy_table;
 extern crate hexdump;
 use std::string::ToString;
 
 use crate::ese::ese_db::{FileHeader, PageHeader};
 use crate::ese::{jet, ese_db};
-//use std::fmt::{self, /*Formatter,*/ Debug};
+//use std::fmt::{self, Debug};
 
 pub fn _dump_db_file_header(db_file_header: FileHeader) {
     let mut table = prettytable::Table::new();
