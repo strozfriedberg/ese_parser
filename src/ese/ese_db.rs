@@ -152,6 +152,7 @@ bitfield! {
     pub size, _: 14, 0;
 }
 
+#[derive(Debug)]
 pub enum PageTag {
     old(PageTagOld),
     x11(PageTag0x11),
