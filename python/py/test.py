@@ -1,6 +1,8 @@
 import ese_parser
 import unittest, datetime
 
+from datetime import datetime
+
 class TestEseDbMethods(unittest.TestCase):
 	def test_test_db(self):
 		edb = ese_parser.PyEseDb()
@@ -24,7 +26,7 @@ class TestEseDbMethods(unittest.TestCase):
 		self.assertEqual(edb.get_row(tbl, edb.get_column(t, "UnsignedLong")), 4294967295)
 		self.assertEqual(edb.get_row(tbl, edb.get_column(t, "LongLong")), 9223372036854775807)
 		self.assertEqual(edb.get_row(tbl, edb.get_column(t, "UnsignedShort")), 65535)
-		self.assertEqual(edb.get_row(tbl, edb.get_column(t, "DateTime")), datetime.datetime(2020, 12, 13, 11, 56, 32))
+		self.assertEqual(datetime.utcfromtimestamp(edb.get_row(tbl, edb.get_column(t, "DateTime"))), datetime(2020, 12, 13, 11, 56, 32))
 		self.assertEqual(edb.get_row(tbl, edb.get_column(t, "GUID")), "{4D36E96E-E325-11CE-BFC1-08002BE10318}")
 
 		b = edb.get_row(tbl, edb.get_column(t, "Binary"))

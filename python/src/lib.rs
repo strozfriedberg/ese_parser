@@ -20,23 +20,6 @@ extern "C" {
     ) -> ::std::os::raw::c_int;
 }
 
-#[repr(C)]
-#[derive(Debug, Copy, Clone)]
-pub struct SYSTEMTIME {
-    pub wYear: ::std::os::raw::c_ushort,
-    pub wMonth: ::std::os::raw::c_ushort,
-    pub wDayOfWeek: ::std::os::raw::c_ushort,
-    pub wDay: ::std::os::raw::c_ushort,
-    pub wHour: ::std::os::raw::c_ushort,
-    pub wMinute: ::std::os::raw::c_ushort,
-    pub wSecond: ::std::os::raw::c_ushort,
-    pub wMilliseconds: ::std::os::raw::c_ushort,
-}
-
-extern "C" {
-    pub fn VariantTimeToSystemTime(vtime: f64, lpSystemTime: *mut SYSTEMTIME) -> ::std::os::raw::c_int;
-}
-
 #[pyclass]
 pub struct PyEseDb {
     jdb : EseAPI,
@@ -299,19 +282,32 @@ impl PyEseDb {
                 let ov = get::<f64>(self, table, column)?;
                 match ov {
                     Some(v) => {
-                        let mut st = MaybeUninit::<SYSTEMTIME>::zeroed();
+                        use winapi::um::minwinbase::SYSTEMTIME;
+                        use winapi::shared::minwindef::FILETIME;
+                        use winapi::shared::ntdef::LARGE_INTEGER;
+                        use winapi::um::oleauto::VariantTimeToSystemTime;
+                        use winapi::um::timezoneapi::SystemTimeToFileTime;
+                        use std::io::Error;
                         unsafe {
-                            let r = VariantTimeToSystemTime(v, st.as_mut_ptr());
+                        let mut st = std::mem::zeroed::<SYSTEMTIME>();
+                            let r = VariantTimeToSystemTime(v as winapi::shared::wtypesbase::DOUBLE, &mut st);
                             if r == 1 {
-                                let s = st.assume_init();
-                                let pydt = PyDateTime::new(py,
-                                    s.wYear as i32, s.wMonth as u8, s.wDay as u8,
-                                    s.wHour as u8, s.wMinute as u8, s.wSecond as u8,
-                                    s.wMilliseconds as u32, None).unwrap();
-                                return Ok(Some(pydt.to_object(py)));
-                            } else {
-                                return Err(PyErr::new::<exceptions::PyTypeError, _>("VariantTimeToSystemTime failed"));
+                                let mut ft = std::mem::zeroed::<FILETIME>();
+                                let r = SystemTimeToFileTime(&mut st, &mut ft);
+                                if r > 0 {
+                                    let mut li = std::mem::zeroed::<LARGE_INTEGER>();
+                                    let mut qli = li.s_mut();
+                                    qli.LowPart = ft.dwLowDateTime;
+                                    qli.HighPart = ft.dwHighDateTime as i32;
+                                    // January 1, 1970 (start of Unix epoch) in "ticks"
+                                    const UNIX_TIME_START : i64 = 0x019DB1DED53E8000;
+                                    // a tick is 100ns
+                                    const TICKS_PER_SECOND : i64 = 10000000;
+                                    let unix_timestamp = (li.QuadPart() - UNIX_TIME_START) / TICKS_PER_SECOND;
+                                    return Ok(Some(unix_timestamp.to_object(py)));
+                                }
                             }
+                            return Err(PyErr::new::<exceptions::PyTypeError, _>(format!("failed with error: {}", Error::last_os_error())));
                         }
                     },
                     None => return Ok(None)
