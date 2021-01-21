@@ -1,19 +1,19 @@
 //dumper.rs
 
-use prettytable::{Row, Cell};
-//use comfy_table;
+use prettytable::{Cell, Row};
 extern crate hexdump;
 use std::string::ToString;
 
 use crate::ese::ese_db::{FileHeader, PageHeader};
-use crate::ese::{jet, ese_db};
-//use std::fmt::{self, Debug};
+use crate::ese::{ese_db, jet};
 
 pub fn _dump_db_file_header(db_file_header: FileHeader) {
     let mut table = prettytable::Table::new();
 
     macro_rules! add_row {
-        ($fld: expr, $val: expr) => {table.add_row(Row::new(vec![Cell::new($fld), Cell::new($val)]))}
+        ($fld: expr, $val: expr) => {
+            table.add_row(Row::new(vec![Cell::new($fld), Cell::new($val)]))
+        };
     }
 
     macro_rules! add_field {
@@ -33,20 +33,27 @@ pub fn _dump_db_file_header(db_file_header: FileHeader) {
     macro_rules! add_dt_field {
         ($fld: ident) => {
             add_row!(stringify!($fld), &db_file_header.$fld.to_string());
-        }
+        };
     }
 
     macro_rules! add_db_time_field {
         ($fld: ident) => {
             add_row!(stringify!($fld), &db_file_header.$fld.to_string());
-        }
+        };
     }
 
     macro_rules! add_bk_info_field {
         ($fld: ident) => {
             unsafe {
                 let bk = db_file_header.$fld;
-                let s = format!("Log Gen:{}-{} ({:#x}-{:#x}), Mark:{}", bk.gen_low, bk.gen_high, bk.gen_low, bk.gen_high, bk.bk_logtime_mark.to_string());
+                let s = format!(
+                    "Log Gen:{}-{} ({:#x}-{:#x}), Mark:{}",
+                    bk.gen_low,
+                    bk.gen_high,
+                    bk.gen_low,
+                    bk.gen_high,
+                    bk.bk_logtime_mark.to_string()
+                );
                 add_row!(stringify!($fld), &s)
             }
         };
@@ -56,27 +63,37 @@ pub fn _dump_db_file_header(db_file_header: FileHeader) {
         ($fld: ident) => {
             unsafe {
                 let v = &db_file_header.$fld;
-                let s = format!("ib: {}, isec: {}, l_generation: {}", v.ib, v.isec, v.l_generation);
+                let s = format!(
+                    "ib: {}, isec: {}, l_generation: {}",
+                    v.ib, v.isec, v.l_generation
+                );
                 add_row!(stringify!($fld), &s);
             }
-        }
+        };
     }
 
     macro_rules! add_hex_field {
         ($fld: ident) => {
             let mut s: String = "".to_string();
-            hexdump::hexdump_iter(&db_file_header.$fld).for_each(|line| { s.push_str(&line); s.push_str("\n"); } );
+            hexdump::hexdump_iter(&db_file_header.$fld).for_each(|line| {
+                s.push_str(&line);
+                s.push_str("\n");
+            });
             add_row!(stringify!($fld), &s);
-        }
+        };
     }
     macro_rules! add_sign_field {
         ($fld: ident) => {
             let sign = &db_file_header.$fld;
             let dt = &sign.logtime_create;
-            let s = format!("Create time: {} Rand:{} Computer: {}",
-                                dt.to_string(), sign.random, std::str::from_utf8(&sign.computer_name).unwrap());
+            let s = format!(
+                "Create time: {} Rand:{} Computer: {}",
+                dt.to_string(),
+                sign.random,
+                std::str::from_utf8(&sign.computer_name).unwrap()
+            );
             add_row!(stringify!($fld), &s);
-        }
+        };
     }
 
     add_field!(checksum);
@@ -104,8 +121,13 @@ pub fn _dump_db_file_header(db_file_header: FileHeader) {
     add_field!(index_update_build_number);
     add_field!(index_update_service_pack_number);
 
-    //add_field!(format_revision);
-    add_row!("format_revision", &jet::revision_to_string(db_file_header.format_version, db_file_header.format_revision));
+    add_row!(
+        "format_revision",
+        &jet::revision_to_string(
+            db_file_header.format_version,
+            db_file_header.format_revision
+        )
+    );
 
     add_field!(page_size);
     add_dt_field!(repair_time);
@@ -150,40 +172,20 @@ pub fn _dump_db_file_header(db_file_header: FileHeader) {
 pub fn _dump_page_header(page_header: &ese_db::PageHeader) {
     let table = comfy_table::Table::new();
 
-    // macro_rules! add_row {
-    //     ($fld: expr, $val: expr) => {
-    //         table.add_row(vec![comfy_table::Cell::new($fld), comfy_table::Cell::new($val)])
-    //     }
-    // }
-
     match page_header {
-        PageHeader::old (pg_hdr, pg_common) => {
+        PageHeader::old(pg_hdr, pg_common) => {
             println!("{:?} {:?}", pg_hdr, pg_common)
-        },
+        }
         PageHeader::x0b(pg_hdr, pg_common) => {
             println!("{:?} {:?}", pg_hdr, pg_common)
-        },
+        }
         PageHeader::x11(pg_hdr, pg_common) => {
             println!("{:?} {:?}", pg_hdr, pg_common)
-        },
+        }
         PageHeader::x11_ext(pg_hdr, pg_common, pg_ext) => {
             println!("{:?} {:?} {:?}", pg_hdr, pg_common, pg_ext)
-        },
+        }
     }
 
     println!("{}", table);
-
 }
-
-/*impl Debug for jet::PageHeader {
-    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
-        match self.page_header {
-            page_header::old(page) => write!(f, "{:?}", page),
-            page_header::x0b(page) => write!(f, "{:?}", page),
-            page_header::x11(page, ..) => write!(f, "{:?}", page),
-        }
-    }
-}
-
- */
-

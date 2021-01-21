@@ -1,12 +1,12 @@
 //ese_db
-#![allow( non_camel_case_types, dead_code )]
+#![allow(non_camel_case_types, dead_code)]
 
 use bitfield::bitfield;
 
 use crate::ese::jet;
 use winapi::_core::fmt::Debug;
 
-use jet::{ uint8_t, uint16_t, uint32_t, uint64_t, PageFlags };
+use jet::{uint16_t, uint32_t, uint64_t, uint8_t, PageFlags};
 
 pub const ESEDB_FILE_SIGNATURE: uint32_t = 0x89abcdef;
 pub const ESEDB_FORMAT_REVISION_NEW_RECORD_FORMAT: uint32_t = 0x0b;
@@ -116,7 +116,7 @@ pub struct PageHeaderCommon {
 
 #[repr(C)]
 #[derive(Copy, Clone, Debug)]
-pub struct  PageHeaderExt0x11 {
+pub struct PageHeaderExt0x11 {
     pub checksum1: uint64_t,
     pub checksum2: uint64_t,
     pub checksum3: uint64_t,
@@ -127,10 +127,10 @@ pub struct  PageHeaderExt0x11 {
 #[repr(C)]
 #[derive(Copy, Clone)]
 pub enum PageHeader {
-    old (PageHeaderOld, PageHeaderCommon),
-    x0b (PageHeader0x0b, PageHeaderCommon),
-    x11 (PageHeader0x11, PageHeaderCommon),
-    x11_ext (PageHeader0x11, PageHeaderCommon, PageHeaderExt0x11),
+    old(PageHeaderOld, PageHeaderCommon),
+    x0b(PageHeader0x0b, PageHeaderCommon),
+    x11(PageHeader0x11, PageHeaderCommon),
+    x11_ext(PageHeader0x11, PageHeaderCommon, PageHeaderExt0x11),
 }
 
 bitfield! {

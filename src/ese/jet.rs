@@ -1,18 +1,17 @@
 //jet.rs
-#![allow( non_camel_case_types, dead_code )]
+#![allow(non_camel_case_types, dead_code)]
 use crate::ese::ese_db;
 
 use bitflags::bitflags;
-use std::{mem, fmt};
-use std::rc::Rc;
-use chrono::TimeZone;
 use chrono::naive::{NaiveDate, NaiveTime};
-use winapi::um::timezoneapi::{GetTimeZoneInformation/*, FileTimeToSystemTime*/};
+use chrono::TimeZone;
+use std::rc::Rc;
+use std::{fmt, mem};
 use strum::Display;
+use winapi::um::timezoneapi::GetTimeZoneInformation;
 
 use crate::util::config::Config;
 use crate::util::reader::{load_page_header, load_page_tags};
-//use std::path::Display;
 use crate::ese::ese_db::{PageHeader, PageTag};
 
 pub type uint8_t = ::std::os::raw::c_uchar;
@@ -50,48 +49,48 @@ bitflags! {
 
 #[derive(Copy, Clone, Debug)]
 pub enum FixedPageNumber {
-    Database        = 1,
-    Catalog         = 4,
-    CatalogBackup   = 24,
+    Database = 1,
+    Catalog = 4,
+    CatalogBackup = 24,
 }
 
 #[derive(Copy, Clone, Debug)]
 pub enum FixedFDPNumber {
-    Database        = 1,
-    Catalog         = 2,
-    CatalogBackup   = 3,
+    Database = 1,
+    Catalog = 2,
+    CatalogBackup = 3,
 }
 
 #[derive(Copy, Clone, Debug)]
 pub enum CatalogType {
-    Table           = 1,
-    Column          = 2,
-    Index           = 3,
-    LongValue       = 4,
-    Callback        = 5,
+    Table = 1,
+    Column = 2,
+    Index = 3,
+    LongValue = 4,
+    Callback = 5,
 }
 
 #[derive(Copy, Clone, Debug)]
 pub enum ColumnType {
-    Nil             = 0,
-    Bit             = 1,
-    UnsignedByte    = 2,
-    Short           = 3,
-    Long            = 4,
-    Currency        = 5,
-    IEEESingle      = 6,
-    IEEEDouble      = 7,
-    DateTime        = 8,
-    Binary          = 9,
-    Text            = 10,
-    LongBinary      = 11,
-    LongText        = 12,
-    SLV             = 13,
-    UnsignedLong    = 14,
-    LongLong        = 15,
-    GUID            = 16,
-    UnsignedShort   = 17,
-    Max             = 18,
+    Nil = 0,
+    Bit = 1,
+    UnsignedByte = 2,
+    Short = 3,
+    Long = 4,
+    Currency = 5,
+    IEEESingle = 6,
+    IEEEDouble = 7,
+    DateTime = 8,
+    Binary = 9,
+    Text = 10,
+    LongBinary = 11,
+    LongText = 12,
+    SLV = 13,
+    UnsignedLong = 14,
+    LongLong = 15,
+    GUID = 16,
+    UnsignedShort = 17,
+    Max = 18,
 }
 
 bitflags! {
@@ -107,18 +106,19 @@ bitflags! {
 #[derive(Copy, Clone, Display, Debug)]
 #[repr(u32)]
 pub enum DbState {
-    impossible      = 0,
-    JustCreated     = 1,
-    DirtyShutdown   = 2,
-    CleanShutdown   = 3,
-    BeingConverted  = 4,
-    ForceDetach     = 5
+    impossible = 0,
+    JustCreated = 1,
+    DirtyShutdown = 2,
+    CleanShutdown = 3,
+    BeingConverted = 4,
+    ForceDetach = 5,
 }
 
 impl Default for DbState {
-    fn default() -> Self { DbState::impossible }
+    fn default() -> Self {
+        DbState::impossible
+    }
 }
-
 
 #[derive(Copy, Clone, Display, Debug)]
 #[repr(u32)]
@@ -128,7 +128,9 @@ pub enum FileType {
 }
 
 impl Default for FileType {
-    fn default() -> Self { FileType::Database }
+    fn default() -> Self {
+        FileType::Database
+    }
 }
 
 #[derive(Copy, Clone, Default, Debug)]
@@ -142,10 +144,11 @@ pub struct DbTime {
 
 impl fmt::Display for DbTime {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        if let Some(t) = NaiveTime::from_hms_opt(self.hours as u32, self.minutes as u32, self.seconds as u32) {
+        if let Some(t) =
+            NaiveTime::from_hms_opt(self.hours as u32, self.minutes as u32, self.seconds as u32)
+        {
             write!(f, "{}", t)
-        }
-        else {
+        } else {
             write!(f, "Bad DbTime: {:?}", self)
         }
     }
@@ -167,19 +170,23 @@ pub struct DateTime {
 impl fmt::Display for DateTime {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         if self.year > 0 {
-            let ndt = NaiveDate::from_ymd(self.year as i32 + 1900, self.month as u32, self.day as u32)
-                .and_hms(self.hours as u32, self.minutes as u32, self.seconds as u32);
+            let ndt =
+                NaiveDate::from_ymd(self.year as i32 + 1900, self.month as u32, self.day as u32)
+                    .and_hms(self.hours as u32, self.minutes as u32, self.seconds as u32);
             let offset = if self.time_is_utc != 0 {
                 0
-            }
-            else {
-                unsafe{
+            } else {
+                unsafe {
                     let mut tz = mem::zeroed();
                     GetTimeZoneInformation(&mut tz);
                     -60 * (tz.Bias + tz.StandardBias)
                 }
             };
-            let dt: OsDateTime = OsDateTime::from(chrono::FixedOffset::east(offset).from_local_datetime(&ndt).unwrap());
+            let dt: OsDateTime = OsDateTime::from(
+                chrono::FixedOffset::east(offset)
+                    .from_local_datetime(&ndt)
+                    .unwrap(),
+            );
 
             write!(f, "{}", dt)
         } else {
@@ -251,7 +258,7 @@ impl IoHandle {
             last_page_number: (pages_data_offset / db_file_header.page_size as i64) as u32,
 
             ascii_codepage: 0,
-            abort: 0
+            abort: 0,
         }
     }
 }
@@ -265,7 +272,11 @@ pub struct DbPage {
 impl DbPage {
     pub fn new(config: &Config, io_handle: &IoHandle, page_number: u32) -> DbPage {
         let page_header = load_page_header(config, io_handle, page_number).unwrap();
-        let mut db_page = DbPage{page_number, page_header, page_tags: vec![] };
+        let mut db_page = DbPage {
+            page_number,
+            page_header,
+            page_tags: vec![],
+        };
 
         db_page.page_tags = load_page_tags(config, io_handle, &db_page).unwrap();
         db_page
@@ -296,7 +307,6 @@ impl PageTag {
         }
     }
 }
-
 
 #[derive(Copy, Clone)]
 #[repr(C)]
@@ -329,20 +339,13 @@ pub struct TableDefinition {
     pub table_catalog_definition: Rc<CatalogDefinition>,
     pub long_value_catalog_definition: Rc<CatalogDefinition>,
     pub callback_catalog_definition: Rc<CatalogDefinition>,
-    //pub column_catalog_definition_array: *mut libcdata_array_t,
-    //pub index_catalog_definition_array: *mut libcdata_array_t,
 }
 
 pub struct PageTree {
-    //pub io_handle: *mut libesedb_io_handle_t,
     pub object_identifier: uint32_t,
     pub root_page_number: uint32_t,
     pub table_definition: TableDefinition,
     pub template_table_definition: TableDefinition,
-    // pub pages_vector: *mut libfdata_vector_t,
-    // pub pages_cache: *mut libfcache_cache_t,
-    // pub root_page_header: *mut libesedb_root_page_header_t,
-    // pub leaf_page_descriptors_tree: *mut libcdata_btree_t,
     pub number_of_leaf_values: uint32_t,
 }
 
@@ -388,4 +391,3 @@ pub fn filetime_to_string(ft: FileTime) -> String {
     }
 }
  */
-

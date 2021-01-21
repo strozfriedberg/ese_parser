@@ -10,7 +10,10 @@ use std::slice;
 /// use slice::from_raw_parts_mut
 #[allow(clippy::mut_from_ref)]
 pub unsafe fn _any_as_slice<'a, U: Sized, T: Sized>(p: &'a &mut T) -> &'a mut [U] {
-    slice::from_raw_parts_mut((*p as *const T) as *mut U, mem::size_of::<T>() / mem::size_of::<U>())
+    slice::from_raw_parts_mut(
+        (*p as *const T) as *mut U,
+        mem::size_of::<T>() / mem::size_of::<U>(),
+    )
 }
 
 #[macro_export]
