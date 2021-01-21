@@ -5,8 +5,7 @@ ARG GROUP_ID
 
 RUN apt-get update && \
 	apt-get install -y mingw-w64 && \
-	rustup target add x86_64-pc-windows-gnu && \
-	rustup toolchain install stable-x86_64-pc-windows-gnu
+	rustup target add x86_64-pc-windows-gnu
 
 RUN apt install -y llvm-dev libclang-dev clang
 
