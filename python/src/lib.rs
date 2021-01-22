@@ -110,7 +110,7 @@ impl PyEseDb {
         self.jdb.move_row(table, crow)
     }
 
-    fn get_row(&self, table: u64, column: &PyColumnInfo) -> PyResult<Option<Py<PyAny>>> {
+    fn get_row(&self, table: u64, column: &PyColumnInfo) -> PyResult<Option<PyObject>> {
         let gil = Python::acquire_gil();
         let py = gil.python();
 
