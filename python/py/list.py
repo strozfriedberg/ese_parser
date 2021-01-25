@@ -12,7 +12,7 @@ for t in tables:
 	columns = edb.get_columns(t)
 
 	for c in columns:
-		print("name: {}, id: {}, type: {}, cbmax: {}, cp: {}".format(c.name(), c.id(), c.typ(), c.cbmax(), c.cp()))
+		print("name: {}, id: {}, type: {}, cbmax: {}, cp: {}".format(c.name, c.id, c.typ, c.cbmax, c.cp))
 
 	while True:
 		print("|", end='')

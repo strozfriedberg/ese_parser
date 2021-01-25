@@ -27,20 +27,16 @@ pub struct PyEseDb {
 
 #[pyclass]
 pub struct PyColumnInfo {
+    #[pyo3(get)]
     pub name: String,
+    #[pyo3(get)]
     pub id: u32,
+    #[pyo3(get)]
     pub typ: u32,
+    #[pyo3(get)]
     pub cbmax: u32,
+    #[pyo3(get)]
     pub cp: u16
-}
-
-#[pymethods]
-impl PyColumnInfo {
-    fn name(&self) -> String { self.name.to_string() }
-    fn id(&self) -> u32 { self.id }
-    fn typ(&self) -> u32 { self.typ }
-    fn cbmax(&self) -> u32 { self.cbmax }
-    fn cp(&self) -> u16 { self.cp }
 }
 
 #[pymethods]
