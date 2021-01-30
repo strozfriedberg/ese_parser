@@ -1,23 +1,24 @@
 //dumper.rs
 
-pub use prettytable::{Table, Row, Cell};
+use prettytable::{Cell, Row};
 extern crate hexdump;
-use itertools::Itertools;
 use std::string::ToString;
 
-use crate::ese::db_file_header::{ esedb_file_header };
-use crate::ese::jet;
+use crate::ese::ese_db::{FileHeader, PageHeader};
+use crate::ese::{ese_db, jet};
 
-pub fn dump_db_file_header(db_file_header: esedb_file_header) {
-    let mut table = Table::new();
+pub fn _dump_db_file_header(db_file_header: FileHeader) {
+    let mut table = prettytable::Table::new();
 
     macro_rules! add_row {
-        ($fld: expr, $val: expr) => {table.add_row(Row::new(vec![Cell::new($fld), Cell::new($val)]))}
+        ($fld: expr, $val: expr) => {
+            table.add_row(Row::new(vec![Cell::new($fld), Cell::new($val)]))
+        };
     }
 
     macro_rules! add_field {
         ($fld: ident) => {
-            let s = format!("{:#x}", db_file_header.$fld);
+            let s = format!("{}", db_file_header.$fld);
             add_row!(stringify!($fld), &s)
         };
     }
@@ -32,20 +33,27 @@ pub fn dump_db_file_header(db_file_header: esedb_file_header) {
     macro_rules! add_dt_field {
         ($fld: ident) => {
             add_row!(stringify!($fld), &db_file_header.$fld.to_string());
-        }
+        };
     }
 
     macro_rules! add_db_time_field {
         ($fld: ident) => {
             add_row!(stringify!($fld), &db_file_header.$fld.to_string());
-        }
+        };
     }
 
     macro_rules! add_bk_info_field {
         ($fld: ident) => {
             unsafe {
                 let bk = db_file_header.$fld;
-                let s = format!("Log Gen:{}-{} ({:#x}-{:#x}), Mark:{}", bk.gen_low, bk.gen_high, bk.gen_low, bk.gen_high, bk.bk_logtime_mark.to_string());
+                let s = format!(
+                    "Log Gen:{}-{} ({:#x}-{:#x}), Mark:{}",
+                    bk.gen_low,
+                    bk.gen_high,
+                    bk.gen_low,
+                    bk.gen_high,
+                    bk.bk_logtime_mark.to_string()
+                );
                 add_row!(stringify!($fld), &s)
             }
         };
@@ -55,27 +63,37 @@ pub fn dump_db_file_header(db_file_header: esedb_file_header) {
         ($fld: ident) => {
             unsafe {
                 let v = &db_file_header.$fld;
-                let s = format!("ib: {}, isec: {}, l_generation: {}", v.ib, v.isec, v.l_generation);
+                let s = format!(
+                    "ib: {}, isec: {}, l_generation: {}",
+                    v.ib, v.isec, v.l_generation
+                );
                 add_row!(stringify!($fld), &s);
             }
-        }
+        };
     }
 
     macro_rules! add_hex_field {
         ($fld: ident) => {
             let mut s: String = "".to_string();
-            hexdump::hexdump_iter(&db_file_header.$fld).foreach(|line| { s.push_str(&line); s.push_str("\n"); } );
+            hexdump::hexdump_iter(&db_file_header.$fld).for_each(|line| {
+                s.push_str(&line);
+                s.push_str("\n");
+            });
             add_row!(stringify!($fld), &s);
-        }
+        };
     }
     macro_rules! add_sign_field {
         ($fld: ident) => {
             let sign = &db_file_header.$fld;
             let dt = &sign.logtime_create;
-            let s = format!("Create time: {} Rand:{} Computer: {}",
-                                dt.to_string(), sign.random, std::str::from_utf8(&sign.computer_name).unwrap());
+            let s = format!(
+                "Create time: {} Rand:{} Computer: {}",
+                dt.to_string(),
+                sign.random,
+                std::str::from_utf8(&sign.computer_name).unwrap()
+            );
             add_row!(stringify!($fld), &s);
-        }
+        };
     }
 
     add_field!(checksum);
@@ -103,8 +121,13 @@ pub fn dump_db_file_header(db_file_header: esedb_file_header) {
     add_field!(index_update_build_number);
     add_field!(index_update_service_pack_number);
 
-    //add_field!(format_revision);
-    add_row!("format_revision", &jet::revision_to_string(db_file_header.format_version, db_file_header.format_revision));
+    add_row!(
+        "format_revision",
+        &jet::revision_to_string(
+            db_file_header.format_version,
+            db_file_header.format_revision
+        )
+    );
 
     add_field!(page_size);
     add_dt_field!(repair_time);
@@ -144,4 +167,25 @@ pub fn dump_db_file_header(db_file_header: esedb_file_header) {
     add_field!(unknown_flags);
 
     table.printstd();
+}
+
+pub fn _dump_page_header(page_header: &ese_db::PageHeader) {
+    let table = comfy_table::Table::new();
+
+    match page_header {
+        PageHeader::old(pg_hdr, pg_common) => {
+            println!("{:?} {:?}", pg_hdr, pg_common)
+        }
+        PageHeader::x0b(pg_hdr, pg_common) => {
+            println!("{:?} {:?}", pg_hdr, pg_common)
+        }
+        PageHeader::x11(pg_hdr, pg_common) => {
+            println!("{:?} {:?}", pg_hdr, pg_common)
+        }
+        PageHeader::x11_ext(pg_hdr, pg_common, pg_ext) => {
+            println!("{:?} {:?} {:?}", pg_hdr, pg_common, pg_ext)
+        }
+    }
+
+    println!("{}", table);
 }

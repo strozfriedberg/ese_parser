@@ -20,4 +20,7 @@ strum = {version = "*", features = ["derive"]}
 strum_macros = "*"
 chrono = "*"
 winapi = { version = "0.3", features = ["timezoneapi"] }
-
+bitflags = "*"
+comfy-table = "*"
+bitfield = "*"
+nom = "*"
