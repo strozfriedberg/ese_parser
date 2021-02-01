@@ -39,6 +39,18 @@ pub struct PyColumnInfo {
     pub cp: u16
 }
 
+fn bytes_to_string(v: Vec<u8>, wide: bool) -> Option<String> {
+    if wide {
+        let t = v.as_slice();
+        unsafe {
+            let (_, v16, _) = t.align_to::<u16>();
+            OsString::from_wide(&v16).into_string().ok()
+        }
+    } else {
+        std::str::from_utf8(&v).map(|s| s.to_string()).ok()
+    }
+}
+
 #[pymethods]
 impl PyEseDb {
     #[new]
@@ -183,18 +195,7 @@ impl PyEseDb {
                     Ok(ov) => {
                         match ov {
                             Some(v) => {
-                                if column.cp == 1200 {
-                                    let t = v.as_slice();
-                                    unsafe {
-                                        let (_, v16, _) = t.align_to::<u16>();
-                                        let ws = OsString::from_wide(&v16);
-                                        let wss = ws.into_string().unwrap();
-                                        return Ok(Some(wss.to_object(py)));
-                                    }
-                                } else {
-                                    let s = std::str::from_utf8(&v).unwrap();
-                                    return Ok(Some(s.to_object(py)));
-                                }
+                               return Ok(bytes_to_string(v, column.cp == 1200).map(|s| s.to_object(py)));
                             }
                             None => return Ok(None)
                         }
@@ -213,18 +214,7 @@ impl PyEseDb {
                     Ok(ov) => {
                         match ov {
                             Some(v) => {
-                                if column.cp == 1200 {
-                                    let t = v.as_slice();
-                                    unsafe {
-                                        let (_, v16, _) = t.align_to::<u16>();
-                                        let ws = OsString::from_wide(&v16);
-                                        let wss = ws.into_string().unwrap();
-                                        return Ok(Some(wss.to_object(py)));
-                                    }
-                                } else {
-                                    let s = std::str::from_utf8(&v).unwrap();
-                                    return Ok(Some(s.to_object(py)));
-                                }
+                                return Ok(bytes_to_string(v, column.cp == 1200).map(|s| s.to_object(py)));
                             }
                             None => return Ok(None)
                         }
