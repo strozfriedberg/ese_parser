@@ -109,6 +109,13 @@ fn dump_tables(dbpath: &str) {
                                 None => println!("NULL")
                             }
                         },
+                        JET_coltypUnsignedLongLong => {
+                            assert!(c.cbmax as usize == size_of::<u64>());
+                            match jdb.get_column::<u64>(table_id, c.id).unwrap() {
+                                Some(v) => println!("{}", v),
+                                None => println!("NULL")
+                            }
+                        },
                         JET_coltypCurrency => {
                             assert!(c.cbmax as usize == size_of::<i64>());
                             match jdb.get_column::<i64>(table_id, c.id).unwrap() {

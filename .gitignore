@@ -1,4 +1,5 @@
 target
 lib/Cargo.lock
+python/Cargo.lock
 .idea
 .vscode

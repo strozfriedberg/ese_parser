@@ -168,7 +168,7 @@ fn test_edb_table_all_values() {
             let ws = OsString::from_wide(&v16).into_string().unwrap();
             for i in 0..ws.len() {
                 let l = ws.chars().nth(i).unwrap();
-                let r = abc.as_bytes()[i %  abc.len()] as char;
+                let r = abc.as_bytes()[i % abc.len()] as char;
                 assert_eq!(l, r);
             }
         }
