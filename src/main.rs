@@ -3,7 +3,6 @@
 #[macro_use]
 extern crate log;
 extern crate strum;
-
 mod ese;
 mod util;
 
@@ -11,8 +10,7 @@ use std::process;
 
 use ese_parser::ese::jet;
 use ese_parser::util::config::Config;
-use ese_parser::util::reader::load_db_file_header;
-use ese_parser::util::reader::load_page_tags;
+use ese_parser::util::reader::*;
 
 fn main() {
     env_logger::init();
@@ -32,9 +30,16 @@ fn main() {
     };
 
     let io_handle = jet::IoHandle::new(&db_file_header);
-    let db_page = jet::DbPage::new(&config, &io_handle, jet::FixedPageNumber::Database as u32);
+    let db_page = jet::DbPage::new(&config, &io_handle, 13 as u32);
     let pg_tags = load_page_tags(&config, &io_handle, &db_page).unwrap();
+    println!("page {:?}, size: {}", db_page, db_page.size());
+
+    if db_page.common().page_flags.contains(jet::PageFlags::IS_ROOT) {
+        let root_page_header = load_root_page_header(&config, &io_handle, &db_page, &pg_tags[0]).unwrap();
+        println!("root_page {:?}", root_page_header);
+    }
+    load_data_definition(&config, &io_handle, &db_page, &pg_tags[1]);
     for pg_tag in pg_tags {
-        println!("{:?}", pg_tag);
+        println!("tag {:?}", pg_tag);
     }
 }

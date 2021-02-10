@@ -125,7 +125,7 @@ pub struct PageHeaderExt0x11 {
 }
 
 #[repr(C)]
-#[derive(Copy, Clone)]
+#[derive(Debug, Copy, Clone)]
 pub enum PageHeader {
     old(PageHeaderOld, PageHeaderCommon),
     x0b(PageHeader0x0b, PageHeaderCommon),
@@ -133,27 +133,54 @@ pub enum PageHeader {
     x11_ext(PageHeader0x11, PageHeaderCommon, PageHeaderExt0x11),
 }
 
-bitfield! {
-    pub struct PageTagOld(u32);
-    impl Debug;
-    u32;
-    pub offset, _: 31, 16;
-    pub flags, _: 15, 13;
-    pub size, _: 12, 0;
+#[derive(Debug)]
+pub struct PageTag {
+    pub size: u16,
+    pub offset: u16,
+    pub flags: u8,
 }
 
-bitfield! {
-    pub struct PageTag0x11(u32);
-    impl Debug;
-    u32;
-    pub flag1, _: 31;
-    pub offset, _: 30, 16;
-    pub flag2, _: 15;
-    pub size, _: 14, 0;
+#[repr(C)]
+#[derive(Copy, Clone, Debug)]
+pub struct RootPageHeader16 {
+    pub initial_number_of_pages: uint32_t,
+    pub parent_fdp: uint32_t,
+    pub extent_space: uint32_t,
+    pub space_tree_page_number: uint32_t,
+}
+
+#[repr(C)]
+#[derive(Copy, Clone, Debug)]
+pub struct RootPageHeader25 {
+    pub initial_number_of_pages: uint32_t,
+    pub unknown1: uint8_t,
+    pub parent_fdp: uint32_t,
+    pub extent_space: uint32_t,
+    pub space_tree_page_number: uint32_t,
+    pub unknown2: uint32_t,
+    pub unknown3: uint32_t,
 }
 
 #[derive(Debug)]
-pub enum PageTag {
-    old(PageTagOld),
-    x11(PageTag0x11),
+pub enum RootPageHeader {
+    xf(RootPageHeader16),
+    x19(RootPageHeader25),
+}
+
+#[repr(C)]
+#[derive(Clone, Debug)]
+pub struct BranchPageEntry {
+    pub common_page_key_size: uint16_t,
+    pub local_page_key_size: uint16_t,
+    pub local_page_key: Vec<uint8_t>,
+    pub child_page_number: uint32_t
+}
+
+#[repr(C)]
+#[derive(Clone, Debug)]
+pub struct LeafPageEntry {
+    pub common_page_key_size: uint16_t,
+    pub local_page_key_size: uint16_t,
+    pub local_page_key: Vec<uint8_t>,
+    pub child_page_number: uint32_t
 }

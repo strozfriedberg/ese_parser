@@ -8,23 +8,23 @@ use std::io::{self, BufReader, Read, Seek, SeekFrom};
 use std::mem::{self};
 use std::path::{Path, PathBuf};
 use std::slice;
+use simple_error::SimpleError;
 
 use crate::ese::ese_db;
-use crate::ese::ese_db::{
-    PageHeader, PageHeader0x0b, PageHeader0x11, PageHeaderCommon, PageHeaderExt0x11, PageHeaderOld,
-    PageTag, ESEDB_FILE_SIGNATURE,
-};
+use crate::ese::ese_db::*;
 use crate::util::_any_as_slice;
 use crate::util::config::Config;
 
 #[derive(Debug)]
 pub enum EseParserError {
     Io(io::Error),
+    Simple(simple_error::SimpleError)
 }
 impl fmt::Display for EseParserError {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match *self {
             EseParserError::Io(ref err) => write!(f, "IO error: {}", err),
+            EseParserError::Simple(ref err) => write!(f, "Error: {}", err),
         }
     }
 }
@@ -147,23 +147,73 @@ pub fn load_page_tags(
     io_handle: &jet::IoHandle,
     db_page: &jet::DbPage,
 ) -> Result<Vec<PageTag>, EseParserError> {
-    let page_offset = (db_page.page_number + 1) * io_handle.page_size;
-    let mut tags_offset = (page_offset + io_handle.page_size - 4) as u64;
+    let page_offset = ((db_page.page_number + 1) * io_handle.page_size) as u64;
+    let mut tags_offset = (page_offset + io_handle.page_size as u64) as u64;
     let path = &config.inp_file;
     let mut tags = Vec::<PageTag>::new();
 
     for _i in 0..db_page.get_available_page_tag() {
-        if io_handle.format_revision >= 0x00000011 && io_handle.page_size > 8 * 1024 {
-            let tag = read_struct::<ese_db::PageTag0x11, _>(path, SeekFrom::Start(tags_offset))
-                .map_err(EseParserError::Io)?;
-            tags.push(PageTag::x11(tag));
+        tags_offset -= 2;
+        let page_tag_offset : u16 = read_struct(path, SeekFrom::Start(tags_offset)).map_err(EseParserError::Io)?;
+        tags_offset -= 2;
+        let page_tag_size : u16 = read_struct(path, SeekFrom::Start(tags_offset)).map_err(EseParserError::Io)?;
+
+        let mut flags : u8 = 0;
+		let mut offset : u16 = 0;
+        let mut size : u16 = 0;
+
+        if io_handle.format_revision >= 0x00000011 && io_handle.page_size > 16384 {
+			offset = page_tag_offset & 0x7fff;
+            size   = page_tag_size & 0x7fff;
         } else {
-            let tag = read_struct::<ese_db::PageTagOld, _>(path, SeekFrom::Start(tags_offset))
-                .map_err(EseParserError::Io)?;
-            tags.push(PageTag::old(tag));
+            flags  = (page_tag_offset >> 13) as u8;
+            offset = page_tag_offset & 0x1fff;
+            size   = page_tag_size & 0x1fff;
         }
-        tags_offset -= 4;
+        tags.push(PageTag{ flags: flags, offset: offset, size: size} );
     }
 
     Ok(tags)
+}
+
+pub fn load_root_page_header(
+    config: &Config,
+    io_handle: &jet::IoHandle,
+    db_page: &jet::DbPage,
+    page_tag: &PageTag,
+) -> Result<RootPageHeader, EseParserError> {
+    let path = &config.inp_file;
+    let page_offset = ((db_page.page_number + 1) * io_handle.page_size) as u64;
+    let root_page_offset = page_offset + db_page.size() as u64 + page_tag.offset as u64;
+
+    // TODO Seen in format version 0x620 revision 0x14
+    // check format and revision
+    if page_tag.size == 16 {
+        let root_page_header = read_struct::<ese_db::RootPageHeader16, _>(path, SeekFrom::Start(root_page_offset))
+                .map_err(EseParserError::Io)?;
+        return Ok(RootPageHeader::xf(root_page_header));
+    } else if page_tag.size == 25 {
+        let root_page_header = read_struct::<ese_db::RootPageHeader25, _>(path, SeekFrom::Start(root_page_offset))
+        .map_err(EseParserError::Io)?;
+        return Ok(RootPageHeader::x19(root_page_header));
+    }
+
+    Err(EseParserError::Simple(SimpleError::new(format!("wrong size of page tag: {:?}", page_tag))))
+}
+
+pub fn load_data_definition(
+    config: &Config,
+    io_handle: &jet::IoHandle,
+    db_page: &jet::DbPage,
+    page_tag: &PageTag,
+) {
+    let path = &config.inp_file;
+    let page_offset = ((db_page.page_number + 1) * io_handle.page_size) as u64;
+    let s1 = db_page.size();
+    let s2 = page_tag.offset;
+    let offset = page_offset + db_page.size() as u64 + page_tag.offset as u64;
+
+    if db_page.common().page_flags.bits() == 0 {
+
+    }
 }

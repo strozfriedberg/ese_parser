@@ -12,7 +12,7 @@ use winapi::um::timezoneapi::GetTimeZoneInformation;
 
 use crate::util::config::Config;
 use crate::util::reader::{load_page_header, load_page_tags};
-use crate::ese::ese_db::{PageHeader, PageTag};
+use crate::ese::ese_db::*;
 
 pub type uint8_t = ::std::os::raw::c_uchar;
 pub type uint16_t = ::std::os::raw::c_short;
@@ -263,6 +263,7 @@ impl IoHandle {
     }
 }
 
+#[derive(Debug)]
 pub struct DbPage {
     pub page_number: uint32_t,
     pub page_header: ese_db::PageHeader,
@@ -290,20 +291,60 @@ impl DbPage {
             PageHeader::x11_ext(_, common, _) => common.available_page_tag as usize,
         }
     }
-}
 
-impl PageTag {
-    pub fn size(&self) -> u32 {
-        match self {
-            PageTag::old(x) => x.size(),
-            PageTag::x11(x) => x.size(),
+    pub fn common(&self) -> PageHeaderCommon {
+        match self.page_header {
+            PageHeader::old(_, common) => common,
+            PageHeader::x0b(_, common) => common,
+            PageHeader::x11(_, common) => common,
+            PageHeader::x11_ext(_, common, _) => common,
         }
     }
 
-    pub fn offset(&self) -> u32 {
+    pub fn size(&self) -> usize {
+        match self.page_header {
+            PageHeader::old(old, common) => mem::size_of_val(&old) + mem::size_of_val(&common),
+            PageHeader::x0b(x0b, common) => mem::size_of_val(&x0b) + mem::size_of_val(&common),
+            PageHeader::x11(x11, common) => mem::size_of_val(&x11) + mem::size_of_val(&common),
+            PageHeader::x11_ext(x11_ext, common, ext) => mem::size_of_val(&x11_ext) + mem::size_of_val(&common) +
+                mem::size_of_val(&ext),
+        }
+    }
+}
+
+impl RootPageHeader {
+    pub fn initial_number_of_pages(&self) -> uint32_t {
         match self {
-            PageTag::old(x) => x.offset(),
-            PageTag::x11(x) => x.offset(),
+            RootPageHeader::xf(x) => x.initial_number_of_pages,
+            RootPageHeader::x19(x) => x.initial_number_of_pages,
+        }
+    }
+
+    pub fn parent_fdp(&self) -> uint32_t {
+        match self {
+            RootPageHeader::xf(x) => x.parent_fdp,
+            RootPageHeader::x19(x) => x.parent_fdp,
+        }
+    }
+
+    pub fn extent_space(&self) -> uint32_t {
+        match self {
+            RootPageHeader::xf(x) => x.extent_space,
+            RootPageHeader::x19(x) => x.extent_space,
+        }
+    }
+
+    pub fn space_tree_page_number(&self) -> uint32_t {
+        match self {
+            RootPageHeader::xf(x) => x.space_tree_page_number,
+            RootPageHeader::x19(x) => x.space_tree_page_number,
+        }
+    }
+
+    pub fn size(&self) -> usize {
+        match self {
+            RootPageHeader::xf(x) => mem::size_of_val(&x),
+            RootPageHeader::x19(x) => mem::size_of_val(&x),
         }
     }
 }
