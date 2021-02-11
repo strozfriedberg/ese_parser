@@ -106,14 +106,14 @@ fn test_load_page_tags() {
 
         let mut seq_no = 0;
         for pg_tag in &db_page.page_tags {
-            let size = pg_tag.size();
-            let offset = pg_tag.offset();
+            let size = pg_tag.size;
+            let offset = pg_tag.offset;
             println!(
                 "offset: {:#x} ({}), size: {:#x} ({})",
                 offset, offset, size, size
             );
-            assert_eq!(tst_tags[seq_no].offset, offset);
-            assert_eq!(tst_tags[seq_no].size, size);
+            assert_eq!(tst_tags[seq_no].offset, offset as u32);
+            assert_eq!(tst_tags[seq_no].size, size as u32);
             seq_no += 1;
         }
     }
