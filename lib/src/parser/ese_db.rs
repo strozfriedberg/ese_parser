@@ -3,7 +3,7 @@
 
 use bitfield::bitfield;
 
-use crate::ese::jet;
+use crate::parser::jet;
 use winapi::_core::fmt::Debug;
 
 use jet::{uint16_t, uint32_t, uint64_t, uint8_t, PageFlags};
@@ -80,27 +80,27 @@ pub struct FileHeader {
     pub unknown_val: uint32_t,
 }
 
-#[repr(C)]
+#[repr(packed)]
 #[derive(Copy, Clone, Debug)]
 pub struct PageHeaderOld {
     pub xor_checksum: uint32_t,
     pub page_number: uint32_t,
 }
 
-#[repr(C)]
+#[repr(packed)]
 #[derive(Copy, Clone, Debug)]
 pub struct PageHeader0x0b {
     pub xor_checksum: uint32_t,
     pub ecc_checksum: uint32_t,
 }
 
-#[repr(C)]
+#[repr(packed)]
 #[derive(Copy, Clone, Debug)]
 pub struct PageHeader0x11 {
     pub checksum: uint64_t,
 }
 
-#[repr(C)]
+#[repr(packed)]
 #[derive(Copy, Clone, Debug)]
 pub struct PageHeaderCommon {
     pub database_modification_time: jet::DateTime,
@@ -114,7 +114,7 @@ pub struct PageHeaderCommon {
     pub page_flags: PageFlags,
 }
 
-#[repr(C)]
+#[repr(packed)]
 #[derive(Copy, Clone, Debug)]
 pub struct PageHeaderExt0x11 {
     pub checksum1: uint64_t,
@@ -140,7 +140,7 @@ pub struct PageTag {
     pub flags: u8,
 }
 
-#[repr(C)]
+#[repr(packed)]
 #[derive(Copy, Clone, Debug)]
 pub struct RootPageHeader16 {
     pub initial_number_of_pages: uint32_t,
@@ -149,7 +149,7 @@ pub struct RootPageHeader16 {
     pub space_tree_page_number: uint32_t,
 }
 
-#[repr(C)]
+#[repr(packed)]
 #[derive(Copy, Clone, Debug)]
 pub struct RootPageHeader25 {
     pub initial_number_of_pages: uint32_t,
@@ -161,6 +161,7 @@ pub struct RootPageHeader25 {
     pub unknown3: uint32_t,
 }
 
+#[repr(C)]
 #[derive(Debug)]
 pub enum RootPageHeader {
     xf(RootPageHeader16),
@@ -183,4 +184,116 @@ pub struct LeafPageEntry {
     pub local_page_key_size: uint16_t,
     pub local_page_key: Vec<uint8_t>,
     pub child_page_number: uint32_t
+}
+
+#[repr(packed)]
+#[derive(Copy, Clone, Debug)]
+pub struct DataDefinitionHeader {
+    pub last_fixed_size_data_type: uint8_t,
+    pub last_variable_size_data_type: uint8_t,
+    pub variable_size_data_types_offset: uint16_t,
+}
+
+// Data type identifier: 4 (ColtypOrPgnoFDP)
+#[derive(Copy, Clone)]
+#[repr(packed)]
+pub union ColtypOrPgnoFDP {
+    pub father_data_page_number: uint32_t,
+    pub column_type: uint32_t,
+}
+
+// Data type identifier: 7 (PagesOrLocale)
+#[derive(Copy, Clone)]
+#[repr(packed)]
+pub union PagesOrLocale {
+    // The (initial) number of pages
+    pub number_of_pages : uint32_t,
+
+    // The codepage
+    pub codepage : uint32_t,
+
+    // The locale identifier
+    pub locale_identifier : uint32_t
+}
+
+#[repr(packed)]
+#[derive(Copy, Clone)]
+pub struct DataDefinition
+{
+	// Data type identifier: 1 (ObjidTable)
+	// The father data page (FDP) object identifier
+	pub father_data_page_object_identifier : uint32_t,
+
+	// Data type identifier: 2 (Type)
+	// The definition type
+	pub data_type : uint16_t,
+
+	// Data type identifier: 3 (Id)
+	// The indentifier
+	pub identifier : uint32_t,
+
+	// Data type identifier: 4 (ColtypOrPgnoFDP)
+    pub coltyp_or_fdp: ColtypOrPgnoFDP,
+
+	// Data type identifier: 5 (SpaceUsage)
+	// The space usage (density percentage)
+	pub space_usage : uint32_t,
+
+	// Data type identifier: 6 (Flags)
+	// Flags
+	pub flags : uint32_t,
+
+    pub pages_or_locale: PagesOrLocale,
+
+	// Data type identifier: 8 (RootFlag)
+	// The root flag
+	pub root_flag : uint8_t,
+
+	// Data type identifier: 9 (RecordOffset)
+	// The record offset
+	pub record_offset : uint16_t,
+
+	// Data type identifier: 10 (LCMapFlags)
+	// LC Map flags
+	pub lc_map_flags : uint32_t,
+
+	// Data type identifier: 11 (KeyMost)
+	// Key most
+	// Introduced in Windows Vista
+	pub key_most : uint16_t,
+
+	/* Data type identifier: 128 (Name)
+	 * The name
+	 */
+
+	/* Data type identifier: 129 (Stats)
+	 */
+
+	/* Data type identifier: 130 (TemplateTable)
+	 */
+
+	/* Data type identifier: 131 (DefaultValue)
+	 */
+
+	/* Data type identifier: 132 (KeyFldIDs)
+	 */
+
+	/* Data type identifier: 133 (VarSegMac)
+	 */
+
+	/* Data type identifier: 134 (ConditionalColumns)
+	 */
+
+	/* Data type identifier: 135 (TupleLimits)
+	 */
+
+	/* Data type identifier: 136 (Version)
+	 * Introduced in Windows Vista
+	 */
+
+	/* Data type identifier: 256 (CallbackData)
+	 */
+
+	/* Data type identifier: 257 (CallbackDependencies)
+	 */
 }

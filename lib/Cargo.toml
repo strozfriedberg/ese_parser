@@ -14,3 +14,13 @@ bindgen = "0.56.0"
 libc = "0.2"
 winapi = { version = "0.3", features = ["timezoneapi"] }
 simple-error = "*"
+pretty-hex = "*"
+
+bitflags = "*"
+bitfield = "*"
+hexdump = "*"
+log = "*"
+chrono = "*"
+
+strum = {version = "*", features = ["derive"]}
+strum_macros = "*"

@@ -1,18 +1,16 @@
 //jet.rs
 #![allow(non_camel_case_types, dead_code)]
-use crate::ese::ese_db;
+use crate::parser::ese_db;
+use crate::parser::ese_db::*;
+use crate::parser::reader::*;
+use simple_error::SimpleError;
 
 use bitflags::bitflags;
+use std::{fmt, mem};
 use chrono::naive::{NaiveDate, NaiveTime};
 use chrono::TimeZone;
-use std::rc::Rc;
-use std::{fmt, mem};
 use strum::Display;
 use winapi::um::timezoneapi::GetTimeZoneInformation;
-
-use crate::util::config::Config;
-use crate::util::reader::{load_page_header, load_page_tags};
-use crate::ese::ese_db::*;
 
 pub type uint8_t = ::std::os::raw::c_uchar;
 pub type uint16_t = ::std::os::raw::c_short;
@@ -93,13 +91,29 @@ pub enum ColumnType {
     Max = 18,
 }
 
+// The tagged data type format definitions
+#[derive(PartialEq, Copy, Clone, Debug)]
+pub enum TaggedDataTypesFormats {
+	Linear = 0,
+	Index = 1,
+}
+
 bitflags! {
     pub struct TaggedDataTypeFlag : uint16_t {
-        const VARIABLE_SIZE = 0b00000001;
-        const COMPRESSED    = 0b00000010;
-        const STORED        = 0b00000100;
-        const MULTI_VALUE   = 0b00001000;
-        const WHO_KNOWS     = 0b00010000;
+        const VARIABLE_SIZE         = 0b00000001;
+        const COMPRESSED            = 0b00000010;
+        const LONG_VALUE            = 0b00000100;
+        const MULTI_VALUE           = 0b00001000;
+        const MULTI_VALUE_OFFSET    = 0b00010000;
+    }
+}
+
+bitflags! {
+    // The page tag flags
+    pub struct PageTagFlags : u8 {
+        const FLAG_0x01                 = 0x1;
+        const FLAG_IS_DEFUNCT           = 0x2;
+        const FLAG_HAS_COMMON_KEY_SIZE  = 0x4;
     }
 }
 
@@ -225,42 +239,13 @@ pub struct DbFile {
     file_header: ese_db::FileHeader,
 }
 
-#[derive(Copy, Clone)]
 #[repr(C)]
 pub struct IoHandle {
-    pub file_type: FileType,
+    pub path: std::path::PathBuf,
     pub format_version: FormatVersion,
     pub format_revision: FormatRevision,
-    pub creation_format_version: uint32_t,
-    pub creation_format_revision: uint32_t,
-    pub pages_data_offset: off64_t,
-    pub pages_data_size: size64_t,
-    pub page_size: uint32_t,
-    pub last_page_number: uint32_t,
-    pub ascii_codepage: libc::c_int,
-    pub abort: libc::c_int,
-}
-
-impl IoHandle {
-    pub fn new(db_file_header: &ese_db::FileHeader) -> IoHandle {
-        let pages_data_offset: off64_t = (db_file_header.page_size * 2) as off64_t;
-
-        IoHandle {
-            file_type: db_file_header.file_type,
-            format_version: db_file_header.format_version,
-            format_revision: db_file_header.format_revision,
-            creation_format_version: db_file_header.creation_format_version,
-            creation_format_revision: db_file_header.creation_format_revision,
-            page_size: db_file_header.page_size,
-
-            pages_data_offset,
-            pages_data_size: pages_data_offset as u64,
-            last_page_number: (pages_data_offset / db_file_header.page_size as i64) as u32,
-
-            ascii_codepage: 0,
-            abort: 0,
-        }
-    }
+    pub page_size: u32,
+    pub last_page_number: u32,
 }
 
 #[derive(Debug)]
@@ -271,16 +256,16 @@ pub struct DbPage {
 }
 
 impl DbPage {
-    pub fn new(config: &Config, io_handle: &IoHandle, page_number: u32) -> DbPage {
-        let page_header = load_page_header(config, io_handle, page_number).unwrap();
+    pub fn new(io_handle: &IoHandle, page_number: u32) -> Result<DbPage, SimpleError> {
+        let page_header = load_page_header(io_handle, page_number)?;
         let mut db_page = DbPage {
             page_number,
             page_header,
             page_tags: vec![],
         };
 
-        db_page.page_tags = load_page_tags(config, io_handle, &db_page).unwrap();
-        db_page
+        db_page.page_tags = load_page_tags(io_handle, &db_page)?;
+        Ok(db_page)
     }
 
     pub fn get_available_page_tag(&self) -> usize {
@@ -309,6 +294,18 @@ impl DbPage {
             PageHeader::x11_ext(x11_ext, common, ext) => mem::size_of_val(&x11_ext) + mem::size_of_val(&common) +
                 mem::size_of_val(&ext),
         }
+    }
+
+    pub fn flags(&self) -> PageFlags {
+        self.common().page_flags
+    }
+
+    pub fn next_page(&self) -> u32 {
+        self.common().next_page as u32
+    }
+
+    pub fn prev_page(&self) -> u32 {
+        self.common().previous_page as u32
     }
 }
 
@@ -349,25 +346,28 @@ impl RootPageHeader {
     }
 }
 
-#[derive(Copy, Clone)]
-#[repr(C)]
-pub union C2RustUnnamed {
-    pub father_data_page_number: uint32_t,
-    pub column_type: uint32_t,
+impl PageTag {
+    pub fn flags(&self) -> PageTagFlags {
+        PageTagFlags::from_bits_truncate(self.flags)
+    }
 }
 
-#[derive(Copy, Clone)]
+#[derive(Clone)]
 #[repr(C)]
 pub struct CatalogDefinition {
     pub father_data_page_object_identifier: uint32_t,
-    pub type_0: uint16_t,
+    pub cat_type: uint16_t,
     pub identifier: uint32_t,
-    pub c2rust_unnamed: C2RustUnnamed,
+ 
+    pub column_type: uint32_t,
+    pub father_data_page_number: uint32_t,
+ 
     pub size: uint32_t,
     pub codepage: uint32_t,
     pub lcmap_flags: uint32_t,
-    pub name: *mut uint8_t,
-    pub name_size: uint32_t,
+
+    pub name: String,
+
     pub template_name: *mut uint8_t,
     pub template_name_size: uint32_t,
     pub default_value: *mut uint8_t,
@@ -377,9 +377,11 @@ pub struct CatalogDefinition {
 #[derive(Clone)]
 #[repr(C)]
 pub struct TableDefinition {
-    pub table_catalog_definition: Rc<CatalogDefinition>,
-    pub long_value_catalog_definition: Rc<CatalogDefinition>,
-    pub callback_catalog_definition: Rc<CatalogDefinition>,
+    pub table_catalog_definition: Option<CatalogDefinition>,
+    pub column_catalog_definition_array: Vec<CatalogDefinition>,
+    pub long_value_catalog_definition: Option<CatalogDefinition>,
+    //pub callback_catalog_definition: Option<CatalogDefinition>,
+    //pub index_catalog_definition_array: Vec<Option<CatalogDefinition>>,
 }
 
 pub struct PageTree {

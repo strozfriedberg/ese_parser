@@ -1,12 +1,16 @@
 #![allow(non_upper_case_globals, non_snake_case, non_camel_case_types, clippy::mut_from_ref, clippy::cast_ptr_alignment)]
 
+mod parser;
+
 pub mod esent;
 pub mod ese_trait;
 pub mod ese_api;
+pub mod ese_parser;
 
 use esent::*;
 use ese_api::*;
 use ese_trait::*;
+use ese_parser::*;
 
 use std::mem::MaybeUninit;
 use std::ffi::OsString;
@@ -38,11 +42,19 @@ extern "C" {
 
 #[test]
 fn test_edb_table_all_values() {
-    let mut jdb : EseAPI = EseDb::init();
+    //let mut jdb : EseAPI = EseDb::init();
+    let mut jdb : EseParser = EseParser::init();
 
     match jdb.load("testdata\\test.edb") {
         Some(e) => panic!("Error: {}", e),
-        None => println!("jdb: {:?}", jdb)
+        None => println!("Loaded.")
+    }
+
+    let expected_tables = vec!["MSysObjects", "MSysObjectsShadow", "MSysObjids", "MSysLocales", "TestTable"];
+    let tables = jdb.get_tables().unwrap();
+    assert_eq!(tables.len(), expected_tables.len());
+    for i in 0..tables.len() {
+        assert_eq!(tables[i], expected_tables[i]);
     }
 
     let table = "TestTable";
@@ -124,6 +136,7 @@ fn test_edb_table_all_values() {
         assert_eq!(binary.cbmax, 255);
 
         let b = jdb.get_column_dyn(table_id, binary.id, binary.cbmax as usize).unwrap().unwrap();
+        println!("Binary data size: {}", b.len());
         for i in 0..b.len() {
             assert_eq!(b[i], (i % 255) as u8);
         }
@@ -135,6 +148,7 @@ fn test_edb_table_all_values() {
         assert_eq!(long_binary.cbmax, 1024);
 
         let b = jdb.get_column_dyn_varlen(table_id, long_binary.id).unwrap().unwrap();
+        println!("LongBinary data size: {}", b.len());
         for i in 0..b.len() {
             assert_eq!(b[i], (i % 255) as u8);
         }
@@ -148,9 +162,13 @@ fn test_edb_table_all_values() {
         assert_eq!(text.cbmax, 255);
         assert_eq!(text.cp, 1252);
 
+        let str = jdb.get_column_str(table_id, text.id, text.cbmax as u32).unwrap().unwrap();
         let t = jdb.get_column_dyn(table_id, text.id, text.cbmax as usize).unwrap().unwrap();
+        println!("Text data size: {}", t.len());
         for i in 0..t.len() {
-            assert_eq!(t[i], abc.as_bytes()[i %  abc.len()]);
+            let expected_char = abc.as_bytes()[i % abc.len()];
+            assert_eq!(t[i], expected_char);
+            assert_eq!(str.as_bytes()[i], expected_char);
         }
     }
 
@@ -161,6 +179,7 @@ fn test_edb_table_all_values() {
         assert_eq!(long_text.cp, 1200);
 
         let lt = jdb.get_column_dyn_varlen(table_id, long_text.id).unwrap().unwrap();
+        println!("LongText data size: {}", lt.len());
         let s = lt.as_slice();
 
         unsafe {
@@ -173,4 +192,6 @@ fn test_edb_table_all_values() {
             }
         }
     }
+
+    jdb.close_table(table_id);
 }
