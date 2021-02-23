@@ -535,12 +535,19 @@ pub fn load_data(
     for j in 0..tbl_def.column_catalog_definition_array.len() {
         let col = &tbl_def.column_catalog_definition_array[j];
         if col.identifier <= 127 {
-            // fixed size column
-            if col.identifier == column_id {
-                let v = io_handle.read_bytes(offset, col.size as usize);
+            if col.identifier <= ddh.last_fixed_size_data_type as u32 {
+                // fixed size column
+                if col.identifier == column_id {
+                    let v = io_handle.read_bytes(offset, col.size as usize);
+                    return Ok(Some(v));
+                }
+                offset += col.size as u64;
+            } else if col.identifier == column_id {
+                // no value in tag, return empty
+                let mut v : Vec<u8> = Vec::new();
+                v.resize(col.size as usize, 0);
                 return Ok(Some(v));
             }
-            offset += col.size as u64;
         } else if current_variable_size_data_type < ddh.last_variable_size_data_type as u32 {
             // variable size
             while current_variable_size_data_type < col.identifier {
