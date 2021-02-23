@@ -12,11 +12,11 @@ use simple_error::SimpleError;
 use std::convert::TryInto;
 use pretty_hex::*;
 
-use crate::parser::jet;
-use crate::parser::jet::*;
-
 use crate::parser::ese_db;
 use crate::parser::ese_db::*;
+
+use crate::parser::jet;
+use crate::parser::jet::*;
 
 impl jet::IoHandle {
     //https://stackoverflow.com/questions/38334994/how-to-read-a-c-struct-from-a-binary-file-in-rust
@@ -288,23 +288,23 @@ pub fn load_catalog(
                 continue;
             }
             let cat_item = load_catalog_item(io_handle, &db_page, &pg_tags[i])?;
-            if cat_item.cat_type == jet::CatalogType::Table as i16 {
+            if cat_item.cat_type == jet::CatalogType::Table as u16 {
                 if table_def.table_catalog_definition.is_some() {
                     res.push(table_def);
                     table_def = jet::TableDefinition { table_catalog_definition: None,
                         column_catalog_definition_array: vec![], long_value_catalog_definition: None };
                 }
                 table_def.table_catalog_definition = Some(cat_item);
-            } else if cat_item.cat_type == jet::CatalogType::Column as i16 {
+            } else if cat_item.cat_type == jet::CatalogType::Column as u16 {
                 table_def.column_catalog_definition_array.push(cat_item);
-            } else if cat_item.cat_type == jet::CatalogType::Index as i16 {
+            } else if cat_item.cat_type == jet::CatalogType::Index as u16 {
                 // TODO
-            } else if cat_item.cat_type == jet::CatalogType::LongValue as i16 {
+            } else if cat_item.cat_type == jet::CatalogType::LongValue as u16 {
                 if table_def.long_value_catalog_definition.is_some() {
                     return Err(SimpleError::new("long-value catalog definition duplicate?"));
                 }
                 table_def.long_value_catalog_definition = Some(cat_item);
-            } else if cat_item.cat_type == jet::CatalogType::Callback as i16 {
+            } else if cat_item.cat_type == jet::CatalogType::Callback as u16 {
                 // TODO
             } else {
                 println!("TODO: Unknown cat_item.cat_type {}", cat_item.cat_type);
@@ -363,14 +363,14 @@ pub fn load_catalog_item(
     cat_def.father_data_page_object_identifier = data_def.father_data_page_object_identifier;
     cat_def.cat_type = data_def.data_type;
     cat_def.identifier = data_def.identifier;
-    if cat_def.cat_type == jet::CatalogType::Column as i16 {
+    if cat_def.cat_type == jet::CatalogType::Column as u16 {
         cat_def.column_type = unsafe { data_def.coltyp_or_fdp.column_type };
     } else {
         cat_def.father_data_page_number = unsafe { data_def.coltyp_or_fdp.father_data_page_number };
     }
     cat_def.size = data_def.space_usage;
     // data_def.flags?
-    if cat_def.cat_type == jet::CatalogType::Column as i16 {
+    if cat_def.cat_type == jet::CatalogType::Column as u16 {
         cat_def.codepage = unsafe { data_def.pages_or_locale.codepage };
     }
     if ddh.last_fixed_size_data_type >= 10 {
@@ -524,14 +524,14 @@ pub fn load_data(
     let mut masked_previous_tagged_data_type_offset : u16 = 0;
     let mut previous_variable_size_data_type_size : u16 = 0;
 
-    let mut number_of_variable_size_data_types = 0;
+    let mut number_of_variable_size_data_types : u16 = 0;
     if ddh.last_variable_size_data_type > 127 {
-        number_of_variable_size_data_types = ddh.last_variable_size_data_type - 127;
+        number_of_variable_size_data_types = ddh.last_variable_size_data_type as u16 - 127;
     }
 
     let mut current_variable_size_data_type : u32 = 127;
     let mut variable_size_data_type_offset = ddh.variable_size_data_types_offset;
-    let mut variable_size_data_type_value_offset : u16 = (ddh.variable_size_data_types_offset + (number_of_variable_size_data_types as i16 * 2)).try_into().unwrap();
+    let mut variable_size_data_type_value_offset : u16 = (ddh.variable_size_data_types_offset + (number_of_variable_size_data_types * 2)).try_into().unwrap();
     for j in 0..tbl_def.column_catalog_definition_array.len() {
         let col = &tbl_def.column_catalog_definition_array[j];
         if col.identifier <= 127 {
@@ -629,7 +629,7 @@ pub fn load_data(
                         }
                     }
                     if tagged_data_type_size > 0 && col.identifier == column_id {
-                        if jet::TaggedDataTypeFlag::from_bits_truncate(data_type_flags as i16).intersects(jet::TaggedDataTypeFlag::LONG_VALUE) {
+                        if jet::TaggedDataTypeFlag::from_bits_truncate(data_type_flags as u16).intersects(jet::TaggedDataTypeFlag::LONG_VALUE) {
                             let key = io_handle.read_struct::<u32>(offset_ddh + tagged_data_type_value_offset as u64);
                             let v = load_lv_data(&io_handle, &lv_tags, key).unwrap();
                             return Ok(Some(v));
@@ -717,7 +717,7 @@ pub fn load_lv_tag(
         res.key = skey;
 
         if page_key.len() == 8 {
-            let mut segment_offset = unsafe { std::mem::transmute::<[u8; 4], u32>(page_key[4..8].try_into().unwrap()) }.to_be();
+            let segment_offset = unsafe { std::mem::transmute::<[u8; 4], u32>(page_key[4..8].try_into().unwrap()) }.to_be();
             res.seg_offset = segment_offset;
         }
 

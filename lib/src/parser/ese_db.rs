@@ -1,12 +1,8 @@
 //ese_db
-#![allow(non_camel_case_types, dead_code)]
-
-use bitfield::bitfield;
+#![allow(non_camel_case_types)]
 
 use crate::parser::jet;
-use winapi::_core::fmt::Debug;
-
-use jet::{uint16_t, uint32_t, uint64_t, uint8_t, PageFlags};
+use crate::parser::jet::*;
 
 pub const ESEDB_FILE_SIGNATURE: uint32_t = 0x89abcdef;
 pub const ESEDB_FORMAT_REVISION_NEW_RECORD_FORMAT: uint32_t = 0x0b;

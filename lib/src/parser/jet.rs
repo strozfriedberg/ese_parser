@@ -1,28 +1,26 @@
 //jet.rs
 #![allow(non_camel_case_types, dead_code)]
-use crate::parser::ese_db;
-use crate::parser::ese_db::*;
-use crate::parser::reader::*;
-use simple_error::SimpleError;
-
 use bitflags::bitflags;
-use std::{fmt, mem};
 use chrono::naive::{NaiveDate, NaiveTime};
 use chrono::TimeZone;
+use std::{fmt, mem};
 use strum::Display;
 use winapi::um::timezoneapi::GetTimeZoneInformation;
+use simple_error::SimpleError;
 
-pub type uint8_t = ::std::os::raw::c_uchar;
-pub type uint16_t = ::std::os::raw::c_short;
-pub type uint32_t = ::std::os::raw::c_ulong;
-pub type uint64_t = ::std::os::raw::c_ulonglong;
-pub type off64_t = ::std::os::raw::c_longlong;
-pub type size64_t = uint64_t;
+use crate::parser::ese_db;
+use crate::parser::ese_db::*;
+use crate::parser::reader;
+
+pub type uint8_t = u8;
+pub type uint16_t = u16;
+pub type uint32_t = u32;
+pub type uint64_t = u64;
 
 type OsDateTime = chrono::DateTime<chrono::Utc>;
 
-pub type FormatVersion = uint32_t;
-pub type FormatRevision = uint32_t;
+pub type FormatVersion = u32;
+pub type FormatRevision = u32;
 
 bitflags! {
     pub struct PageFlags: uint32_t {
@@ -257,14 +255,14 @@ pub struct DbPage {
 
 impl DbPage {
     pub fn new(io_handle: &IoHandle, page_number: u32) -> Result<DbPage, SimpleError> {
-        let page_header = load_page_header(io_handle, page_number)?;
+        let page_header = reader::load_page_header(io_handle, page_number)?;
         let mut db_page = DbPage {
             page_number,
             page_header,
             page_tags: vec![],
         };
 
-        db_page.page_tags = load_page_tags(io_handle, &db_page)?;
+        db_page.page_tags = reader::load_page_tags(io_handle, &db_page)?;
         Ok(db_page)
     }
 
@@ -413,24 +411,3 @@ pub fn revision_to_string(version: FormatVersion, revision: FormatRevision) -> S
                 };
     format!("{:#x}, {:#x}: {}", version, revision, s)
 }
-
-/*
-use winapi::um::minwinbase::{SYSTEMTIME, LPSYSTEMTIME};
-use winapi::shared::minwindef::FILETIME;
-pub type FileTime = FILETIME;
-
-pub fn filetime_to_string(ft: FileTime) -> String {
-    let mut st: SYSTEMTIME = unsafe {mem::zeroed()};
-    let p_st: LPSYSTEMTIME = &mut st;
-
-    if unsafe {FileTimeToSystemTime(&ft, p_st )} != 0 {
-        let ndt = NaiveDate::from_ymd(st.wYear as i32, st.wMonth as u32, st.wDay as u32)
-            .and_hms_milli(st.wHour as u32, st.wMinute as u32, st.wSecond as u32, st.wMilliseconds as u32);
-        let dt = OsDateTime::from_utc(ndt, chrono::Utc);
-        dt.to_string()
-    }
-    else {
-        "".to_string()
-    }
-}
- */
