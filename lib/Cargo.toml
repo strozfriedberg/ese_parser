@@ -21,6 +21,7 @@ bitfield = "*"
 hexdump = "*"
 log = "*"
 chrono = "*"
+cache_2q = "*"
 
 strum = {version = "*", features = ["derive"]}
 strum_macros = "*"
