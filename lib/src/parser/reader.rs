@@ -1,71 +1,84 @@
 //reader.rs
 
-use log::error;
-use std::fmt;
-use std::fs::File;
-use std::io::{self, BufReader, Read, Seek, SeekFrom};
-use std::mem::{self};
-use std::path::{Path, PathBuf};
-use std::slice;
-use std::rc::Rc;
+use std::{fs, io, io::{Seek, Read}, mem, path::PathBuf, slice, convert::TryInto, cell::RefCell};
 use simple_error::SimpleError;
-use std::convert::TryInto;
-use pretty_hex::*;
+use cache_2q::Cache;
 
 use crate::parser::ese_db;
 use crate::parser::ese_db::*;
-
 use crate::parser::jet;
-use crate::parser::jet::*;
 
-impl jet::IoHandle {
-    //https://stackoverflow.com/questions/38334994/how-to-read-a-c-struct-from-a-binary-file-in-rust
-    pub fn read_struct<T>(&self, offset: u64) -> T {
-        let mut reader = BufReader::new(File::open(&self.path).unwrap());
-        reader.seek(SeekFrom::Start(offset)).unwrap();
-        let struct_size = mem::size_of::<T>();
-        let mut r: T = unsafe { mem::zeroed() };
-        unsafe {
-            let buffer = slice::from_raw_parts_mut(&mut r as *mut _ as *mut u8, struct_size);
-            reader.read_exact(buffer).unwrap();
+pub struct Reader {
+    path: PathBuf,
+    file: RefCell<fs::File>,
+    cache: RefCell<Cache<u64, Vec<u8>>>,
+    format_version: jet::FormatVersion,
+    format_revision: jet::FormatRevision,
+    page_size: usize,
+    last_page_number: usize,
+}
+
+impl Reader {
+    fn read(&self, offset: u64, buf: &mut [u8]) {
+        let page_size = self.page_size as u64;
+        let pg_no = offset / page_size;
+
+        if !self.cache.borrow_mut().contains_key(&pg_no) {
+            let mut page_buf = vec![0u8; self.page_size];
+
+            self.file.borrow_mut().seek(io::SeekFrom::Start(pg_no * page_size)).unwrap();
+            if let Ok(_) = self.file.borrow_mut().read_exact(&mut page_buf) {
+                self.cache.borrow_mut().insert(pg_no, page_buf);
+            }
         }
-        r
+
+        if let Some(page_buf) = self.cache.borrow_mut().get(&pg_no) {
+            let page_offset = offset % page_size;
+            buf.copy_from_slice(&page_buf[page_offset as usize..buf.len()]);
+        }
+    }
+
+    pub fn read_struct<T>(&self, offset: u64) -> T {
+        let struct_size = mem::size_of::<T>();
+        let mut rec: T = unsafe { mem::zeroed() };
+        unsafe {
+            let buffer = slice::from_raw_parts_mut(&mut rec as *mut _ as *mut u8, struct_size);
+            self.read(offset, buffer);
+        }
+        rec
+    }
+
+    fn new(path: &PathBuf, cache_size: usize) -> Reader {
+        let mut reader = Reader{path: path.clone(),
+            file: RefCell::new(fs::File::open(path).unwrap()),
+            cache: RefCell::new(Cache::new(cache_size)),
+            page_size: 2 * 1024, //just to read header
+            format_version: 0, format_revision: 0, last_page_number: 0 };
+        let db_fh = reader.read_struct::<ese_db::FileHeader>(0);
+
+        reader.format_version = db_fh.format_version;
+        reader.format_revision = db_fh.format_revision;
+        reader.page_size = db_fh.page_size as usize;
+        reader.last_page_number = ((db_fh.page_size * 2) / db_fh.page_size) as usize;
+
+        reader.cache.get_mut().remove(&0);
+
+        reader
     }
 
     pub fn read_bytes(&self, offset: u64, size: usize) -> Vec<u8> {
-        let mut reader = BufReader::new(File::open(&self.path).unwrap());
-        reader.seek(SeekFrom::Start(offset)).unwrap();
-
-        let mut v : Vec<u8> = Vec::new();
-        v.resize(size as usize, 0);
-
-        unsafe {
-            let buffer = slice::from_raw_parts_mut(v.as_mut_ptr(), size);
-            reader.read_exact(buffer).unwrap();
-        }
-        v
+        let mut buf = vec!(0u8; size);
+        self.read(offset, &mut buf);
+        buf
     }
 
-    pub fn read_string(&self, offset: u64, size: usize) -> String {
+    pub fn read_string(&mut self, offset: u64, size: usize) -> String {
         let v = self.read_bytes(offset, size);
         std::str::from_utf8(&v).unwrap().to_string()
     }
 
-    pub fn load_db(path: &std::path::PathBuf) -> Result<jet::IoHandle, SimpleError> {
-        let mut h = jet::IoHandle {
-            path: path.clone(),
-            format_version: 0,
-            format_revision: 0,
-            page_size: 0,
-            last_page_number: 0,
-        };
-
-        let db_fh = load_db_file_header(&h)?;
-        h.format_version = db_fh.format_version;
-        h.format_revision = db_fh.format_revision;
-        h.page_size = db_fh.page_size.into();
-        h.last_page_number = (db_fh.page_size * 2) / db_fh.page_size;
-        Ok(h)
+    pub fn load_db(path: &std::path::PathBuf, cache_size: usize) -> Result<Reader, SimpleError> {
+        Ok(Reader::new(path, cache_size))
     }
 }
 
@@ -80,9 +93,9 @@ unsafe fn _any_as_slice<'a, U: Sized, T: Sized>(p: &'a &mut T) -> &'a mut [U] {
     )
 }
 
-pub fn load_db_file_header(io_handle: &jet::IoHandle) -> Result<ese_db::FileHeader, SimpleError> {
+pub fn load_db_file_header(reader: &mut Reader) -> Result<ese_db::FileHeader, SimpleError> {
     let mut db_file_header =
-        io_handle.read_struct::<ese_db::FileHeader>(0);
+        reader.read_struct::<ese_db::FileHeader>(0);
 
     assert_eq!(
         db_file_header.signature, ESEDB_FILE_SIGNATURE,
@@ -100,7 +113,7 @@ pub fn load_db_file_header(io_handle: &jet::IoHandle) -> Result<ese_db::FileHead
         return Err(SimpleError::new(format!("wrong checksum: {}, calculated {}", stored_checksum, checksum)));
     }
 
-    let backup_file_header = io_handle.read_struct::<ese_db::FileHeader>(db_file_header.page_size as u64);
+    let backup_file_header = reader.read_struct::<ese_db::FileHeader>(db_file_header.page_size as u64);
 
     if db_file_header.format_revision == 0 {
         db_file_header.format_revision = backup_file_header.format_revision;
@@ -129,31 +142,31 @@ pub fn load_db_file_header(io_handle: &jet::IoHandle) -> Result<ese_db::FileHead
 }
 
 pub fn load_page_header(
-    io_handle: &jet::IoHandle,
-    page_number: u32,
+    reader: &Reader,
+    page_number: usize,
 ) -> Result<PageHeader, SimpleError> {
-    let page_offset = ((page_number + 1) * (io_handle.page_size)) as u64;
+    let page_offset = ((page_number + 1) * (reader.page_size)) as u64;
 
-    if io_handle.format_revision < ESEDB_FORMAT_REVISION_NEW_RECORD_FORMAT {
-        let header = io_handle.read_struct::<PageHeaderOld>(page_offset);
-        let common = io_handle.read_struct::<PageHeaderCommon>(page_offset + mem::size_of_val(&header) as u64);
+    if reader.format_revision < ESEDB_FORMAT_REVISION_NEW_RECORD_FORMAT {
+        let header = reader.read_struct::<PageHeaderOld>(page_offset);
+        let common = reader.read_struct::<PageHeaderCommon>(page_offset + mem::size_of_val(&header) as u64);
 
         //let TODO_checksum = 0;
         Ok(PageHeader::old(header, common))
-    } else if io_handle.format_revision < ESEDB_FORMAT_REVISION_EXTENDED_PAGE_HEADER {
-        let header = io_handle.read_struct::<PageHeader0x0b>(page_offset);
-        let common = io_handle.read_struct::<PageHeaderCommon>(page_offset + mem::size_of_val(&header) as u64);
+    } else if reader.format_revision < ESEDB_FORMAT_REVISION_EXTENDED_PAGE_HEADER {
+        let header = reader.read_struct::<PageHeader0x0b>(page_offset);
+        let common = reader.read_struct::<PageHeaderCommon>(page_offset + mem::size_of_val(&header) as u64);
 
         //TODO: verify checksum
         Ok(PageHeader::x0b(header, common))
     } else {
-        let header = io_handle.read_struct::<PageHeader0x11>(page_offset);
-        let common = io_handle.read_struct::<PageHeaderCommon>(page_offset + mem::size_of_val(&header) as u64);
+        let header = reader.read_struct::<PageHeader0x11>(page_offset);
+        let common = reader.read_struct::<PageHeaderCommon>(page_offset + mem::size_of_val(&header) as u64);
 
         //TODO: verify checksum
-        if io_handle.page_size > 8 * 1024 {
+        if reader.page_size > 8 * 1024 {
             let offs = mem::size_of_val(&header) + mem::size_of_val(&common);
-            let ext = io_handle.read_struct::<PageHeaderExt0x11>(page_offset + offs as u64);
+            let ext = reader.read_struct::<PageHeaderExt0x11>(page_offset + offs as u64);
 
             Ok(PageHeader::x11_ext(header, common, ext))
         } else {
@@ -163,24 +176,24 @@ pub fn load_page_header(
 }
 
 pub fn load_page_tags(
-    io_handle: &jet::IoHandle,
+    reader: &Reader,
     db_page: &jet::DbPage,
 ) -> Result<Vec<PageTag>, SimpleError> {
-    let page_offset = ((db_page.page_number + 1) * io_handle.page_size) as u64;
-    let mut tags_offset = (page_offset + io_handle.page_size as u64) as u64;
+    let page_offset = ((db_page.page_number + 1) * reader.page_size) as u64;
+    let mut tags_offset = (page_offset + reader.page_size as u64) as u64;
     let mut tags = Vec::<PageTag>::new();
 
     for _i in 0..db_page.get_available_page_tag() {
         tags_offset -= 2;
-        let page_tag_offset : u16 = io_handle.read_struct(tags_offset);
+        let page_tag_offset : u16 = reader.read_struct(tags_offset);
         tags_offset -= 2;
-        let page_tag_size : u16 = io_handle.read_struct(tags_offset);
+        let page_tag_size : u16 = reader.read_struct(tags_offset);
 
         let mut flags : u8 = 0;
 		let mut offset : u16 = 0;
         let mut size : u16 = 0;
 
-        if io_handle.format_revision >= ESEDB_FORMAT_REVISION_EXTENDED_PAGE_HEADER && io_handle.page_size >= 16384 {
+        if reader.format_revision >= ESEDB_FORMAT_REVISION_EXTENDED_PAGE_HEADER && reader.page_size >= 16384 {
 			offset = page_tag_offset & 0x7fff;
             size   = page_tag_size & 0x7fff;
 
@@ -188,7 +201,7 @@ pub fn load_page_tags(
             //if db_page.flags().contains(jet::PageFlags::IS_LEAF)
             {
                 let flags_offset = page_offset + db_page.size() as u64 + offset as u64;
-                let f : u16 = io_handle.read_struct(flags_offset);
+                let f : u16 = reader.read_struct(flags_offset);
                 flags = (f >> 13) as u8;
             }
         } else {
@@ -203,20 +216,20 @@ pub fn load_page_tags(
 }
 
 pub fn load_root_page_header(
-    io_handle: &jet::IoHandle,
+    reader: &Reader,
     db_page: &jet::DbPage,
     page_tag: &PageTag,
 ) -> Result<RootPageHeader, SimpleError> {
-    let page_offset = ((db_page.page_number + 1) * io_handle.page_size) as u64;
+    let page_offset = ((db_page.page_number + 1) * reader.page_size) as u64;
     let root_page_offset = page_offset + db_page.size() as u64 + page_tag.offset as u64;
 
     // TODO Seen in format version 0x620 revision 0x14
     // check format and revision
     if page_tag.size == 16 {
-        let root_page_header = io_handle.read_struct::<ese_db::RootPageHeader16>(root_page_offset);
+        let root_page_header = reader.read_struct::<ese_db::RootPageHeader16>(root_page_offset);
         return Ok(RootPageHeader::xf(root_page_header));
     } else if page_tag.size == 25 {
-        let root_page_header = io_handle.read_struct::<ese_db::RootPageHeader25>(root_page_offset);
+        let root_page_header = reader.read_struct::<ese_db::RootPageHeader25>(root_page_offset);
         return Ok(RootPageHeader::x19(root_page_header));
     }
 
@@ -224,32 +237,32 @@ pub fn load_root_page_header(
 }
 
 pub fn page_tag_get_branch_child_page_number(
-    io_handle: &jet::IoHandle,
+    reader: &Reader,
     db_page: &jet::DbPage,
     page_tag: &PageTag,
-) -> Result<u32, SimpleError> {
-    let page_offset = ((db_page.page_number + 1) * io_handle.page_size) as u64;
+) -> Result<usize, SimpleError> {
+    let page_offset = ((db_page.page_number + 1) * reader.page_size) as u64;
     let mut offset = page_offset + db_page.size() as u64 + page_tag.offset as u64;
 
     let mut common_page_key_size : u16 = 0;
     if page_tag.flags().intersects(jet::PageTagFlags::FLAG_HAS_COMMON_KEY_SIZE) {
-        common_page_key_size = io_handle.read_struct(offset);
+        common_page_key_size = reader.read_struct(offset);
         offset += 2;
     }
-    let local_page_key_size : u16 = io_handle.read_struct(offset);
+    let local_page_key_size : u16 = reader.read_struct(offset);
     offset += 2;
     offset += local_page_key_size as u64;
 
-    let child_page_number : u32 = io_handle.read_struct(offset);
+    let child_page_number : usize = reader.read_struct(offset);
     offset += 4;
 
     Ok(child_page_number)
 }
 
 pub fn load_catalog(
-    io_handle: &jet::IoHandle,
+    reader: &mut Reader,
 ) -> Result<Vec<jet::TableDefinition>, SimpleError> {
-    let db_page = jet::DbPage::new(&io_handle, jet::FixedPageNumber::Catalog as u32)?;
+    let db_page = jet::DbPage::new(reader, jet::FixedPageNumber::Catalog as usize)?;
     let pg_tags = &db_page.page_tags;
 
     if !db_page.flags().contains(jet::PageFlags::IS_PARENT) {
@@ -260,7 +273,7 @@ pub fn load_catalog(
     let is_root = db_page.flags().contains(jet::PageFlags::IS_ROOT);
 
     if is_root {
-        let root_page_header = load_root_page_header(&io_handle, &db_page, &pg_tags[0]).unwrap();
+        let root_page_header = load_root_page_header(reader, &db_page, &pg_tags[0]).unwrap();
         //println!("root_page {:?}", root_page_header);
     }
 
@@ -269,9 +282,9 @@ pub fn load_catalog(
         column_catalog_definition_array: vec![], long_value_catalog_definition: None };
 
     let mut prev_page_number = db_page.page_number;
-    let mut page_number = page_tag_get_branch_child_page_number(io_handle, &db_page, &pg_tags[1])?;
+    let mut page_number = page_tag_get_branch_child_page_number(reader, &db_page, &pg_tags[1])?;
     while page_number != 0 {
-        let db_page = jet::DbPage::new(&io_handle, page_number)?;
+        let db_page = jet::DbPage::new(reader, page_number)?;
         let pg_tags = &db_page.page_tags;
 
         if db_page.prev_page() != 0 && prev_page_number != db_page.prev_page() {
@@ -287,7 +300,7 @@ pub fn load_catalog(
             if jet::PageTagFlags::from_bits_truncate(pg_tags[i].flags).intersects(jet::PageTagFlags::FLAG_IS_DEFUNCT) {
                 continue;
             }
-            let cat_item = load_catalog_item(io_handle, &db_page, &pg_tags[i])?;
+            let cat_item = load_catalog_item(reader, &db_page, &pg_tags[i])?;
             if cat_item.cat_type == jet::CatalogType::Table as u16 {
                 if table_def.table_catalog_definition.is_some() {
                     res.push(table_def);
@@ -322,24 +335,25 @@ pub fn load_catalog(
 }
 
 pub fn load_catalog_item(
-    io_handle: &jet::IoHandle,
+    reader: &mut Reader,
     db_page: &jet::DbPage,
     page_tag: &PageTag,
 ) -> Result<jet::CatalogDefinition, SimpleError> {
-    let page_offset = ((db_page.page_number + 1) * io_handle.page_size) as u64;
+    let page_offset = ((db_page.page_number + 1) * reader.page_size) as u64;
     let mut offset = page_offset + db_page.size() as u64 + page_tag.offset as u64;
     let offset_start = offset;
 
     let mut first_word_readed = false;
     let mut common_page_key_size : u16 = 0;
+    let data: u16 = reader.read_struct(offset);
     if page_tag.flags().intersects(jet::PageTagFlags::FLAG_HAS_COMMON_KEY_SIZE) {
-        common_page_key_size = clean_pgtag_flag(io_handle, db_page, io_handle.read_struct(offset));
+        common_page_key_size = clean_pgtag_flag(reader, db_page, data);
         first_word_readed = true;
         offset += 2;
     }
-    let mut local_page_key_size : u16 = io_handle.read_struct(offset);
+    let mut local_page_key_size : u16 = reader.read_struct(offset);
     if !first_word_readed {
-        local_page_key_size = clean_pgtag_flag(io_handle, db_page, local_page_key_size);
+        local_page_key_size = clean_pgtag_flag(reader, db_page, local_page_key_size);
         first_word_readed = true;
     }
     offset += 2;
@@ -348,7 +362,7 @@ pub fn load_catalog_item(
     let data_left_in_tag = page_tag.size as u64 - (offset - offset_start);
 
     let offset_ddh = offset;
-    let ddh = io_handle.read_struct::<ese_db::DataDefinitionHeader>(offset_ddh);
+    let ddh = reader.read_struct::<ese_db::DataDefinitionHeader>(offset_ddh);
     offset += mem::size_of::<ese_db::DataDefinitionHeader>() as u64;
 
     let mut number_of_variable_size_data_types : u32 = 0;
@@ -358,7 +372,7 @@ pub fn load_catalog_item(
 
     let cat_def_zero = std::mem::MaybeUninit::<jet::CatalogDefinition>::zeroed();
     let mut cat_def = unsafe { cat_def_zero.assume_init() };
-    let data_def = io_handle.read_struct::<ese_db::DataDefinition>(offset);
+    let data_def = reader.read_struct::<ese_db::DataDefinition>(offset);
 
     cat_def.father_data_page_object_identifier = data_def.father_data_page_object_identifier;
     cat_def.cat_type = data_def.data_type;
@@ -385,7 +399,7 @@ pub fn load_catalog_item(
         let remaining_data_size = page_tag.size as u32 - variable_size_data_type_value_data_offset;
         for variable_size_data_type_iterator in 0..number_of_variable_size_data_types {
             offset += ddh.variable_size_data_types_offset as u64;
-            let variable_size_data_type_size : u16 = io_handle.read_struct(offset_ddh + variable_size_data_types_offset as u64);
+            let variable_size_data_type_size : u16 = reader.read_struct(offset_ddh + variable_size_data_types_offset as u64);
             variable_size_data_types_offset += 2;
 
             let mut data_type_size : u16 = 0;
@@ -397,7 +411,7 @@ pub fn load_catalog_item(
             match data_type_number {
                 128 => {
                     let offset_dtn = offset_ddh + variable_size_data_type_value_data_offset as u64 + previous_variable_size_data_type_size as u64;
-                    cat_def.name = io_handle.read_string(offset_dtn, data_type_size as usize);
+                    cat_def.name = reader.read_string(offset_dtn, data_type_size as usize);
                     //println!("cat_def.name: {}", cat_def.name);
                 },
                 130 => {
@@ -431,10 +445,10 @@ pub fn load_catalog_item(
     Ok(cat_def)
 }
 
-pub fn clean_pgtag_flag(io_handle: &jet::IoHandle, db_page: &jet::DbPage, data: u16) -> u16 {
+pub fn clean_pgtag_flag(reader: &Reader, db_page: &jet::DbPage, data: u16) -> u16 {
     // The upper 3-bits of the first 16-bit-value in the leaf page entry contain the page tag flags
-    if io_handle.format_revision >= ESEDB_FORMAT_REVISION_EXTENDED_PAGE_HEADER
-        && io_handle.page_size >= 16384
+    if reader.format_revision >= ESEDB_FORMAT_REVISION_EXTENDED_PAGE_HEADER
+        && reader.page_size >= 16384
         && db_page.flags().contains(jet::PageFlags::IS_LEAF)
     {
         return data & 0x1FFF;
@@ -442,20 +456,20 @@ pub fn clean_pgtag_flag(io_handle: &jet::IoHandle, db_page: &jet::DbPage, data: 
     data
 }
 
-pub fn find_first_leaf_page(io_handle: &jet::IoHandle, page_number: u32)
-    -> Result<u32, SimpleError> {
-    let db_page = jet::DbPage::new(&io_handle, page_number)?;
+pub fn find_first_leaf_page(reader: &Reader, page_number: usize)
+    -> Result<usize, SimpleError> {
+    let db_page = jet::DbPage::new(reader, page_number)?;
     if db_page.flags().contains(jet::PageFlags::IS_LEAF) {
         return Ok(page_number);
     }
 
     let pg_tags = &db_page.page_tags;
-    let child_page_number = page_tag_get_branch_child_page_number(io_handle, &db_page, &pg_tags[1])?;
-    return find_first_leaf_page(io_handle, child_page_number);
+    let child_page_number = page_tag_get_branch_child_page_number(reader, &db_page, &pg_tags[1])?;
+    return find_first_leaf_page(reader, child_page_number);
 }
 
 pub fn load_data(
-    io_handle: &jet::IoHandle,
+    reader: &Reader,
     tbl_def: &jet::TableDefinition,
     lv_tags: &Vec<LV_tags>,
     db_page: &jet::DbPage,
@@ -466,7 +480,7 @@ pub fn load_data(
 
     let is_root = db_page.flags().contains(jet::PageFlags::IS_ROOT);
     if is_root {
-        let _root_page_header = load_root_page_header(&io_handle, &db_page, &pg_tags[0]).unwrap();
+        let _root_page_header = load_root_page_header(reader, &db_page, &pg_tags[0]).unwrap();
         //println!("root_page {:?}", _root_page_header);
     }
 
@@ -480,20 +494,21 @@ pub fn load_data(
     }
 
     let page_tag = &pg_tags[page_tag_index];
-    let page_offset = ((db_page.page_number + 1) * io_handle.page_size) as u64;
+    let page_offset = ((db_page.page_number + 1) * reader.page_size) as u64;
     let mut offset = page_offset + db_page.size() as u64 + page_tag.offset as u64;
     let offset_start = offset;
 
     let mut first_word_readed = false;
     let mut common_page_key_size : u16 = 0;
+    let data: u16 = reader.read_struct(offset);
     if page_tag.flags().intersects(jet::PageTagFlags::FLAG_HAS_COMMON_KEY_SIZE) {
-        common_page_key_size = clean_pgtag_flag(io_handle, &db_page, io_handle.read_struct(offset));
+        common_page_key_size = clean_pgtag_flag(reader, &db_page, data);
         first_word_readed = true;
         offset += 2;
     }
-    let mut local_page_key_size : u16 = io_handle.read_struct(offset);
+    let mut local_page_key_size : u16 = reader.read_struct(offset);
     if !first_word_readed {
-        local_page_key_size = clean_pgtag_flag(io_handle, &db_page, local_page_key_size);
+        local_page_key_size = clean_pgtag_flag(reader, &db_page, local_page_key_size);
         first_word_readed = true;
     }
     offset += 2;
@@ -502,16 +517,16 @@ pub fn load_data(
     let record_data_size = page_tag.size as u64 - (offset - offset_start);
 
     let offset_ddh = offset;
-    let ddh = io_handle.read_struct::<ese_db::DataDefinitionHeader>(offset_ddh);
+    let ddh = reader.read_struct::<ese_db::DataDefinitionHeader>(offset_ddh);
     offset += mem::size_of::<ese_db::DataDefinitionHeader>() as u64;
 
     let mut tagged_data_types_format = jet::TaggedDataTypesFormats::Index;
-    if io_handle.format_version == 0x620 && io_handle.format_revision <= 2 {
+    if reader.format_version == 0x620 && reader.format_revision <= 2 {
         tagged_data_types_format = jet::TaggedDataTypesFormats::Linear;
     }
 
     let mut tagged_data_type_offset_bitmask : u16 = 0x3fff;
-    if io_handle.format_revision >= ESEDB_FORMAT_REVISION_EXTENDED_PAGE_HEADER && io_handle.page_size >= 16384 {
+    if reader.format_revision >= ESEDB_FORMAT_REVISION_EXTENDED_PAGE_HEADER && reader.page_size >= 16384 {
         tagged_data_type_offset_bitmask = 0x7fff;
     }
 
@@ -537,21 +552,21 @@ pub fn load_data(
         if col.identifier <= 127 {
             // fixed size column
             if col.identifier == column_id {
-                let v = io_handle.read_bytes(offset, col.size as usize);
+                let v = reader.read_bytes(offset, col.size as usize);
                 return Ok(Some(v));
             }
             offset += col.size as u64;
         } else if current_variable_size_data_type < ddh.last_variable_size_data_type as u32 {
             // variable size
             while current_variable_size_data_type < col.identifier {
-                let variable_size_data_type_size : u16 = io_handle.read_struct(offset_ddh + variable_size_data_type_offset as u64);
+                let variable_size_data_type_size : u16 = reader.read_struct(offset_ddh + variable_size_data_type_offset as u64);
                 variable_size_data_type_offset += 2;
                 current_variable_size_data_type += 1;
                 if current_variable_size_data_type == col.identifier {
                     if (variable_size_data_type_size & 0x8000) == 0 {
 
                         if col.identifier == column_id {
-                            let v = io_handle.read_bytes(offset_ddh + variable_size_data_type_value_offset as u64,
+                            let v = reader.read_bytes(offset_ddh + variable_size_data_type_value_offset as u64,
                                 (variable_size_data_type_size - previous_variable_size_data_type_size) as usize);
                             return Ok(Some(v));
                         }
@@ -577,10 +592,10 @@ pub fn load_data(
                     offset = offset_ddh + tagged_data_types_offset as u64;
 
                     if remaining_definition_data_size > 0 {
-                        tagged_data_type_identifier = io_handle.read_struct::<u16>(offset);
+                        tagged_data_type_identifier = reader.read_struct::<u16>(offset);
                         offset += 2;
 
-                        tagged_data_type_offset = io_handle.read_struct::<u16>(offset);
+                        tagged_data_type_offset = reader.read_struct::<u16>(offset);
                         offset += 2;
 
                         if tagged_data_type_offset == 0 {
@@ -593,10 +608,10 @@ pub fn load_data(
                 if remaining_definition_data_size > 0 && col.identifier == tagged_data_type_identifier as u32 {
                     previous_tagged_data_type_offset = tagged_data_type_offset;
                     if tagged_data_type_offset_data_size > 0 {
-                        tagged_data_type_identifier = io_handle.read_struct::<u16>(offset);
+                        tagged_data_type_identifier = reader.read_struct::<u16>(offset);
                         offset += 2;
 
-                        tagged_data_type_offset = io_handle.read_struct::<u16>(offset);
+                        tagged_data_type_offset = reader.read_struct::<u16>(offset);
                         offset += 2;
 
                         tagged_data_type_offset_data_size -= 4;
@@ -616,10 +631,10 @@ pub fn load_data(
                     let mut data_type_flags : u8 = 0;
                     if tagged_data_type_size > 0 {
                         remaining_definition_data_size -= tagged_data_type_size;
-                        if (io_handle.format_revision >= ESEDB_FORMAT_REVISION_EXTENDED_PAGE_HEADER &&
-                            io_handle.page_size >= 16384) || (previous_tagged_data_type_offset & 0x4000 ) != 0
+                        if (reader.format_revision >= ESEDB_FORMAT_REVISION_EXTENDED_PAGE_HEADER &&
+                            reader.page_size >= 16384) || (previous_tagged_data_type_offset & 0x4000 ) != 0
                         {
-                            data_type_flags = io_handle.read_struct::<u8>(offset_ddh + tagged_data_type_value_offset as u64);
+                            data_type_flags = reader.read_struct::<u8>(offset_ddh + tagged_data_type_value_offset as u64);
                             if data_type_flags != 5 && data_type_flags != 1 {
                                 let dtf = jet::TaggedDataTypeFlag::from_bits(data_type_flags.into());
                                 println!("{} unsupported tagged data type flags: {:?}", col.name, dtf);
@@ -630,11 +645,11 @@ pub fn load_data(
                     }
                     if tagged_data_type_size > 0 && col.identifier == column_id {
                         if jet::TaggedDataTypeFlag::from_bits_truncate(data_type_flags as u16).intersects(jet::TaggedDataTypeFlag::LONG_VALUE) {
-                            let key = io_handle.read_struct::<u32>(offset_ddh + tagged_data_type_value_offset as u64);
-                            let v = load_lv_data(&io_handle, &lv_tags, key).unwrap();
+                            let key = reader.read_struct::<u32>(offset_ddh + tagged_data_type_value_offset as u64);
+                            let v = load_lv_data(reader, &lv_tags, key).unwrap();
                             return Ok(Some(v));
                         } else {
-                            let v = io_handle.read_bytes(offset_ddh + tagged_data_type_value_offset as u64,
+                            let v = reader.read_bytes(offset_ddh + tagged_data_type_value_offset as u64,
                                 tagged_data_type_size as usize);
                             return Ok(Some(v));
                         }
@@ -652,12 +667,12 @@ pub fn load_data(
 }
 
 pub fn load_lv_tag(
-    io_handle: &jet::IoHandle,
+    reader: &Reader,
     db_page: &jet::DbPage,
     page_tag: &PageTag,
     page_tag_0: &PageTag
 ) -> Result<Option<LV_tags>, SimpleError> {
-    let page_offset = ((db_page.page_number + 1) * io_handle.page_size) as u64;
+    let page_offset = ((db_page.page_number + 1) * reader.page_size) as u64;
     let mut offset = page_offset + db_page.size() as u64 + page_tag.offset as u64;
     let page_tag_offset : u64 = offset;
 
@@ -665,37 +680,38 @@ pub fn load_lv_tag(
 
     let mut first_word_readed = false;
     let mut common_page_key_size : u16 = 0;
+    let data: u16 = reader.read_struct(offset);
     if page_tag.flags().intersects(jet::PageTagFlags::FLAG_HAS_COMMON_KEY_SIZE) {
-        common_page_key_size = clean_pgtag_flag(io_handle, db_page, io_handle.read_struct(offset));
+        common_page_key_size = clean_pgtag_flag(reader, db_page, data);
         first_word_readed = true;
         offset += 2;
 
         if common_page_key_size > 0 {
             let offset0 = page_offset + db_page.size() as u64 + page_tag_0.offset as u64;
-            let mut common_page_key = io_handle.read_bytes(offset0, common_page_key_size as usize);
+            let mut common_page_key = reader.read_bytes(offset0, common_page_key_size as usize);
             res.common_page_key.append(&mut common_page_key);
         }
     }
 
-    let mut local_page_key_size : u16 = io_handle.read_struct(offset);
+    let mut local_page_key_size : u16 = reader.read_struct(offset);
     if !first_word_readed {
-        local_page_key_size = clean_pgtag_flag(io_handle, db_page, local_page_key_size);
+        local_page_key_size = clean_pgtag_flag(reader, db_page, local_page_key_size);
         first_word_readed = true;
     }
     offset += 2;
     if local_page_key_size > 0 {
-        let mut local_page_key = io_handle.read_bytes(offset, local_page_key_size as usize);
+        let mut local_page_key = reader.read_bytes(offset, local_page_key_size as usize);
         res.local_page_key.append(&mut local_page_key);
         offset += local_page_key_size as u64;
     }
 
     if (page_tag.size as u64) - (offset - page_tag_offset) == 8 {
-        let skey : u32 = io_handle.read_struct(offset);
+        let skey : u32 = reader.read_struct(offset);
         offset += 4;
 
         res.key = skey;
 
-        let total_size : u32 = io_handle.read_struct(offset);
+        let total_size : u32 = reader.read_struct(offset);
         offset += 4;
 
         // TODO: handle? page_tags with skey & total_size only
@@ -747,10 +763,10 @@ impl std::fmt::Display for LV_tags{
 }
 
 pub fn load_lv_metadata(
-    io_handle: &jet::IoHandle,
-    page_number: u32
+    reader: &Reader,
+    page_number: usize
 ) -> Result<Vec<LV_tags>, SimpleError> {
-    let db_page = jet::DbPage::new(&io_handle, page_number)?;
+    let db_page = jet::DbPage::new(reader, page_number)?;
     let pg_tags = &db_page.page_tags;
 
     if !db_page.flags().contains(jet::PageFlags::IS_LONG_VALUE) {
@@ -760,7 +776,7 @@ pub fn load_lv_metadata(
 
     let is_root = db_page.flags().contains(jet::PageFlags::IS_ROOT);
     if is_root {
-        let _root_page_header = load_root_page_header(&io_handle, &db_page, &pg_tags[0]).unwrap();
+        let _root_page_header = load_root_page_header(reader, &db_page, &pg_tags[0]).unwrap();
         //println!("root_page {:?}", _root_page_header);
     }
 
@@ -768,9 +784,9 @@ pub fn load_lv_metadata(
 
     if !db_page.flags().contains(jet::PageFlags::IS_LEAF) {
         let mut prev_page_number = page_number;
-        let mut page_number = page_tag_get_branch_child_page_number(io_handle, &db_page, &pg_tags[1])?;
+        let mut page_number = page_tag_get_branch_child_page_number(reader, &db_page, &pg_tags[1])?;
         while page_number != 0 {
-            let db_page = jet::DbPage::new(&io_handle, page_number)?;
+            let db_page = jet::DbPage::new(reader, page_number)?;
             let pg_tags = &db_page.page_tags;
 
             if db_page.prev_page() != 0 && prev_page_number != db_page.prev_page() {
@@ -780,7 +796,7 @@ pub fn load_lv_metadata(
             if !db_page.flags().contains(jet::PageFlags::IS_LEAF | jet::PageFlags::IS_LONG_VALUE) {
 
                 // maybe it's "Parent of leaf" page
-                let mut r = load_lv_metadata(&io_handle, page_number);
+                let mut r = load_lv_metadata(reader, page_number);
                 match r {
                     Ok(mut r) => {
                         res.append(&mut r);
@@ -795,7 +811,7 @@ pub fn load_lv_metadata(
                         continue;
                     }
 
-                    match load_lv_tag(&io_handle, &db_page, &pg_tags[i], &pg_tags[0]) {
+                    match load_lv_tag(reader, &db_page, &pg_tags[i], &pg_tags[0]) {
                         Ok(r) => {
                             if r.is_some() {
                                 res.push(r.unwrap());
@@ -810,7 +826,7 @@ pub fn load_lv_metadata(
         }
     } else {
         for i in 1..pg_tags.len() {
-            match load_lv_tag(&io_handle, &db_page, &pg_tags[i], &pg_tags[0]) {
+            match load_lv_tag(reader, &db_page, &pg_tags[i], &pg_tags[0]) {
                 Ok(r) => {
                     if r.is_some() {
                         res.push(r.unwrap());
@@ -825,7 +841,7 @@ pub fn load_lv_metadata(
 }
 
 pub fn load_lv_data(
-    io_handle: &jet::IoHandle,
+    reader: &Reader,
     lv_tags: &Vec<LV_tags>,
     long_value_key: u32,
 ) -> Result<Vec<u8>, SimpleError> {
@@ -833,7 +849,7 @@ pub fn load_lv_data(
     let mut i = 0;
     while i < lv_tags.len() {
         if long_value_key == lv_tags[i].key && res.len() == lv_tags[i].seg_offset as usize {
-            let mut v = io_handle.read_bytes(lv_tags[i].offset, lv_tags[i].size as usize);
+            let mut v = reader.read_bytes(lv_tags[i].offset, lv_tags[i].size as usize);
             res.append(&mut v);
             i = 0; // search next seg_offset (lv_tags could be not sorted)
             continue;
