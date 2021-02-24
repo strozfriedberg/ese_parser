@@ -33,8 +33,8 @@ impl Reader {
         }
 
         if let Some(page_buf) = self.cache.borrow_mut().get(&pg_no) {
-            let page_offset = offset % page_size;
-            buf.copy_from_slice(&page_buf[page_offset as usize..buf.len()]);
+            let page_offset = (offset % page_size) as usize;
+            buf.copy_from_slice(&page_buf[page_offset..page_offset + buf.len()]);
         }
     }
 
