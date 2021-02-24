@@ -87,7 +87,7 @@ impl EseDb for EseAPI {
         EseAPI { instance: 0, sesid: 0, dbid: 0 }
     }
 
-    fn load(&mut self, dbpath: &str) -> Option<SimpleError> {
+    fn load(&mut self, dbpath: &str, cache_size: usize) -> Option<SimpleError> {
         let dbinfo = match EseAPI::get_database_file_info(dbpath) {
             Ok(i) => i,
             Err(e) => return Some(e)
