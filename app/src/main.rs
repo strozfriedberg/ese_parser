@@ -64,10 +64,10 @@ impl EseDb for EseBoth {
 
     fn load(&mut self, dbpath: &str) -> Option<SimpleError> {
         if let Some(e) = self.api.load(dbpath) {
-            return Some(SimpleError::new(format!("EseAPI failed: {}", e)));
+            return Some(SimpleError::new(format!("EseAPI::load failed: {}", e)));
         }
         if let Some(e) = self.parser.load(dbpath) {
-            return Some(SimpleError::new(format!("EseParser failed: {}", e)));
+            return Some(SimpleError::new(format!("EseParser::load failed: {}", e)));
         }
         None
     }
@@ -77,8 +77,8 @@ impl EseDb for EseBoth {
     }
 
     fn open_table(&self, table: &str) -> Result<u64, SimpleError> {
-        let api_table = self.api.open_table(table).map_err(|e| SimpleError::new(format!("EseAPI failed: {}", e)))?;
-        let parser_table = self.parser.open_table(table).map_err(|e| SimpleError::new(format!("EseParser failed: {}", e)))?;
+        let api_table = self.api.open_table(table).map_err(|e| SimpleError::new(format!("EseAPI::open_table failed: {}", e)))?;
+        let parser_table = self.parser.open_table(table).map_err(|e| SimpleError::new(format!("EseParser::open_table failed: {}", e)))?;
         let mut v = self.opened_tables.borrow_mut();
         v.push((api_table, parser_table));
         Ok((v.len()-1) as u64)
@@ -100,8 +100,8 @@ impl EseDb for EseBoth {
     }
 
     fn get_tables(&self) -> Result<Vec<String>, SimpleError> {
-        let api_tables = self.api.get_tables().map_err(|e| SimpleError::new(format!("EseAPI failed: {}", e)))?;
-        let parser_tables = self.parser.get_tables().map_err(|e| SimpleError::new(format!("EseParser failed: {}", e)))?;
+        let api_tables = self.api.get_tables().map_err(|e| SimpleError::new(format!("EseAPI::get_tables failed: {}", e)))?;
+        let parser_tables = self.parser.get_tables().map_err(|e| SimpleError::new(format!("EseParser::get_tables failed: {}", e)))?;
         if api_tables.len() != parser_tables.len() {
             return Err(SimpleError::new(format!("get_tables() have difference: EseAPI tables:\n{:?}\n not equal to EseParser:\n{:?}\n",
                 api_tables, parser_tables)));
@@ -116,8 +116,8 @@ impl EseDb for EseBoth {
     }
 
     fn get_columns(&self, table: &str) -> Result<Vec<ColumnInfo>, SimpleError> {
-        let api_columns = self.api.get_columns(table).map_err(|e| SimpleError::new(format!("EseAPI failed: {}", e)))?;
-        let parser_columns = self.parser.get_columns(table).map_err(|e| SimpleError::new(format!("EseParser failed: {}", e)))?;
+        let api_columns = self.api.get_columns(table).map_err(|e| SimpleError::new(format!("EseAPI::get_columns failed: {}", e)))?;
+        let parser_columns = self.parser.get_columns(table).map_err(|e| SimpleError::new(format!("EseParser::get_columns failed: {}", e)))?;
         if api_columns.len() != parser_columns.len() {
             return Err(SimpleError::new(format!("get_columns({}) have difference: EseAPI columns:\n{:?}\n not equal to EseParser:\n{:?}\n",
                 table, api_columns, parser_columns)));
@@ -177,6 +177,21 @@ impl EseDb for EseBoth {
                 d2.as_mut_ptr() as *mut std::ffi::c_void,
                 size);
             if cmp != size {
+                // if value filled with 0x2a, it's NULL???
+                let mut d1p = d1.as_ptr() as *const u8;
+                let mut d2p = d2.as_ptr() as *const u8;
+                let mut all_0x2a = true;
+                for i in 0..size {
+                    unsafe {
+                        if *d2p.offset(i as isize) != 0x2a || *d1p.offset(i as isize) != 0 {
+                            all_0x2a = false;
+                            break;
+                        }
+                    }
+                }
+                if all_0x2a {
+                    return Ok(Some(d1.assume_init()));
+                }
                 return Err(SimpleError::new(format!("table {}, column({}) EseAPI value not equal to EseParser value",
                     table, column)));
             }
@@ -233,6 +248,10 @@ fn dump_tables(dbpath: &str) {
         println!("table {}", &t);
         let table_id = jdb.open_table(&t).unwrap();
         let cols = jdb.get_columns(&t).unwrap();
+        if !jdb.move_row(table_id, JET_MoveFirst as u32) {
+            // empty table
+            continue;
+        }
         let mut column_names_printed = false;
         loop {
             let mut values : Vec<String> = Vec::new();
