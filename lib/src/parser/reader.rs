@@ -544,10 +544,8 @@ pub fn load_data(
                 }
                 offset += col.size as u64;
             } else if col.identifier == column_id {
-                // no value in tag, return empty
-                let mut v : Vec<u8> = Vec::new();
-                v.resize(col.size as usize, 0);
-                return Ok(Some(v));
+                // no value in tag
+                return Ok(None);
             }
         } else if current_variable_size_data_type < ddh.last_variable_size_data_type as u32 {
             // variable size

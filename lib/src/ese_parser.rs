@@ -139,13 +139,35 @@ impl EseParser {
 
         Err(SimpleError::new(format!("move_row: TODO: implement me, crow {}", crow)))
     }
+
+    pub fn get_column<T>(&self, table: u64, column: u32) -> Result<Option<T>, SimpleError> {
+        let size = std::mem::size_of::<T>();
+        let mut dst = std::mem::MaybeUninit::<T>::zeroed();
+
+        unsafe {
+            let vo = self.get_column_dyn_helper(table, column)?;
+            if vo.is_none() {
+                return Err(SimpleError::new(format!("get_column_dyn_helper: 0 size returned, expected {}", size)));
+            }
+            let v = vo.as_ref().unwrap();
+            if size != v.len() {
+                return Err(SimpleError::new(format!("get_column_dyn_helper: wrong size ({}) returned, expected {}",
+                    v.len(), size)));
+            }
+            std::ptr::copy_nonoverlapping(
+                v.as_ptr(),
+                dst.as_mut_ptr() as *mut u8,
+                size);
+            Ok(Some(dst.assume_init()))
+        }
+    }
+
+    pub fn init() -> EseParser {
+        EseParser { io_handle: None, tables: vec![] }
+    }
 }
 
 impl EseDb for EseParser {
-    fn init() -> EseParser {
-        EseParser { io_handle: None, tables: vec![] }
-    }
-
     fn load(&mut self, dbpath: &str) -> Option<SimpleError> {
         let h = match jet::IoHandle::load_db(&std::path::PathBuf::from(dbpath)) {
             Ok(h) => h,
@@ -243,28 +265,6 @@ impl EseDb for EseParser {
         match std::str::from_utf8(&v.unwrap()) {
             Ok(s) => Ok(Some(s.to_string())),
             Err(e) => Err(SimpleError::new(format!("std::str::from_utf8 failed: {}", e)))
-        }
-    }
-
-    fn get_column<T>(&self, table: u64, column: u32) -> Result<Option<T>, SimpleError> {
-        let size = std::mem::size_of::<T>();
-        let mut dst = std::mem::MaybeUninit::<T>::zeroed();
-
-        unsafe {
-            let vo = self.get_column_dyn_helper(table, column)?;
-            if vo.is_none() {
-                return Err(SimpleError::new(format!("get_column_dyn_helper: 0 size returned, expected {}", size)));
-            }
-            let v = vo.as_ref().unwrap();
-            if size != v.len() {
-                return Err(SimpleError::new(format!("get_column_dyn_helper: wrong size ({}) returned, expected {}",
-                    v.len(), size)));
-            }
-            std::ptr::copy_nonoverlapping(
-                v.as_ptr(),
-                dst.as_mut_ptr() as *mut u8,
-                size);
-            Ok(Some(dst.assume_init()))
         }
     }
 

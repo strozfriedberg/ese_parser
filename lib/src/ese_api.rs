@@ -79,13 +79,24 @@ impl EseAPI {
             Ok(bytes as u32)
         }
     }
+
+    pub fn get_column<T>(&self, table: u64, column: u32) -> Result<Option<T>, SimpleError> {
+        let size : c_ulong = size_of::<T>() as u32;
+        let mut v = MaybeUninit::<T>::zeroed();
+
+        unsafe {
+            self.get_column_dyn_helper(table, column,
+                std::slice::from_raw_parts_mut::<u8>(v.as_mut_ptr() as *mut u8, size as usize), size as usize)?;
+            Ok(Some(v.assume_init()))
+        }
+    }
+
+    pub fn init() -> EseAPI {
+        EseAPI { instance: 0, sesid: 0, dbid: 0 }
+    }
 }
 
 impl EseDb for EseAPI {
-
-    fn init() -> EseAPI {
-        EseAPI { instance: 0, sesid: 0, dbid: 0 }
-    }
 
     fn load(&mut self, dbpath: &str) -> Option<SimpleError> {
         let dbinfo = match EseAPI::get_database_file_info(dbpath) {
@@ -202,17 +213,6 @@ impl EseDb for EseAPI {
         match std::str::from_utf8(&v) {
             Ok(s) => Ok(Some(s.to_string())),
             Err(e) => Err(SimpleError::new(format!("std::str::from_utf8 failed: {}", e)))
-        }
-    }
-
-    fn get_column<T>(&self, table: u64, column: u32) -> Result<Option<T>, SimpleError> {
-        let size : c_ulong = size_of::<T>() as u32;
-        let mut v = MaybeUninit::<T>::zeroed();
-
-        unsafe {
-            self.get_column_dyn_helper(table, column,
-                std::slice::from_raw_parts_mut::<u8>(v.as_mut_ptr() as *mut u8, size as usize), size as usize)?;
-            Ok(Some(v.assume_init()))
         }
     }
 
