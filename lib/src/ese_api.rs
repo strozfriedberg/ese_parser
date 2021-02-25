@@ -177,7 +177,7 @@ impl EseDb for EseAPI {
     fn close_table(&self, table: u64) -> bool {
         unsafe {
             let err = JetCloseTable(self.sesid, table);
-            err != 0
+            err == 0
         }
     }
 
