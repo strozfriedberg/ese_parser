@@ -71,9 +71,13 @@ impl EseParser {
             if crow == esent::JET_MoveFirst as u32 {
                 let first_leaf_page = find_first_leaf_page(io_handle,
                     t.cat.table_catalog_definition.as_ref().unwrap().father_data_page_number)?;
-                if t.page().page_number != first_leaf_page {
+                if t.current_page.is_none() || t.page().page_number != first_leaf_page {
                     let page = jet::DbPage::new(&self.io_handle.as_ref().unwrap(), first_leaf_page)?;
                     t.current_page = Some(page);
+                }
+                if t.page().page_tags.len() < 2 {
+                    // empty table
+                    return Ok(false);
                 }
                 i = 1;
             }
@@ -103,6 +107,10 @@ impl EseParser {
                 while t.page().common().next_page != 0 {
                     let page = jet::DbPage::new(&self.io_handle.as_ref().unwrap(), t.page().common().next_page)?;
                     t.current_page = Some(page);
+                }
+                if t.page().page_tags.len() < 2 {
+                    // empty table
+                    return Ok(false);
                 }
                 i = t.page().page_tags.len()-1;
             }
@@ -183,17 +191,9 @@ impl EseDb for EseParser {
                     t.cat.long_value_catalog_definition.as_ref().unwrap().father_data_page_number)?;
                 t.lv_tags = lv;
             }
-
-            // find and load first leaf page
-            let first_leaf_page = find_first_leaf_page(io_handle,
-                t.cat.table_catalog_definition.as_ref().unwrap().father_data_page_number)?;
-            let page = jet::DbPage::new(&self.io_handle.as_ref().unwrap(), first_leaf_page)?;
-            if page.page_tags.len() < 2 {
-                return Err(SimpleError::new(format!("Table {} is empty", table)));
-            }
-            t.current_page = Some(page);
-            t.page_tag_index = 1;
         }
+        // ignore return result
+        self.move_row_helper(index as u64, esent::JET_MoveFirst);
 
         Ok(index as u64)
     }
