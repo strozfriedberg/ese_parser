@@ -366,10 +366,8 @@ pub struct CatalogDefinition {
 
     pub name: String,
 
-    pub template_name: *mut uint8_t,
-    pub template_name_size: uint32_t,
-    pub default_value: *mut uint8_t,
-    pub default_value_size: uint32_t,
+    pub template_name: Vec<u8>,
+    pub default_value: Vec<u8>
 }
 
 #[derive(Clone)]

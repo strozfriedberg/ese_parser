@@ -394,35 +394,36 @@ pub fn load_catalog_item(
             } else {
                 data_type_size = variable_size_data_type_size - previous_variable_size_data_type_size;
             }
-            match data_type_number {
-                128 => {
-                    let offset_dtn = offset_ddh + variable_size_data_type_value_data_offset as u64 + previous_variable_size_data_type_size as u64;
-                    cat_def.name = io_handle.read_string(offset_dtn, data_type_size as usize);
-                    //println!("cat_def.name: {}", cat_def.name);
-                },
-                130 => {
-                    // TODO template_name
-                },
-                131 => {
-                    // TODO default_value
-                },
-                132 | // KeyFldIDs
-                133 | // VarSegMac
-                134 | // ConditionalColumns
-                135 | // TupleLimits
-                136   // Version
-                    => {
-                    // not usefull fields
-                },
-                _ => {
-                    if data_type_size > 0 {
-                        println!("TODO handle data_type_number {}", data_type_number);
+            if data_type_size > 0 {
+                match data_type_number {
+                    128 => {
+                        let offset_dtn = offset_ddh + variable_size_data_type_value_data_offset as u64 + previous_variable_size_data_type_size as u64;
+                        cat_def.name = io_handle.read_string(offset_dtn, data_type_size as usize);
+                        //println!("cat_def.name: {}", cat_def.name);
+                    },
+                    130 => {
+                        // TODO template_name
+                    },
+                    131 => {
+                        // TODO default_value
+                        let offset_def = offset_ddh + variable_size_data_type_value_data_offset as u64 + previous_variable_size_data_type_size as u64;
+                        cat_def.default_value = io_handle.read_bytes(offset_def, data_type_size as usize);
+                    },
+                    132 | // KeyFldIDs
+                    133 | // VarSegMac
+                    134 | // ConditionalColumns
+                    135 | // TupleLimits
+                    136   // Version
+                        => {
+                        // not usefull fields
+                    },
+                    _ => {
+                        if data_type_size > 0 {
+                            println!("TODO handle data_type_number {}", data_type_number);
+                        }
                     }
                 }
-            }
-
-            if data_type_size > 0 {
-				previous_variable_size_data_type_size = variable_size_data_type_size;
+                previous_variable_size_data_type_size = variable_size_data_type_size;
 			}
 			data_type_number += 1;
         }
@@ -627,9 +628,10 @@ pub fn load_data(
                             io_handle.page_size >= 16384) || (previous_tagged_data_type_offset & 0x4000 ) != 0
                         {
                             data_type_flags = io_handle.read_struct::<u8>(offset_ddh + tagged_data_type_value_offset as u64);
-                            if data_type_flags != 5 && data_type_flags != 1 {
+                            // 5 = VARIABLE_SIZE(0x1) & LONG_VALUE(0x4)
+                            if data_type_flags != 0 && data_type_flags != 5 && data_type_flags != 1 {
                                 let dtf = jet::TaggedDataTypeFlag::from_bits(data_type_flags.into());
-                                println!("{} unsupported tagged data type flags: {:?}", col.name, dtf);
+                                println!("{} unsupported data type flags: {:?}", col.name, dtf);
                             }
                             tagged_data_type_value_offset += 1;
                             tagged_data_type_size         -= 1;
