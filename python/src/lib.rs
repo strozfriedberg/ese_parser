@@ -3,7 +3,7 @@ use pyo3::wrap_pyfunction;
 use pyo3::exceptions;
 use pyo3::types::*;
 
-use ese_parser_lib::{esent::*, ese_trait::*, ese_api::*};
+use ese_parser_lib::{esent::*, ese_trait::*, ese_api::*, ese_parser::*};
 
 use simple_error::SimpleError;
 
@@ -22,7 +22,7 @@ extern "C" {
 
 #[pyclass]
 pub struct PyEseDb {
-    jdb : EseAPI,
+    jdb : EseParser,
 }
 
 #[pyclass]
@@ -56,7 +56,7 @@ impl PyEseDb {
     #[new]
     fn new() -> Self {
         PyEseDb {
-            jdb : EseDb::init()
+            jdb : EseParser::init()
         }
     }
 

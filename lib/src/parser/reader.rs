@@ -11,29 +11,28 @@ use crate::parser::jet;
 pub struct Reader {
     path: PathBuf,
     file: RefCell<fs::File>,
-    cache: RefCell<Cache<u64, Vec<u8>>>,
+    cache: RefCell<Cache<u32, Vec<u8>>>,
     format_version: jet::FormatVersion,
     format_revision: jet::FormatRevision,
-    page_size: usize,
-    last_page_number: usize,
+    page_size: u32,
+    last_page_number: u32,
 }
 
 impl Reader {
     fn read(&self, offset: u64, buf: &mut [u8]) {
-        let page_size = self.page_size as u64;
-        let pg_no = offset / page_size;
+        let pg_no = (offset / self.page_size as u64) as u32;
 
         if !self.cache.borrow_mut().contains_key(&pg_no) {
-            let mut page_buf = vec![0u8; self.page_size];
+            let mut page_buf = vec![0u8; self.page_size as usize];
 
-            self.file.borrow_mut().seek(io::SeekFrom::Start(pg_no * page_size)).unwrap();
+            self.file.borrow_mut().seek(io::SeekFrom::Start(pg_no as u64 * self.page_size as u64)).unwrap();
             if let Ok(_) = self.file.borrow_mut().read_exact(&mut page_buf) {
                 self.cache.borrow_mut().insert(pg_no, page_buf);
             }
         }
 
         if let Some(page_buf) = self.cache.borrow_mut().get(&pg_no) {
-            let page_offset = (offset % page_size) as usize;
+            let page_offset = (offset % self.page_size as u64) as usize;
             buf.copy_from_slice(&page_buf[page_offset..page_offset + buf.len()]);
         }
     }
@@ -49,17 +48,21 @@ impl Reader {
     }
 
     fn new(path: &PathBuf, cache_size: usize) -> Reader {
-        let mut reader = Reader{path: path.clone(),
+        let mut reader = Reader {
+            path: path.clone(),
             file: RefCell::new(fs::File::open(path).unwrap()),
             cache: RefCell::new(Cache::new(cache_size)),
             page_size: 2 * 1024, //just to read header
-            format_version: 0, format_revision: 0, last_page_number: 0 };
+            format_version: 0,
+            format_revision: 0,
+            last_page_number: 0
+        };
         let db_fh = reader.read_struct::<ese_db::FileHeader>(0);
 
         reader.format_version = db_fh.format_version;
         reader.format_revision = db_fh.format_revision;
-        reader.page_size = db_fh.page_size as usize;
-        reader.last_page_number = ((db_fh.page_size * 2) / db_fh.page_size) as usize;
+        reader.page_size = db_fh.page_size;
+        reader.last_page_number = (db_fh.page_size * 2) / db_fh.page_size;
 
         reader.cache.get_mut().remove(&0);
 
@@ -143,7 +146,7 @@ pub fn load_db_file_header(reader: &mut Reader) -> Result<ese_db::FileHeader, Si
 
 pub fn load_page_header(
     reader: &Reader,
-    page_number: usize,
+    page_number: u32,
 ) -> Result<PageHeader, SimpleError> {
     let page_offset = ((page_number + 1) * (reader.page_size)) as u64;
 
@@ -240,7 +243,7 @@ pub fn page_tag_get_branch_child_page_number(
     reader: &Reader,
     db_page: &jet::DbPage,
     page_tag: &PageTag,
-) -> Result<usize, SimpleError> {
+) -> Result<u32, SimpleError> {
     let page_offset = ((db_page.page_number + 1) * reader.page_size) as u64;
     let mut offset = page_offset + db_page.size() as u64 + page_tag.offset as u64;
 
@@ -253,7 +256,7 @@ pub fn page_tag_get_branch_child_page_number(
     offset += 2;
     offset += local_page_key_size as u64;
 
-    let child_page_number : usize = reader.read_struct(offset);
+    let child_page_number : u32 = reader.read_struct(offset);
     offset += 4;
 
     Ok(child_page_number)
@@ -262,7 +265,7 @@ pub fn page_tag_get_branch_child_page_number(
 pub fn load_catalog(
     reader: &mut Reader,
 ) -> Result<Vec<jet::TableDefinition>, SimpleError> {
-    let db_page = jet::DbPage::new(reader, jet::FixedPageNumber::Catalog as usize)?;
+    let db_page = jet::DbPage::new(reader, jet::FixedPageNumber::Catalog as u32)?;
     let pg_tags = &db_page.page_tags;
 
     if !db_page.flags().contains(jet::PageFlags::IS_PARENT) {
@@ -408,35 +411,36 @@ pub fn load_catalog_item(
             } else {
                 data_type_size = variable_size_data_type_size - previous_variable_size_data_type_size;
             }
-            match data_type_number {
-                128 => {
-                    let offset_dtn = offset_ddh + variable_size_data_type_value_data_offset as u64 + previous_variable_size_data_type_size as u64;
-                    cat_def.name = reader.read_string(offset_dtn, data_type_size as usize);
-                    //println!("cat_def.name: {}", cat_def.name);
-                },
-                130 => {
-                    // TODO template_name
-                },
-                131 => {
-                    // TODO default_value
-                },
-                132 | // KeyFldIDs
-                133 | // VarSegMac
-                134 | // ConditionalColumns
-                135 | // TupleLimits
-                136   // Version
-                    => {
-                    // not usefull fields
-                },
-                _ => {
-                    if data_type_size > 0 {
-                        println!("TODO handle data_type_number {}", data_type_number);
+            if data_type_size > 0 {
+                match data_type_number {
+                    128 => {
+                        let offset_dtn = offset_ddh + variable_size_data_type_value_data_offset as u64 + previous_variable_size_data_type_size as u64;
+                        cat_def.name = reader.read_string(offset_dtn, data_type_size as usize);
+                        //println!("cat_def.name: {}", cat_def.name);
+                    },
+                    130 => {
+                        // TODO template_name
+                    },
+                    131 => {
+                        // TODO default_value
+                        let offset_def = offset_ddh + variable_size_data_type_value_data_offset as u64 + previous_variable_size_data_type_size as u64;
+                        cat_def.default_value = reader.read_bytes(offset_def, data_type_size as usize);
+                    },
+                    132 | // KeyFldIDs
+                    133 | // VarSegMac
+                    134 | // ConditionalColumns
+                    135 | // TupleLimits
+                    136   // Version
+                        => {
+                        // not usefull fields
+                    },
+                    _ => {
+                        if data_type_size > 0 {
+                            println!("TODO handle data_type_number {}", data_type_number);
+                        }
                     }
                 }
-            }
-
-            if data_type_size > 0 {
-				previous_variable_size_data_type_size = variable_size_data_type_size;
+                previous_variable_size_data_type_size = variable_size_data_type_size;
 			}
 			data_type_number += 1;
         }
@@ -456,8 +460,8 @@ pub fn clean_pgtag_flag(reader: &Reader, db_page: &jet::DbPage, data: u16) -> u1
     data
 }
 
-pub fn find_first_leaf_page(reader: &Reader, page_number: usize)
-    -> Result<usize, SimpleError> {
+pub fn find_first_leaf_page(reader: &Reader, page_number: u32)
+    -> Result<u32, SimpleError> {
     let db_page = jet::DbPage::new(reader, page_number)?;
     if db_page.flags().contains(jet::PageFlags::IS_LEAF) {
         return Ok(page_number);
@@ -550,12 +554,17 @@ pub fn load_data(
     for j in 0..tbl_def.column_catalog_definition_array.len() {
         let col = &tbl_def.column_catalog_definition_array[j];
         if col.identifier <= 127 {
-            // fixed size column
-            if col.identifier == column_id {
-                let v = reader.read_bytes(offset, col.size as usize);
-                return Ok(Some(v));
+            if col.identifier <= ddh.last_fixed_size_data_type as u32 {
+                // fixed size column
+                if col.identifier == column_id {
+                    let v = reader.read_bytes(offset, col.size as usize);
+                    return Ok(Some(v));
+                }
+                offset += col.size as u64;
+            } else if col.identifier == column_id {
+                // no value in tag
+                return Ok(None);
             }
-            offset += col.size as u64;
         } else if current_variable_size_data_type < ddh.last_variable_size_data_type as u32 {
             // variable size
             while current_variable_size_data_type < col.identifier {
@@ -635,9 +644,10 @@ pub fn load_data(
                             reader.page_size >= 16384) || (previous_tagged_data_type_offset & 0x4000 ) != 0
                         {
                             data_type_flags = reader.read_struct::<u8>(offset_ddh + tagged_data_type_value_offset as u64);
-                            if data_type_flags != 5 && data_type_flags != 1 {
+                            // 5 = VARIABLE_SIZE(0x1) & LONG_VALUE(0x4)
+                            if data_type_flags != 0 && data_type_flags != 5 && data_type_flags != 1 {
                                 let dtf = jet::TaggedDataTypeFlag::from_bits(data_type_flags.into());
-                                println!("{} unsupported tagged data type flags: {:?}", col.name, dtf);
+                                println!("{} unsupported data type flags: {:?}", col.name, dtf);
                             }
                             tagged_data_type_value_offset += 1;
                             tagged_data_type_size         -= 1;
@@ -680,9 +690,8 @@ pub fn load_lv_tag(
 
     let mut first_word_readed = false;
     let mut common_page_key_size : u16 = 0;
-    let data: u16 = reader.read_struct(offset);
     if page_tag.flags().intersects(jet::PageTagFlags::FLAG_HAS_COMMON_KEY_SIZE) {
-        common_page_key_size = clean_pgtag_flag(reader, db_page, data);
+        common_page_key_size = clean_pgtag_flag(reader, db_page, reader.read_struct::<u16>(offset));
         first_word_readed = true;
         offset += 2;
 
@@ -764,7 +773,7 @@ impl std::fmt::Display for LV_tags{
 
 pub fn load_lv_metadata(
     reader: &Reader,
-    page_number: usize
+    page_number: u32
 ) -> Result<Vec<LV_tags>, SimpleError> {
     let db_page = jet::DbPage::new(reader, page_number)?;
     let pg_tags = &db_page.page_tags;

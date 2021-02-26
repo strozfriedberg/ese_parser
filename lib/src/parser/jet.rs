@@ -240,13 +240,13 @@ pub struct DbFile {
 
 #[derive(Debug)]
 pub struct DbPage {
-    pub page_number: usize,
+    pub page_number: uint32_t,
     pub page_header: ese_db::PageHeader,
     pub page_tags: Vec<ese_db::PageTag>,
 }
 
 impl DbPage {
-    pub fn new(reader: &Reader, page_number: usize) -> Result<DbPage, SimpleError> {
+    pub fn new(reader: &Reader, page_number: uint32_t) -> Result<DbPage, SimpleError> {
         let page_header = reader::load_page_header(reader, page_number)?;
         let mut db_page = DbPage {
             page_number,
@@ -290,12 +290,12 @@ impl DbPage {
         self.common().page_flags
     }
 
-    pub fn next_page(&self) -> usize {
-        self.common().next_page as usize
+    pub fn next_page(&self) -> u32 {
+        self.common().next_page
     }
 
-    pub fn prev_page(&self) -> usize {
-        self.common().previous_page as usize
+    pub fn prev_page(&self) -> u32 {
+        self.common().previous_page
     }
 }
 
@@ -358,10 +358,8 @@ pub struct CatalogDefinition {
 
     pub name: String,
 
-    pub template_name: *mut uint8_t,
-    pub template_name_size: uint32_t,
-    pub default_value: *mut uint8_t,
-    pub default_value_size: uint32_t,
+    pub template_name: Vec<u8>,
+    pub default_value: Vec<u8>
 }
 
 #[derive(Clone)]

@@ -69,10 +69,14 @@ impl EseParser {
             let mut i = t.page_tag_index + 1;
             if crow == esent::JET_MoveFirst as u32 {
                 let first_leaf_page = find_first_leaf_page(&reader,
-                                                           t.cat.table_catalog_definition.as_ref().unwrap().father_data_page_number as usize)?;
-                if t.page().page_number != first_leaf_page {
+                    t.cat.table_catalog_definition.as_ref().unwrap().father_data_page_number)?;
+                if t.current_page.is_none() || t.page().page_number != first_leaf_page {
                     let page = jet::DbPage::new(&reader, first_leaf_page)?;
                     t.current_page = Some(page);
+                }
+                if t.page().page_tags.len() < 2 {
+                    // empty table
+                    return Ok(false);
                 }
                 i = 1;
             }
@@ -87,7 +91,7 @@ impl EseParser {
                     return Ok(true);
                 } else {
                     if t.page().common().next_page != 0 {
-                        let page = jet::DbPage::new(&mut self.get_reader().unwrap(), t.page().common().next_page as usize)?;
+                        let page = jet::DbPage::new(&mut self.get_reader().unwrap(), t.page().common().next_page)?;
                         t.current_page = Some(page);
                         i = 1;
                     } else {
@@ -100,8 +104,12 @@ impl EseParser {
             let mut i = t.page_tag_index - 1;
             if crow == esent::JET_MoveLast as u32 {
                 while t.page().common().next_page != 0 {
-                    let page = jet::DbPage::new(&mut self.reader.as_ref().unwrap(), t.page().common().next_page as usize)?;
+                    let page = jet::DbPage::new(&mut self.reader.as_ref().unwrap(), t.page().common().next_page)?;
                     t.current_page = Some(page);
+                }
+                if t.page().page_tags.len() < 2 {
+                    // empty table
+                    return Ok(false);
                 }
                 i = t.page().page_tags.len()-1;
             }
@@ -115,7 +123,7 @@ impl EseParser {
                     return Ok(true);
                 } else {
                     if t.page().common().previous_page != 0 {
-                        let page = jet::DbPage::new(&mut self.reader.as_ref().unwrap(), t.page().common().previous_page as usize)?;
+                        let page = jet::DbPage::new(&mut self.reader.as_ref().unwrap(), t.page().common().previous_page)?;
                         t.current_page = Some(page);
                         i = t.page().page_tags.len()-1;
                     } else {
@@ -130,13 +138,35 @@ impl EseParser {
 
         Err(SimpleError::new(format!("move_row: TODO: implement me, crow {}", crow)))
     }
+
+    pub fn get_column<T>(&self, table: u64, column: u32) -> Result<Option<T>, SimpleError> {
+        let size = std::mem::size_of::<T>();
+        let mut dst = std::mem::MaybeUninit::<T>::zeroed();
+
+        unsafe {
+            let vo = self.get_column_dyn_helper(table, column)?;
+            if vo.is_none() {
+                return Err(SimpleError::new(format!("get_column_dyn_helper: 0 size returned, expected {}", size)));
+            }
+            let v = vo.as_ref().unwrap();
+            if size != v.len() {
+                return Err(SimpleError::new(format!("get_column_dyn_helper: wrong size ({}) returned, expected {}",
+                    v.len(), size)));
+            }
+            std::ptr::copy_nonoverlapping(
+                v.as_ptr(),
+                dst.as_mut_ptr() as *mut u8,
+                size);
+            Ok(Some(dst.assume_init()))
+        }
+    }
+
+    pub fn init() -> EseParser {
+        EseParser { reader: None, tables: vec![] }
+    }
 }
 
 impl EseDb for EseParser {
-    fn init() -> EseParser {
-        EseParser { reader: None, tables: vec![] }
-    }
-
     fn load(&mut self, dbpath: &str, cache_size: usize) -> Option<SimpleError> {
         let mut reader = match Reader::load_db(&std::path::PathBuf::from(dbpath), cache_size) {
             Ok(h) => h,
@@ -179,20 +209,12 @@ impl EseDb for EseParser {
             let mut lv : Vec<LV_tags> = Vec::new();
             if t.cat.long_value_catalog_definition.is_some() {
                 lv = load_lv_metadata(&reader,
-                                      t.cat.long_value_catalog_definition.as_ref().unwrap().father_data_page_number as usize)?;
+                    t.cat.long_value_catalog_definition.as_ref().unwrap().father_data_page_number)?;
                 t.lv_tags = lv;
             }
-
-            // find and load first leaf page
-            let first_leaf_page = find_first_leaf_page(&mut reader,
-                                                       t.cat.table_catalog_definition.as_ref().unwrap().father_data_page_number as usize)?;
-            let page = jet::DbPage::new(&mut self.reader.as_ref().unwrap(), first_leaf_page)?;
-            if page.page_tags.len() < 2 {
-                return Err(SimpleError::new(format!("Table {} is empty", table)));
-            }
-            t.current_page = Some(page);
-            t.page_tag_index = 1;
         }
+        // ignore return result
+        self.move_row_helper(index as u64, esent::JET_MoveFirst);
 
         Ok(index as u64)
     }
@@ -242,28 +264,6 @@ impl EseDb for EseParser {
         match std::str::from_utf8(&v.unwrap()) {
             Ok(s) => Ok(Some(s.to_string())),
             Err(e) => Err(SimpleError::new(format!("std::str::from_utf8 failed: {}", e)))
-        }
-    }
-
-    fn get_column<T>(&self, table: u64, column: u32) -> Result<Option<T>, SimpleError> {
-        let size = std::mem::size_of::<T>();
-        let mut dst = std::mem::MaybeUninit::<T>::zeroed();
-
-        unsafe {
-            let vo = self.get_column_dyn_helper(table, column)?;
-            if vo.is_none() {
-                return Err(SimpleError::new(format!("get_column_dyn_helper: 0 size returned, expected {}", size)));
-            }
-            let v = vo.as_ref().unwrap();
-            if size != v.len() {
-                return Err(SimpleError::new(format!("get_column_dyn_helper: wrong size ({}) returned, expected {}",
-                    v.len(), size)));
-            }
-            std::ptr::copy_nonoverlapping(
-                v.as_ptr(),
-                dst.as_mut_ptr() as *mut u8,
-                size);
-            Ok(Some(dst.assume_init()))
         }
     }
 
