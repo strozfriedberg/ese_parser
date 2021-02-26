@@ -15,6 +15,7 @@ struct Internal {
 }
 
 pub struct EseParser {
+    cache_size: usize,
     reader: Option<Reader>,
     tables: Vec<RefCell<Internal>>,
 }
@@ -161,14 +162,15 @@ impl EseParser {
         }
     }
 
-    pub fn init() -> EseParser {
-        EseParser { reader: None, tables: vec![] }
+    // reserve room for cache_size recent entries, and cache_size frequent entries
+    pub fn init(cache_size: usize) -> EseParser {
+        EseParser { cache_size: cache_size, reader: None, tables: vec![] }
     }
 }
 
 impl EseDb for EseParser {
-    fn load(&mut self, dbpath: &str, cache_size: usize) -> Option<SimpleError> {
-        let mut reader = match Reader::load_db(&std::path::PathBuf::from(dbpath), cache_size) {
+    fn load(&mut self, dbpath: &str) -> Option<SimpleError> {
+        let mut reader = match Reader::load_db(&std::path::PathBuf::from(dbpath), self.cache_size) {
             Ok(h) => h,
             Err(e) => {
                 return Some(SimpleError::new(e.to_string()));

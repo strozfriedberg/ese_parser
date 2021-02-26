@@ -98,7 +98,7 @@ impl EseAPI {
 
 impl EseDb for EseAPI {
 
-    fn load(&mut self, dbpath: &str, cache_size: usize) -> Option<SimpleError> {
+    fn load(&mut self, dbpath: &str) -> Option<SimpleError> {
         let dbinfo = match EseAPI::get_database_file_info(dbpath) {
             Ok(i) => i,
             Err(e) => return Some(e)
@@ -296,8 +296,7 @@ impl EseDb for EseAPI {
         Ok(err)
     }
 
-    fn get_columns(&self, table: &str) -> Result<Vec<ColumnInfo>, SimpleError>
-    {
+    fn get_columns(&self, table: &str) -> Result<Vec<ColumnInfo>, SimpleError> {
         let table_id = self.open_table(table)?;
         let mut cols : Vec<ColumnInfo> = Vec::new();
         let mut col_list = MaybeUninit::<JET_COLUMNLIST>::zeroed();
@@ -332,6 +331,7 @@ impl EseDb for EseAPI {
             }
         }
         self.close_table(table_id);
+        cols.sort_by(|a, b| a.id.cmp(&b.id));
         Ok(cols)
     }
 }

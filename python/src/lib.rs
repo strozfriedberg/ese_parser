@@ -56,7 +56,7 @@ impl PyEseDb {
     #[new]
     fn new() -> Self {
         PyEseDb {
-            jdb : EseParser::init()
+            jdb : EseParser::init(10)
         }
     }
 

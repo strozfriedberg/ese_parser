@@ -12,6 +12,8 @@ use std::os::windows::prelude::*;
 
 use simple_error::SimpleError;
 
+const CACHE_SIZE_ENTRIES : usize = 10;
+
 extern "C" {
     pub fn StringFromGUID2(
         rguid: *const ::std::os::raw::c_void,
@@ -59,16 +61,16 @@ struct EseBoth {
 
 impl EseBoth {
     pub fn init() -> EseBoth {
-        EseBoth { api: EseAPI::init(), parser: EseParser::init(), opened_tables: RefCell::new(Vec::new()) }
+        EseBoth { api: EseAPI::init(), parser: EseParser::init(CACHE_SIZE_ENTRIES), opened_tables: RefCell::new(Vec::new()) }
     }
 }
 
 impl EseDb for EseBoth {
-    fn load(&mut self, dbpath: &str, cache_size: usize) -> Option<SimpleError> {
-        if let Some(e) = self.api.load(dbpath, cache_size) {
+    fn load(&mut self, dbpath: &str) -> Option<SimpleError> {
+        if let Some(e) = self.api.load(dbpath) {
             return Some(SimpleError::new(format!("EseAPI::load failed: {}", e)));
         }
-        if let Some(e) = self.parser.load(dbpath, cache_size) {
+        if let Some(e) = self.parser.load(dbpath) {
             return Some(SimpleError::new(format!("EseParser::load failed: {}", e)));
         }
         None
@@ -125,18 +127,16 @@ impl EseDb for EseBoth {
                 table, api_columns, parser_columns)));
         }
         for i in 0..api_columns.len() {
-            for j in 0..parser_columns.len() {
-                if api_columns[i].id == parser_columns[j].id {
-                    let c1 = &api_columns[i];
-                    let c2 = &parser_columns[j];
-                    if c1.name  != c2.name   ||
-                        c1.typ   != c2.typ   ||
-                        c1.cbmax != c2.cbmax ||
-                        c1.cp    != c2.cp
-                    {
-                        return Err(SimpleError::new(format!("get_columns({}) have difference: EseAPI table:\n{:?}\n not equal to EseParser:\n{:?}\n",
-                            table, api_columns[i], parser_columns[i])));
-                    }
+            if api_columns[i].id == parser_columns[i].id {
+                let c1 = &api_columns[i];
+                let c2 = &parser_columns[i];
+                if c1.name  != c2.name  ||
+                   c1.typ   != c2.typ   ||
+                   c1.cbmax != c2.cbmax ||
+                   c1.cp    != c2.cp
+                {
+                    return Err(SimpleError::new(format!("get_columns({}) have difference: EseAPI table:\n{:?}\n not equal to EseParser:\n{:?}\n",
+                        table, api_columns[i], parser_columns[i])));
                 }
             }
         }
@@ -515,7 +515,7 @@ fn alloc_jdb(m: &Mode) -> Box<dyn EseDb> {
     if *m == Mode::EseApi {
         return Box::new(EseAPI::init());
     } else if *m == Mode::EseParser {
-        return Box::new(EseParser::init());
+        return Box::new(EseParser::init(CACHE_SIZE_ENTRIES));
     }
     return Box::new(EseBoth::init());
 }
@@ -559,7 +559,7 @@ fn main() {
     let mut jdb = alloc_jdb(&mode);
     println!("mode {:?}, path: {}", &mode, dbpath);
 
-    let v = jdb.load(&dbpath, 10);
+    let v = jdb.load(&dbpath);
     if v.is_some() {
         println!("Error: {:?}", v.unwrap());
         return ;
