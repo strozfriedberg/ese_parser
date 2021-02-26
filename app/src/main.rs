@@ -225,8 +225,7 @@ fn dump_table(jdb: &Box<dyn EseDb>, t: &str) {
         // empty table
         return ;
     }
-    let mut column_names_printed = false;
-    let mut column_space : Vec<usize> = Vec::new();
+    let mut rows : Vec<Vec<String>> = Vec::new();
     loop {
         let mut values : Vec<String> = Vec::new();
         for c in &cols {
@@ -394,7 +393,7 @@ fn dump_table(jdb: &Box<dyn EseDb>, t: &str) {
                     }
                 },
                 JET_coltypLongBinary => {
-                    let mut v;
+                    let v;
                     if c.cbmax == 0 {
                         v = jdb.get_column_dyn_varlen(table_id, c.id);
                     } else {
@@ -470,39 +469,40 @@ fn dump_table(jdb: &Box<dyn EseDb>, t: &str) {
             //println!("{}", val);
             values.push(val);
         }
-        // format row
         assert_eq!(values.len(), cols.len());
-
-        let mut row = String::new();
-        for i in 0..values.len() {
-            let mut mw = values[i].len();
-            if cols[i].name.len() > mw {
-                mw = cols[i].name.len();
-            }
-            if column_space.len() == values.len() {
-                mw = column_space[i];
-            }
-            row = format!("{}|{:2$}", row, values[i], mw);
-        }
-        if !column_names_printed {
-            let mut nrow = String::new();
-            for i in 0..cols.len() {
-                let mut mw = cols[i].name.len();
-                if values[i].len() > mw {
-                    mw = values[i].len();
-                }
-                nrow = format!("{}|{:2$}", nrow, cols[i].name, mw);
-                column_space.push(mw);
-            }
-            println!("{}|", nrow);
-            column_names_printed = true;
-        }
-        println!("{}|", row);
+        rows.push(values);
         if !jdb.move_row(table_id, JET_MoveNext) {
             break;
         }
     }
     jdb.close_table(table_id);
+
+    // print table
+
+    let mut col_sp : Vec<usize> = Vec::new();
+    for i in 0..cols.len() {
+        let mut col_max_sz = cols[i].name.len();
+        for j in 0..rows.len() {
+            if rows[j][i].len() > col_max_sz {
+                col_max_sz = rows[j][i].len();
+            }
+        }
+        col_sp.push(col_max_sz);
+    }
+
+    let mut nrow = String::new();
+    for i in 0..cols.len() {
+        nrow = format!("{}|{:2$}", nrow, cols[i].name, col_sp[i]);
+    }
+    println!("{}|", nrow);
+
+    for i in 0..rows.len() {
+        let mut row = String::new();
+        for j in 0..rows[i].len() {
+            row = format!("{}|{:2$}", row, rows[i][j], col_sp[j]);
+        }
+        println!("{}|", row);
+    }
 }
 
 #[derive(PartialEq, Debug)]
