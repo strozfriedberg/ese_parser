@@ -144,21 +144,16 @@ impl EseParser {
         let size = std::mem::size_of::<T>();
         let mut dst = std::mem::MaybeUninit::<T>::zeroed();
 
+        let vo = self.get_column_dyn(table, column, size)?;
+
         unsafe {
-            let vo = self.get_column_dyn_helper(table, column)?;
-            if vo.is_none() {
-                return Err(SimpleError::new(format!("get_column_dyn_helper: 0 size returned, expected {}", size)));
+            if let Some(v) = vo {
+                std::ptr::copy_nonoverlapping(
+                    v.as_ptr(),
+                    dst.as_mut_ptr() as *mut u8,
+                    size);
             }
-            let v = vo.as_ref().unwrap();
-            if size != v.len() {
-                return Err(SimpleError::new(format!("get_column_dyn_helper: wrong size ({}) returned, expected {}",
-                    v.len(), size)));
-            }
-            std::ptr::copy_nonoverlapping(
-                v.as_ptr(),
-                dst.as_mut_ptr() as *mut u8,
-                size);
-            Ok(Some(dst.assume_init()))
+            return Ok(Some(dst.assume_init()));
         }
     }
 
