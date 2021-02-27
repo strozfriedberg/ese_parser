@@ -43,9 +43,9 @@ extern "C" {
 #[test]
 fn test_edb_table_all_values() {
     //let mut jdb : EseAPI = EseDb::init();
-    let mut jdb : EseParser = EseParser::init();
+    let mut jdb : EseParser = EseParser::init(5);
 
-    match jdb.load("testdata\\test.edb", 5) {
+    match jdb.load("testdata\\test.edb") {
         Some(e) => panic!("Error: {}", e),
         None => println!("Loaded.")
     }
