@@ -170,19 +170,6 @@ impl EseDb for EseBoth {
         let s1 = self.api.get_column_dyn(api_table, column, size)?;
         let s2 = self.parser.get_column_dyn(parser_table, column, size)?;
         if s1 != s2 {
-            // some fields having values filled with 0x2a, but EseAPI returnin None (NULL)
-            if s1.is_none() && s2.is_some() {
-                let mut all_0x2a = true;
-                for i in 0..size {
-                    if s2.as_ref().unwrap()[i] != 0x2a {
-                        all_0x2a = false;
-                        break;
-                    }
-                }
-                if all_0x2a {
-                    return Ok(s1);
-                }
-            }
             return Err(SimpleError::new(format!(r"table {}, column({}) EseAPI column '{:?}' not equal to EseParser '{:?}'",
                 table, column, s1, s2)));
         }

@@ -534,6 +534,15 @@ pub fn load_data(
         tagged_data_type_offset_bitmask = 0x7fff;
     }
 
+    // read fixed data bits mask, located at the end of fixed columns
+    let fixed_data_bits_mask_size = (ddh.last_fixed_size_data_type as usize + 7) / 8;
+    let mut fixed_data_bits_mask : Vec<u8>= Vec::new();
+    if fixed_data_bits_mask_size > 0 {
+        fixed_data_bits_mask = reader.read_bytes(
+            offset_ddh + ddh.variable_size_data_types_offset as u64 - fixed_data_bits_mask_size as u64,
+            fixed_data_bits_mask_size);
+    }
+
     let mut tagged_data_type_identifier : u16 = 0;
     let mut tagged_data_types_offset : u16 = 0;
     let mut tagged_data_type_offset : u16 = 0;
@@ -557,6 +566,10 @@ pub fn load_data(
             if col.identifier <= ddh.last_fixed_size_data_type as u32 {
                 // fixed size column
                 if col.identifier == column_id {
+                    if fixed_data_bits_mask_size > 0 && fixed_data_bits_mask[j/8] & (1 << (j % 8)) > 0 {
+                        // empty value
+                        return Ok(None);
+                    }
                     let v = reader.read_bytes(offset, col.size as usize);
                     return Ok(Some(v));
                 }
