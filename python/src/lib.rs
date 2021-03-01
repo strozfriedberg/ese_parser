@@ -118,6 +118,22 @@ impl PyEseDb {
         self.jdb.move_row(table, crow)
     }
 
+    fn get_row_mv(&self, table: u64, column: &PyColumnInfo, multi_value_index: u32) -> PyResult<Option<PyObject>> {
+        let gil = Python::acquire_gil();
+        let py = gil.python();
+
+        let d = self.jdb.get_column_dyn_mv(table, column.id, multi_value_index);
+        match d {
+            Ok(ov) => {
+                match ov {
+                    Some(n) => return Ok(Some(n.to_object(py))),
+                    None => return Ok(None)
+                }
+            },
+            Err(e) => return Err(PyErr::new::<exceptions::PyTypeError, _>(e.as_str().to_string()))
+        }
+    }
+
     fn get_row(&self, table: u64, column: &PyColumnInfo) -> PyResult<Option<PyObject>> {
         let gil = Python::acquire_gil();
         let py = gil.python();
