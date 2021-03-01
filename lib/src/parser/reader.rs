@@ -478,7 +478,8 @@ pub fn load_data(
     lv_tags: &Vec<LV_tags>,
     db_page: &jet::DbPage,
     page_tag_index: usize,
-    column_id: u32
+    column_id: u32,
+    multi_value_index: usize // 0 value mean itagSequence = 1
 ) -> Result<Option<Vec<u8>>, SimpleError> {
     let pg_tags = &db_page.page_tags;
 
@@ -656,24 +657,76 @@ pub fn load_data(
                         if (reader.format_revision >= ESEDB_FORMAT_REVISION_EXTENDED_PAGE_HEADER &&
                             reader.page_size >= 16384) || (previous_tagged_data_type_offset & 0x4000 ) != 0
                         {
-                            data_type_flags = reader.read_struct::<u8>(offset_ddh + tagged_data_type_value_offset as u64);
-                            // 5 = VARIABLE_SIZE(0x1) & LONG_VALUE(0x4)
-                            if data_type_flags != 0 && data_type_flags != 5 && data_type_flags != 1 {
-                                let dtf = jet::TaggedDataTypeFlag::from_bits(data_type_flags.into());
-                                println!("{} unsupported data type flags: {:?}", col.name, dtf);
-                            }
+                            data_type_flags = reader.read_struct(offset_ddh + tagged_data_type_value_offset as u64);
+
                             tagged_data_type_value_offset += 1;
                             tagged_data_type_size         -= 1;
                         }
                     }
                     if tagged_data_type_size > 0 && col.identifier == column_id {
-                        if jet::TaggedDataTypeFlag::from_bits_truncate(data_type_flags as u16).intersects(jet::TaggedDataTypeFlag::LONG_VALUE) {
-                            let key = reader.read_struct::<u32>(offset_ddh + tagged_data_type_value_offset as u64);
+                        use jet::TaggedDataTypeFlag;
+                        offset = offset_ddh + tagged_data_type_value_offset as u64;
+                        let dtf = TaggedDataTypeFlag::from_bits_truncate(data_type_flags as u16);
+                        if dtf.intersects(TaggedDataTypeFlag::LONG_VALUE) {
+                            let key = reader.read_struct::<u32>(offset);
                             let v = load_lv_data(reader, &lv_tags, key).unwrap();
                             return Ok(Some(v));
+                        } else if dtf.intersects(TaggedDataTypeFlag::MULTI_VALUE | TaggedDataTypeFlag::MULTI_VALUE_OFFSET) {
+                            let mut mv_indexes : Vec<(u16/*shift*/, (bool/*lv*/, u16/*size*/))> = Vec::new();
+                            if dtf.intersects(jet::TaggedDataTypeFlag::MULTI_VALUE_OFFSET) {
+                                // The first byte contain the offset
+                                // [13, ...]
+                                let mut offset_mv_list = offset;
+                                let mut value : u16 = reader.read_struct::<u8>(offset_mv_list) as u16;
+                                offset_mv_list += 1;
+
+                                mv_indexes.push((1, (false, value)));
+                                mv_indexes.push((value+1, (false, tagged_data_type_size - value - 1)));
+                            } else if dtf.intersects(jet::TaggedDataTypeFlag::MULTI_VALUE) {
+                                // The first 2 bytes contain the offset to the first value
+                                // there is an offset for every value
+                                // therefore first offset / 2 = the number of value entries
+                                // [8, 0, 7, 130, 11, 2, 10, 131, ...]
+                                let mut offset_mv_list = offset;
+                                let mut value = reader.read_struct::<u16>(offset_mv_list);
+                                offset_mv_list += 2;
+
+                                let mut value_entry_size : u16 = 0;
+                                let mut value_entry_offset = value & 0x7fff;
+                                let mut entry_lvbit : bool = (value & 0x8000) > 0;
+                                let number_of_value_entries = value_entry_offset / 2;
+
+                                for _ in 1..number_of_value_entries {
+                                    value = reader.read_struct::<u16>(offset_mv_list);
+                                    offset_mv_list += 2;
+                                    value_entry_size = (value & 0x7fff) - value_entry_offset;
+                                    mv_indexes.push((value_entry_offset, (entry_lvbit, value_entry_size)));
+                                    entry_lvbit = (value & 0x8000) > 0;
+                                    value_entry_offset = value & 0x7fff;
+                                }
+                                value_entry_size = tagged_data_type_size - value_entry_offset;
+                                mv_indexes.push((value_entry_offset, (entry_lvbit, value_entry_size)));
+                            }
+                            let mut mv_index = 0;
+                            if multi_value_index > 0 && multi_value_index - 1 < mv_indexes.len() {
+                                mv_index = multi_value_index - 1;
+                            }
+
+                            if mv_index < mv_indexes.len() {
+                                let (shift, (lv, size)) = mv_indexes[mv_index];
+                                let v;
+                                if lv {
+                                    let key = reader.read_struct::<u32>(offset + shift as u64);
+                                    v = load_lv_data(reader, &lv_tags, key).unwrap();
+                                } else {
+                                    v = reader.read_bytes(offset + shift as u64, size as usize);
+                                }
+                                return Ok(Some(v));
+                            }
+                        } else if dtf.intersects(jet::TaggedDataTypeFlag::COMPRESSED) {
+                            println!("{} unsupported data type flags: {:?}", col.name, dtf);
                         } else {
-                            let v = reader.read_bytes(offset_ddh + tagged_data_type_value_offset as u64,
-                                tagged_data_type_size as usize);
+                            let v = reader.read_bytes(offset, tagged_data_type_size as usize);
                             return Ok(Some(v));
                         }
                     }

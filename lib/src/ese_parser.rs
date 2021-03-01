@@ -53,13 +53,13 @@ impl EseParser {
         Err(SimpleError::new(format!("out of range index {}", table)))
     }
 
-    fn get_column_dyn_helper(&self, table: u64, column: u32) -> Result<Option<Vec<u8>>, SimpleError> {
+    fn get_column_dyn_helper(&self, table: u64, column: u32, mv_index: u32) -> Result<Option<Vec<u8>>, SimpleError> {
         let itrnl = self.get_internal(table)?;
         let reader = self.get_reader()?;
         if itrnl.current_page.is_none() {
             return Err(SimpleError::new("no current page, use open_table API before this"));
         }
-        load_data(reader, &itrnl.cat, &itrnl.lv_tags, &itrnl.page(), itrnl.page_tag_index, column)
+        load_data(reader, &itrnl.cat, &itrnl.lv_tags, &itrnl.page(), itrnl.page_tag_index, column, mv_index as usize)
     }
 
     fn move_row_helper(&self, table: u64, crow: u32) -> Result<bool, SimpleError> {
@@ -254,7 +254,7 @@ impl EseDb for EseParser {
     }
 
     fn get_column_str(&self, table: u64, column: u32, size: u32) -> Result<Option<String>, SimpleError> {
-        let v = self.get_column_dyn_helper(table, column)?;
+        let v = self.get_column_dyn_helper(table, column, 0)?;
         if v.is_none() {
             return Ok(None);
         }
@@ -265,10 +265,15 @@ impl EseDb for EseParser {
     }
 
     fn get_column_dyn(&self, table: u64, column: u32, size: usize) -> Result< Option<Vec<u8>>, SimpleError> {
-        self.get_column_dyn_helper(table, column)
+        self.get_column_dyn_helper(table, column, 0)
     }
 
     fn get_column_dyn_varlen(&self, table: u64, column: u32) -> Result< Option<Vec<u8>>, SimpleError> {
-        self.get_column_dyn_helper(table, column)
+        self.get_column_dyn_helper(table, column, 0)
+    }
+
+    fn get_column_dyn_mv(&self, table: u64, column: u32, multi_value_index: u32)
+        -> Result< Option<Vec<u8>>, SimpleError> {
+        self.get_column_dyn_helper(table, column, multi_value_index)
     }
 }

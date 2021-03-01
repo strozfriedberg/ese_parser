@@ -28,5 +28,8 @@ pub trait EseDb {
     fn get_column_dyn_varlen(&self, table: u64, column: u32)
         -> Result< Option<Vec<u8>>, SimpleError>;
 
+    fn get_column_dyn_mv(&self, table: u64, column: u32, multi_value_index: u32)
+        -> Result< Option<Vec<u8>>, SimpleError>;
+
     fn move_row(&self, table: u64, crow: u32) -> bool;
 }

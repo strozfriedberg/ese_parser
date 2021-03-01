@@ -244,7 +244,11 @@ impl EseDb for EseAPI {
 
             let mut bytes : c_ulong = 0;
             unsafe {
-                let mut retinfo = JET_RETINFO { cbStruct: size_of::<JET_RETINFO>() as c_ulong, ibLongValue: vres.len() as c_ulong, itagSequence : 1, columnidNextTagged: 0 };
+                let mut retinfo = JET_RETINFO {
+                    cbStruct: size_of::<JET_RETINFO>() as c_ulong,
+                    ibLongValue: vres.len() as c_ulong,
+                    itagSequence : 1,
+                    columnidNextTagged: 0 };
                 let err = JetRetrieveColumn(self.sesid, table, column, v.as_mut_slice().as_mut_ptr() as *mut c_void, size as u32,
                     &mut bytes, 0, &mut retinfo);
                 if err != 0 && err != JET_wrnBufferTruncated as i32 {
@@ -263,6 +267,42 @@ impl EseDb for EseAPI {
             }
         }
         Ok(Some(vres))
+    }
+
+    fn get_column_dyn_mv(&self, table: u64, column: u32, multi_value_index: u32)
+        -> Result< Option<Vec<u8>>, SimpleError> {
+            let mut vres : Vec<u8> = Vec::new();
+
+            loop {
+                let mut v : Vec<u8> = Vec::new();
+                let size: usize = 4096;
+                v.resize(size, 0);
+
+                let mut bytes : c_ulong = 0;
+                unsafe {
+                    let mut retinfo = JET_RETINFO {
+                        cbStruct: size_of::<JET_RETINFO>() as c_ulong,
+                        ibLongValue: vres.len() as c_ulong,
+                        itagSequence : multi_value_index,
+                        columnidNextTagged: 0 };
+                    let err = JetRetrieveColumn(self.sesid, table, column, v.as_mut_slice().as_mut_ptr() as *mut c_void, size as u32,
+                        &mut bytes, 0, &mut retinfo);
+                    if err != 0 && err != JET_wrnBufferTruncated as i32 {
+                        if err == JET_wrnColumnNull as i32 {
+                            return Ok(None);
+                        }
+                        return Err(SimpleError::new(
+                            format!("JetRetrieveColumn failed with error {}", self.error_to_string(err))));
+                    }
+
+                    v.truncate(bytes as usize);
+                    vres.append(v.as_mut());
+                    if err != JET_wrnBufferTruncated as i32 {
+                        break;
+                    }
+                }
+            }
+            Ok(Some(vres))
     }
 
     fn move_row(&self, table: u64, crow: u32) -> bool {
