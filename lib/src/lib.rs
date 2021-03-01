@@ -8,7 +8,6 @@ pub mod ese_api;
 pub mod ese_parser;
 
 use esent::*;
-use ese_api::*;
 use ese_trait::*;
 use ese_parser::*;
 
@@ -45,7 +44,7 @@ fn test_edb_table_all_values() {
     //let mut jdb : EseAPI = EseDb::init();
     let mut jdb : EseParser = EseParser::init();
 
-    match jdb.load("testdata\\test.edb") {
+    match jdb.load("testdata\\test.edb", 5) {
         Some(e) => panic!("Error: {}", e),
         None => println!("Loaded.")
     }

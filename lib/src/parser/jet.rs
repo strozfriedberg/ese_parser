@@ -11,6 +11,7 @@ use simple_error::SimpleError;
 use crate::parser::ese_db;
 use crate::parser::ese_db::*;
 use crate::parser::reader;
+use crate::parser::reader::Reader;
 
 pub type uint8_t = u8;
 pub type uint16_t = u16;
@@ -237,32 +238,23 @@ pub struct DbFile {
     file_header: ese_db::FileHeader,
 }
 
-#[repr(C)]
-pub struct IoHandle {
-    pub path: std::path::PathBuf,
-    pub format_version: FormatVersion,
-    pub format_revision: FormatRevision,
-    pub page_size: u32,
-    pub last_page_number: u32,
-}
-
 #[derive(Debug)]
 pub struct DbPage {
-    pub page_number: uint32_t,
+    pub page_number: usize,
     pub page_header: ese_db::PageHeader,
     pub page_tags: Vec<ese_db::PageTag>,
 }
 
 impl DbPage {
-    pub fn new(io_handle: &IoHandle, page_number: u32) -> Result<DbPage, SimpleError> {
-        let page_header = reader::load_page_header(io_handle, page_number)?;
+    pub fn new(reader: &Reader, page_number: usize) -> Result<DbPage, SimpleError> {
+        let page_header = reader::load_page_header(reader, page_number)?;
         let mut db_page = DbPage {
             page_number,
             page_header,
             page_tags: vec![],
         };
 
-        db_page.page_tags = reader::load_page_tags(io_handle, &db_page)?;
+        db_page.page_tags = reader::load_page_tags(reader, &db_page)?;
         Ok(db_page)
     }
 
@@ -298,12 +290,12 @@ impl DbPage {
         self.common().page_flags
     }
 
-    pub fn next_page(&self) -> u32 {
-        self.common().next_page as u32
+    pub fn next_page(&self) -> usize {
+        self.common().next_page as usize
     }
 
-    pub fn prev_page(&self) -> u32 {
-        self.common().previous_page as u32
+    pub fn prev_page(&self) -> usize {
+        self.common().previous_page as usize
     }
 }
 

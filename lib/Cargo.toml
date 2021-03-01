@@ -6,6 +6,7 @@ edition = "2018"
 [lib]
 name = "ese_parser_lib"
 test = true
+doctest = false
 
 [build-dependencies]
 bindgen = "0.56.0"
@@ -21,6 +22,7 @@ bitfield = "*"
 hexdump = "*"
 log = "*"
 chrono = "*"
+cache_2q = "*"
 
 strum = {version = "*", features = ["derive"]}
 strum_macros = "*"

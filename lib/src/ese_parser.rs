@@ -4,9 +4,8 @@ use crate::ese_trait::*;
 use crate::parser::reader::*;
 use crate::esent;
 
-use std::convert::TryFrom;
 use simple_error::SimpleError;
-use std::cell::{RefCell, Ref, RefMut};
+use std::cell::{RefCell, RefMut};
 
 struct Internal {
     cat: Box<jet::TableDefinition>,
@@ -16,7 +15,7 @@ struct Internal {
 }
 
 pub struct EseParser {
-    io_handle: Option<jet::IoHandle>,
+    reader: Option<Reader>,
     tables: Vec<RefCell<Internal>>,
 }
 
@@ -38,10 +37,10 @@ impl EseParser {
         Err(SimpleError::new(format!("can't find table name {}", table)))
     }
 
-    fn get_handle(&self) -> Result<&jet::IoHandle, SimpleError> {
-        match &self.io_handle {
-            Some(h) => Ok(&h),
-            None => Err(SimpleError::new("IoHandle is uninit, database opened?"))
+    fn get_reader(&self) -> Result<&Reader, SimpleError> {
+        match &self.reader {
+            Some(reader) => Ok(reader),
+            None => Err(SimpleError::new("Reader is uninit, database opened?")),
         }
     }
 
@@ -55,24 +54,24 @@ impl EseParser {
 
     fn get_column_dyn_helper(&self, table: u64, column: u32) -> Result<Option<Vec<u8>>, SimpleError> {
         let itrnl = self.get_internal(table)?;
-        let io_handle = self.get_handle()?;
+        let reader = self.get_reader()?;
         if itrnl.current_page.is_none() {
             return Err(SimpleError::new("no current page, use open_table API before this"));
         }
-        load_data(io_handle, &itrnl.cat, &itrnl.lv_tags, &itrnl.page(), itrnl.page_tag_index, column)
+        load_data(reader, &itrnl.cat, &itrnl.lv_tags, &itrnl.page(), itrnl.page_tag_index, column)
     }
 
     fn move_row_helper(&self, table: u64, crow: u32) -> Result<bool, SimpleError> {
-        let io_handle = self.get_handle()?;
+        let reader = self.get_reader()?;
         let mut t = self.get_internal(table)?;
 
         if crow == esent::JET_MoveFirst as u32 || crow == esent::JET_MoveNext as u32 {
             let mut i = t.page_tag_index + 1;
             if crow == esent::JET_MoveFirst as u32 {
-                let first_leaf_page = find_first_leaf_page(io_handle,
-                    t.cat.table_catalog_definition.as_ref().unwrap().father_data_page_number)?;
+                let first_leaf_page = find_first_leaf_page(&reader,
+                                                           t.cat.table_catalog_definition.as_ref().unwrap().father_data_page_number as usize)?;
                 if t.page().page_number != first_leaf_page {
-                    let page = jet::DbPage::new(&self.io_handle.as_ref().unwrap(), first_leaf_page)?;
+                    let page = jet::DbPage::new(&reader, first_leaf_page)?;
                     t.current_page = Some(page);
                 }
                 i = 1;
@@ -88,7 +87,7 @@ impl EseParser {
                     return Ok(true);
                 } else {
                     if t.page().common().next_page != 0 {
-                        let page = jet::DbPage::new(&self.io_handle.as_ref().unwrap(), t.page().common().next_page)?;
+                        let page = jet::DbPage::new(&self.get_reader().unwrap(), t.page().common().next_page as usize)?;
                         t.current_page = Some(page);
                         i = 1;
                     } else {
@@ -101,7 +100,7 @@ impl EseParser {
             let mut i = t.page_tag_index - 1;
             if crow == esent::JET_MoveLast as u32 {
                 while t.page().common().next_page != 0 {
-                    let page = jet::DbPage::new(&self.io_handle.as_ref().unwrap(), t.page().common().next_page)?;
+                    let page = jet::DbPage::new(&self.reader.as_ref().unwrap(), t.page().common().next_page as usize)?;
                     t.current_page = Some(page);
                 }
                 i = t.page().page_tags.len()-1;
@@ -116,7 +115,7 @@ impl EseParser {
                     return Ok(true);
                 } else {
                     if t.page().common().previous_page != 0 {
-                        let page = jet::DbPage::new(&self.io_handle.as_ref().unwrap(), t.page().common().previous_page)?;
+                        let page = jet::DbPage::new(&self.reader.as_ref().unwrap(), t.page().common().previous_page as usize)?;
                         t.current_page = Some(page);
                         i = t.page().page_tags.len()-1;
                     } else {
@@ -135,21 +134,21 @@ impl EseParser {
 
 impl EseDb for EseParser {
     fn init() -> EseParser {
-        EseParser { io_handle: None, tables: vec![] }
+        EseParser { reader: None, tables: vec![] }
     }
 
-    fn load(&mut self, dbpath: &str) -> Option<SimpleError> {
-        let h = match jet::IoHandle::load_db(&std::path::PathBuf::from(dbpath)) {
+    fn load(&mut self, dbpath: &str, cache_size: usize) -> Option<SimpleError> {
+        let reader = match Reader::load_db(&std::path::PathBuf::from(dbpath), cache_size) {
             Ok(h) => h,
             Err(e) => {
                 return Some(SimpleError::new(e.to_string()));
             }
         };
-        let mut cat = match load_catalog(&h) {
+        let mut cat = match load_catalog(&reader) {
             Ok(c) => c,
             Err(e) => return Some(e)
         };
-        self.io_handle = Some(h);
+        self.reader = Some(reader);
         for i in cat.drain(0..) {
             if i.table_catalog_definition.is_some() {
                 let itrnl = Internal { cat: Box::new(i), lv_tags: vec![], current_page: None, page_tag_index: 0 };
@@ -176,18 +175,18 @@ impl EseDb for EseParser {
         let mut index : usize = 0;
         { // used to drop borrow mut
             let mut t = self.get_table(table, &mut index)?;
-            let io_handle = self.get_handle()?;
+            let reader = self.get_reader()?;
             let mut lv : Vec<LV_tags> = Vec::new();
             if t.cat.long_value_catalog_definition.is_some() {
-                lv = load_lv_metadata(io_handle,
-                    t.cat.long_value_catalog_definition.as_ref().unwrap().father_data_page_number)?;
+                lv = load_lv_metadata(&reader,
+                                      t.cat.long_value_catalog_definition.as_ref().unwrap().father_data_page_number as usize)?;
                 t.lv_tags = lv;
             }
 
             // find and load first leaf page
-            let first_leaf_page = find_first_leaf_page(io_handle,
-                t.cat.table_catalog_definition.as_ref().unwrap().father_data_page_number)?;
-            let page = jet::DbPage::new(&self.io_handle.as_ref().unwrap(), first_leaf_page)?;
+            let first_leaf_page = find_first_leaf_page(&reader,
+                                                       t.cat.table_catalog_definition.as_ref().unwrap().father_data_page_number as usize)?;
+            let page = jet::DbPage::new(&self.reader.as_ref().unwrap(), first_leaf_page)?;
             if page.page_tags.len() < 2 {
                 return Err(SimpleError::new(format!("Table {} is empty", table)));
             }

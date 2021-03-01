@@ -12,7 +12,7 @@ pub struct ColumnInfo {
 
 pub trait EseDb {
     fn init() -> Self;
-    fn load(&mut self, dbpath: &str) -> Option<SimpleError>;
+    fn load(&mut self, dbpath: &str, cache_size: usize) -> Option<SimpleError>;
 
     fn error_to_string(&self, err: i32) -> String;
 
