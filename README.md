@@ -3,5 +3,5 @@
 
 For details go to subdirectories:
 - [library](lib/README.md)
-- [ese_parser app](app/README.md)
+- [ese_parser tool](app/README.md)
 - [python wrapper](python/README.md)

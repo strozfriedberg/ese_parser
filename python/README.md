@@ -2,6 +2,8 @@
 
 Export all `ese_trait` interface with python functions.
 
+To build wheel, run `build_wheel.bat`.
+
 Available methods:
 - `load(str) -> Option<String>` - load database, return String in case of error
 - `open_table(table_str) -> u64` - open table, return table ID
