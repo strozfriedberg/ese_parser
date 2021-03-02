@@ -14,7 +14,7 @@ class TestEseDbMethods(unittest.TestCase):
 		tbl = edb.open_table(t)
 		self.assertTrue(tbl > 0)
 
-		self.assertEqual(len(edb.get_columns(t)), 17)
+		self.assertEqual(len(edb.get_columns(t)), 18)
 		
 		self.assertEqual(edb.get_row(tbl, edb.get_column(t, "Bit")), 0)
 		self.assertEqual(edb.get_row(tbl, edb.get_column(t, "UnsignedByte")), 255)
@@ -26,7 +26,7 @@ class TestEseDbMethods(unittest.TestCase):
 		self.assertEqual(edb.get_row(tbl, edb.get_column(t, "UnsignedLong")), 4294967295)
 		self.assertEqual(edb.get_row(tbl, edb.get_column(t, "LongLong")), 9223372036854775807)
 		self.assertEqual(edb.get_row(tbl, edb.get_column(t, "UnsignedShort")), 65535)
-		self.assertEqual(datetime.utcfromtimestamp(edb.get_row(tbl, edb.get_column(t, "DateTime"))), datetime(2021, 3, 1, 14, 4, 25))
+		self.assertEqual(datetime.utcfromtimestamp(edb.get_row(tbl, edb.get_column(t, "DateTime"))), datetime(2021, 3, 2, 11, 11, 17))
 		self.assertEqual(edb.get_row(tbl, edb.get_column(t, "GUID")), "{4D36E96E-E325-11CE-BFC1-08002BE10318}")
 
 		b = edb.get_row(tbl, edb.get_column(t, "Binary"))
