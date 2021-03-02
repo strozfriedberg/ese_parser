@@ -63,7 +63,7 @@ impl EseParser {
     }
 
     fn move_row_helper(&self, table: u64, crow: u32) -> Result<bool, SimpleError> {
-        let mut reader = self.get_reader()?;
+        let reader = self.get_reader()?;
         let mut t = self.get_internal(table)?;
 
         if crow == esent::JET_MoveFirst as u32 || crow == esent::JET_MoveNext as u32 {
@@ -202,7 +202,7 @@ impl EseDb for EseParser {
         let mut index : usize = 0;
         { // used to drop borrow mut
             let mut t = self.get_table(table, &mut index)?;
-            let mut reader = self.get_reader()?;
+            let reader = self.get_reader()?;
             let mut lv : Vec<LV_tags> = Vec::new();
             if t.cat.long_value_catalog_definition.is_some() {
                 lv = load_lv_metadata(&reader,
