@@ -7,15 +7,6 @@ pub mod ese_trait;
 pub mod ese_api;
 pub mod ese_parser;
 
-use esent::*;
-use ese_api::*;
-use ese_trait::*;
-use ese_parser::*;
-
-use std::mem::MaybeUninit;
-use std::ffi::OsString;
-use std::os::windows::prelude::*;
-
 extern "C" {
     pub fn StringFromGUID2(
         rguid: *const ::std::os::raw::c_void,
@@ -42,8 +33,12 @@ extern "C" {
 
 #[test]
 fn test_edb_table_all_values() {
-    //let mut jdb : EseAPI = EseDb::init();
-    let mut jdb : EseParser = EseParser::init(5);
+
+    use ese_trait::*;
+    use std::os::windows::prelude::*;
+
+    //let mut jdb : ese_trait::EseDb = ese_api::EseApi::init();
+    let mut jdb : ese_parser::EseParser = ese_parser::EseParser::init(5);
 
     match jdb.load("testdata\\test.edb") {
         Some(e) => panic!("Error: {}", e),
@@ -63,7 +58,7 @@ fn test_edb_table_all_values() {
     let columns = jdb.get_columns(&table).unwrap();
 
     let table_id = jdb.open_table(&table).unwrap();
-    assert_eq!(jdb.move_row(table_id, JET_MoveFirst), true);
+    assert_eq!(jdb.move_row(table_id, esent::JET_MoveFirst), true);
 
     let bit = columns.iter().find(|x| x.name == "Bit" ).unwrap();
     assert_eq!(jdb.get_column::<i8>(table_id, bit.id).unwrap(), Some(0));
@@ -100,7 +95,7 @@ fn test_edb_table_all_values() {
         let date_time = columns.iter().find(|x| x.name == "DateTime" ).unwrap();
         let dt = jdb.get_column::<f64>(table_id, date_time.id).unwrap().unwrap();
 
-        let mut st = MaybeUninit::<SYSTEMTIME>::zeroed();
+        let mut st =  std::mem::MaybeUninit::<SYSTEMTIME>::zeroed();
         unsafe {
             let r = VariantTimeToSystemTime(dt, st.as_mut_ptr());
             assert_eq!(r, 1);
@@ -126,7 +121,7 @@ fn test_edb_table_all_values() {
             vstr.resize(39, 0);
             let r = StringFromGUID2(gd.as_ptr() as *const ::std::os::raw::c_void, vstr.as_mut_ptr() as *const u16, vstr.len() as i32);
             assert_ne!(r, 0);
-            let s = OsString::from_wide(&vstr).into_string().unwrap();
+            let s = std::ffi::OsString::from_wide(&vstr).into_string().unwrap();
             assert_eq!(s, "{4D36E96E-E325-11CE-BFC1-08002BE10318}\u{0}");
         }
     }
@@ -197,7 +192,7 @@ fn test_edb_table_all_values() {
 
         unsafe {
             let (_, v16, _) = s.align_to::<u16>();
-            let ws = OsString::from_wide(&v16).into_string().unwrap();
+            let ws = std::ffi::OsString::from_wide(&v16).into_string().unwrap();
             for i in 0..ws.len() {
                 let l = ws.chars().nth(i).unwrap();
                 let r = abc.as_bytes()[i % abc.len()] as char;

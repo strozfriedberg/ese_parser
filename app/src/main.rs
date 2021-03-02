@@ -76,7 +76,7 @@ impl EseDb for EseBoth {
         None
     }
 
-    fn error_to_string(&self, err: i32) -> String {
+    fn error_to_string(&self, _err: i32) -> String {
         "useless".to_string()
     }
 
@@ -188,7 +188,7 @@ impl EseDb for EseBoth {
     }
 
     fn get_column_dyn_mv(&self, table: u64, column: u32, multi_value_index: u32)
-    -> Result< Option<Vec<u8>>, SimpleError> {
+        -> Result< Option<Vec<u8>>, SimpleError> {
         let (api_table, parser_table) = self.opened_tables.borrow()[table as usize];
         let s1 = self.api.get_column_dyn_mv(api_table, column, multi_value_index)?;
         let s2 = self.parser.get_column_dyn_mv(parser_table, column, multi_value_index)?;
