@@ -42,9 +42,9 @@ extern "C" {
 #[test]
 fn test_edb_table_all_values() {
     //let mut jdb : EseAPI = EseDb::init();
-    let mut jdb : EseParser = EseParser::init();
+    let mut jdb : EseParser = EseParser::init(5);
 
-    match jdb.load("testdata\\test.edb", 5) {
+    match jdb.load("testdata\\test.edb") {
         Some(e) => panic!("Error: {}", e),
         None => println!("Loaded.")
     }
@@ -71,7 +71,7 @@ fn test_edb_table_all_values() {
     assert_eq!(jdb.get_column::<u8>(table_id, unsigned_byte.id).unwrap(), Some(255));
 
     let short = columns.iter().find(|x| x.name == "Short" ).unwrap();
-    assert_eq!(jdb.get_column::<i16>(table_id, short.id).unwrap(), Some(32767));
+    assert_eq!(jdb.get_column::<i16>(table_id, short.id).unwrap(), Some(0));
 
     let long = columns.iter().find(|x| x.name == "Long" ).unwrap();
     assert_eq!(jdb.get_column::<i32>(table_id, long.id).unwrap(), Some(-2147483648));
@@ -104,13 +104,14 @@ fn test_edb_table_all_values() {
             let r = VariantTimeToSystemTime(dt, st.as_mut_ptr());
             assert_eq!(r, 1);
             let s = st.assume_init();
-            assert_eq!(s.wDayOfWeek, 0);
-            assert_eq!(s.wDay, 13);
-            assert_eq!(s.wMonth, 12);
-            assert_eq!(s.wYear, 2020);
+            println!("{:?}", s);
+            assert_eq!(s.wDayOfWeek, 2);
+            assert_eq!(s.wDay, 2);
+            assert_eq!(s.wMonth, 3);
+            assert_eq!(s.wYear, 2021);
             assert_eq!(s.wHour, 11);
-            assert_eq!(s.wMinute, 56);
-            assert_eq!(s.wSecond, 32);
+            assert_eq!(s.wMinute, 11);
+            assert_eq!(s.wSecond, 17);
             assert_eq!(s.wMilliseconds, 0);
         }
     }
@@ -135,7 +136,6 @@ fn test_edb_table_all_values() {
         assert_eq!(binary.cbmax, 255);
 
         let b = jdb.get_column_dyn(table_id, binary.id, binary.cbmax as usize).unwrap().unwrap();
-        println!("Binary data size: {}", b.len());
         for i in 0..b.len() {
             assert_eq!(b[i], (i % 255) as u8);
         }
@@ -144,10 +144,17 @@ fn test_edb_table_all_values() {
     // LongBinary
     {
         let long_binary = columns.iter().find(|x| x.name == "LongBinary" ).unwrap();
-        assert_eq!(long_binary.cbmax, 1024);
+        assert_eq!(long_binary.cbmax, 65536);
 
         let b = jdb.get_column_dyn_varlen(table_id, long_binary.id).unwrap().unwrap();
-        println!("LongBinary data size: {}", b.len());
+        assert_eq!(b.len(), 128);
+        for i in 0..b.len() {
+            assert_eq!(b[i], (i % 255) as u8);
+        }
+
+        // multi-test value inside of long-value test
+        let b = jdb.get_column_dyn_mv(table_id, long_binary.id, 2).unwrap().unwrap();
+        assert_eq!(b.len(), 65536);
         for i in 0..b.len() {
             assert_eq!(b[i], (i % 255) as u8);
         }
@@ -163,22 +170,28 @@ fn test_edb_table_all_values() {
 
         let str = jdb.get_column_str(table_id, text.id, text.cbmax as u32).unwrap().unwrap();
         let t = jdb.get_column_dyn(table_id, text.id, text.cbmax as usize).unwrap().unwrap();
-        println!("Text data size: {}", t.len());
         for i in 0..t.len() {
             let expected_char = abc.as_bytes()[i % abc.len()];
             assert_eq!(t[i], expected_char);
             assert_eq!(str.as_bytes()[i], expected_char);
+        }
+
+        // Multi-value test
+        let v = jdb.get_column_dyn_mv(table_id, text.id, 2).unwrap().unwrap();
+        let h = "Hello".to_string();
+        assert_eq!(v.len()-2, h.len());
+        for i in 0..v.len()-2 {
+            assert_eq!(v[i], h.as_bytes()[i]);
         }
     }
 
     // LongText
     {
         let long_text = columns.iter().find(|x| x.name == "LongText" ).unwrap();
-        assert_eq!(long_text.cbmax, 1024);
+        assert_eq!(long_text.cbmax, 8600);
         assert_eq!(long_text.cp, 1200);
 
         let lt = jdb.get_column_dyn_varlen(table_id, long_text.id).unwrap().unwrap();
-        println!("LongText data size: {}", lt.len());
         let s = lt.as_slice();
 
         unsafe {
@@ -189,6 +202,19 @@ fn test_edb_table_all_values() {
                 let r = abc.as_bytes()[i % abc.len()] as char;
                 assert_eq!(l, r);
             }
+        }
+    }
+
+    // Default value
+    {
+        let deftext = columns.iter().find(|x| x.name == "TextDefaultValue" ).unwrap();
+        assert_eq!(deftext.cbmax, 255);
+        assert_eq!(deftext.cp, 1252);
+        let str = jdb.get_column_str(table_id, deftext.id, deftext.cbmax as u32).unwrap().unwrap();
+        let defval = "Default value.".to_string();
+        assert_eq!(str.len()-1, defval.len());
+        for i in 0..str.len()-1 {
+            assert_eq!(str.as_bytes()[i], defval.as_bytes()[i]);
         }
     }
 

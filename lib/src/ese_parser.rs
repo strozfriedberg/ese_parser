@@ -6,6 +6,7 @@ use crate::esent;
 
 use simple_error::SimpleError;
 use std::cell::{RefCell, RefMut};
+use crate::parser::jet::uint32_t;
 
 struct Internal {
     cat: Box<jet::TableDefinition>,
@@ -15,6 +16,7 @@ struct Internal {
 }
 
 pub struct EseParser {
+    cache_size: uint32_t,
     reader: Option<Reader>,
     tables: Vec<RefCell<Internal>>,
 }
@@ -52,13 +54,13 @@ impl EseParser {
         Err(SimpleError::new(format!("out of range index {}", table)))
     }
 
-    fn get_column_dyn_helper(&self, table: u64, column: u32) -> Result<Option<Vec<u8>>, SimpleError> {
+    fn get_column_dyn_helper(&self, table: u64, column: u32, mv_index: u32) -> Result<Option<Vec<u8>>, SimpleError> {
         let itrnl = self.get_internal(table)?;
         let reader = self.get_reader()?;
         if itrnl.current_page.is_none() {
             return Err(SimpleError::new("no current page, use open_table API before this"));
         }
-        load_data(reader, &itrnl.cat, &itrnl.lv_tags, &itrnl.page(), itrnl.page_tag_index, column)
+        load_data(reader, &itrnl.cat, &itrnl.lv_tags, &itrnl.page(), itrnl.page_tag_index, column, mv_index as usize)
     }
 
     fn move_row_helper(&self, table: u64, crow: u32) -> Result<bool, SimpleError> {
@@ -69,10 +71,14 @@ impl EseParser {
             let mut i = t.page_tag_index + 1;
             if crow == esent::JET_MoveFirst as u32 {
                 let first_leaf_page = find_first_leaf_page(&reader,
-                                                           t.cat.table_catalog_definition.as_ref().unwrap().father_data_page_number as usize)?;
-                if t.page().page_number != first_leaf_page {
+                    t.cat.table_catalog_definition.as_ref().unwrap().father_data_page_number)?;
+                if t.current_page.is_none() || t.page().page_number != first_leaf_page {
                     let page = jet::DbPage::new(&reader, first_leaf_page)?;
                     t.current_page = Some(page);
+                }
+                if t.page().page_tags.len() < 2 {
+                    // empty table
+                    return Ok(false);
                 }
                 i = 1;
             }
@@ -87,7 +93,7 @@ impl EseParser {
                     return Ok(true);
                 } else {
                     if t.page().common().next_page != 0 {
-                        let page = jet::DbPage::new(&self.get_reader().unwrap(), t.page().common().next_page as usize)?;
+                        let page = jet::DbPage::new(&self.get_reader().unwrap(), t.page().common().next_page)?;
                         t.current_page = Some(page);
                         i = 1;
                     } else {
@@ -100,8 +106,12 @@ impl EseParser {
             let mut i = t.page_tag_index - 1;
             if crow == esent::JET_MoveLast as u32 {
                 while t.page().common().next_page != 0 {
-                    let page = jet::DbPage::new(&self.reader.as_ref().unwrap(), t.page().common().next_page as usize)?;
+                    let page = jet::DbPage::new(&mut self.reader.as_ref().unwrap(), t.page().common().next_page)?;
                     t.current_page = Some(page);
+                }
+                if t.page().page_tags.len() < 2 {
+                    // empty table
+                    return Ok(false);
                 }
                 i = t.page().page_tags.len()-1;
             }
@@ -115,7 +125,7 @@ impl EseParser {
                     return Ok(true);
                 } else {
                     if t.page().common().previous_page != 0 {
-                        let page = jet::DbPage::new(&self.reader.as_ref().unwrap(), t.page().common().previous_page as usize)?;
+                        let page = jet::DbPage::new(&mut self.reader.as_ref().unwrap(), t.page().common().previous_page)?;
                         t.current_page = Some(page);
                         i = t.page().page_tags.len()-1;
                     } else {
@@ -130,21 +140,39 @@ impl EseParser {
 
         Err(SimpleError::new(format!("move_row: TODO: implement me, crow {}", crow)))
     }
+
+    pub fn get_column<T>(&self, table: u64, column: u32) -> Result<Option<T>, SimpleError> {
+        let size = std::mem::size_of::<T>();
+        let mut dst = std::mem::MaybeUninit::<T>::zeroed();
+
+        let vo = self.get_column_dyn(table, column, size)?;
+
+        unsafe {
+            if let Some(v) = vo {
+                std::ptr::copy_nonoverlapping(
+                    v.as_ptr(),
+                    dst.as_mut_ptr() as *mut u8,
+                    size);
+            }
+            return Ok(Some(dst.assume_init()));
+        }
+    }
+
+    // reserve room for cache_size recent entries, and cache_size frequent entries
+    pub fn init(cache_size: uint32_t) -> EseParser {
+        EseParser { cache_size: cache_size, reader: None, tables: vec![] }
+    }
 }
 
 impl EseDb for EseParser {
-    fn init() -> EseParser {
-        EseParser { reader: None, tables: vec![] }
-    }
-
-    fn load(&mut self, dbpath: &str, cache_size: usize) -> Option<SimpleError> {
-        let reader = match Reader::load_db(&std::path::PathBuf::from(dbpath), cache_size) {
+    fn load(&mut self, dbpath: &str) -> Option<SimpleError> {
+        let mut reader = match Reader::load_db(&std::path::PathBuf::from(dbpath), self.cache_size) {
             Ok(h) => h,
             Err(e) => {
                 return Some(SimpleError::new(e.to_string()));
             }
         };
-        let mut cat = match load_catalog(&reader) {
+        let mut cat = match load_catalog(&mut reader) {
             Ok(c) => c,
             Err(e) => return Some(e)
         };
@@ -179,20 +207,12 @@ impl EseDb for EseParser {
             let mut lv : Vec<LV_tags> = Vec::new();
             if t.cat.long_value_catalog_definition.is_some() {
                 lv = load_lv_metadata(&reader,
-                                      t.cat.long_value_catalog_definition.as_ref().unwrap().father_data_page_number as usize)?;
+                    t.cat.long_value_catalog_definition.as_ref().unwrap().father_data_page_number)?;
                 t.lv_tags = lv;
             }
-
-            // find and load first leaf page
-            let first_leaf_page = find_first_leaf_page(&reader,
-                                                       t.cat.table_catalog_definition.as_ref().unwrap().father_data_page_number as usize)?;
-            let page = jet::DbPage::new(&self.reader.as_ref().unwrap(), first_leaf_page)?;
-            if page.page_tags.len() < 2 {
-                return Err(SimpleError::new(format!("Table {} is empty", table)));
-            }
-            t.current_page = Some(page);
-            t.page_tag_index = 1;
         }
+        // ignore return result
+        self.move_row_helper(index as u64, esent::JET_MoveFirst);
 
         Ok(index as u64)
     }
@@ -235,7 +255,7 @@ impl EseDb for EseParser {
     }
 
     fn get_column_str(&self, table: u64, column: u32, size: u32) -> Result<Option<String>, SimpleError> {
-        let v = self.get_column_dyn_helper(table, column)?;
+        let v = self.get_column_dyn_helper(table, column, 0)?;
         if v.is_none() {
             return Ok(None);
         }
@@ -245,33 +265,16 @@ impl EseDb for EseParser {
         }
     }
 
-    fn get_column<T>(&self, table: u64, column: u32) -> Result<Option<T>, SimpleError> {
-        let size = std::mem::size_of::<T>();
-        let mut dst = std::mem::MaybeUninit::<T>::zeroed();
-
-        unsafe {
-            let vo = self.get_column_dyn_helper(table, column)?;
-            if vo.is_none() {
-                return Err(SimpleError::new(format!("get_column_dyn_helper: 0 size returned, expected {}", size)));
-            }
-            let v = vo.as_ref().unwrap();
-            if size != v.len() {
-                return Err(SimpleError::new(format!("get_column_dyn_helper: wrong size ({}) returned, expected {}",
-                    v.len(), size)));
-            }
-            std::ptr::copy_nonoverlapping(
-                v.as_ptr(),
-                dst.as_mut_ptr() as *mut u8,
-                size);
-            Ok(Some(dst.assume_init()))
-        }
-    }
-
     fn get_column_dyn(&self, table: u64, column: u32, size: usize) -> Result< Option<Vec<u8>>, SimpleError> {
-        self.get_column_dyn_helper(table, column)
+        self.get_column_dyn_helper(table, column, 0)
     }
 
     fn get_column_dyn_varlen(&self, table: u64, column: u32) -> Result< Option<Vec<u8>>, SimpleError> {
-        self.get_column_dyn_helper(table, column)
+        self.get_column_dyn_helper(table, column, 0)
+    }
+
+    fn get_column_dyn_mv(&self, table: u64, column: u32, multi_value_index: u32)
+        -> Result< Option<Vec<u8>>, SimpleError> {
+        self.get_column_dyn_helper(table, column, multi_value_index)
     }
 }

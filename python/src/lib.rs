@@ -3,7 +3,7 @@ use pyo3::wrap_pyfunction;
 use pyo3::exceptions;
 use pyo3::types::*;
 
-use ese_parser_lib::{esent::*, ese_trait::*, ese_api::*};
+use ese_parser_lib::{esent::*, ese_trait::*, ese_api::*, ese_parser::*};
 
 use simple_error::SimpleError;
 
@@ -22,7 +22,7 @@ extern "C" {
 
 #[pyclass]
 pub struct PyEseDb {
-    jdb : EseAPI,
+    jdb : EseParser,
 }
 
 #[pyclass]
@@ -56,7 +56,7 @@ impl PyEseDb {
     #[new]
     fn new() -> Self {
         PyEseDb {
-            jdb : EseDb::init()
+            jdb : EseParser::init(10)
         }
     }
 
@@ -116,6 +116,22 @@ impl PyEseDb {
 
     fn move_row(&self, table: u64, crow: u32) -> bool {
         self.jdb.move_row(table, crow)
+    }
+
+    fn get_row_mv(&self, table: u64, column: &PyColumnInfo, multi_value_index: u32) -> PyResult<Option<PyObject>> {
+        let gil = Python::acquire_gil();
+        let py = gil.python();
+
+        let d = self.jdb.get_column_dyn_mv(table, column.id, multi_value_index);
+        match d {
+            Ok(ov) => {
+                match ov {
+                    Some(n) => return Ok(Some(n.to_object(py))),
+                    None => return Ok(None)
+                }
+            },
+            Err(e) => return Err(PyErr::new::<exceptions::PyTypeError, _>(e.as_str().to_string()))
+        }
     }
 
     fn get_row(&self, table: u64, column: &PyColumnInfo) -> PyResult<Option<PyObject>> {

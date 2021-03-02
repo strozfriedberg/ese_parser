@@ -11,8 +11,7 @@ pub struct ColumnInfo {
 }
 
 pub trait EseDb {
-    fn init() -> Self;
-    fn load(&mut self, dbpath: &str, cache_size: usize) -> Option<SimpleError>;
+    fn load(&mut self, dbpath: &str) -> Option<SimpleError>;
 
     fn error_to_string(&self, err: i32) -> String;
 
@@ -24,10 +23,12 @@ pub trait EseDb {
 
     fn get_column_str(&self, table: u64, column: u32, size: u32)
         -> Result<Option<String>, SimpleError>;
-    fn get_column<T>(&self, table: u64, column: u32) -> Result<Option<T>, SimpleError>;
     fn get_column_dyn(&self, table: u64, column: u32, size: usize)
         -> Result< Option<Vec<u8>>, SimpleError>;
     fn get_column_dyn_varlen(&self, table: u64, column: u32)
+        -> Result< Option<Vec<u8>>, SimpleError>;
+
+    fn get_column_dyn_mv(&self, table: u64, column: u32, multi_value_index: u32)
         -> Result< Option<Vec<u8>>, SimpleError>;
 
     fn move_row(&self, table: u64, crow: u32) -> bool;

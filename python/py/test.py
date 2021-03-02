@@ -14,11 +14,11 @@ class TestEseDbMethods(unittest.TestCase):
 		tbl = edb.open_table(t)
 		self.assertTrue(tbl > 0)
 
-		self.assertEqual(len(edb.get_columns(t)), 17)
+		self.assertEqual(len(edb.get_columns(t)), 18)
 		
 		self.assertEqual(edb.get_row(tbl, edb.get_column(t, "Bit")), 0)
 		self.assertEqual(edb.get_row(tbl, edb.get_column(t, "UnsignedByte")), 255)
-		self.assertEqual(edb.get_row(tbl, edb.get_column(t, "Short")), 32767)
+		self.assertEqual(edb.get_row(tbl, edb.get_column(t, "Short")), 0)
 		self.assertEqual(edb.get_row(tbl, edb.get_column(t, "Long")), -2147483648)
 		self.assertEqual(edb.get_row(tbl, edb.get_column(t, "Currency")), 350050)
 		self.assertEqual(edb.get_row(tbl, edb.get_column(t, "IEEESingle")), 3.141592025756836)
@@ -26,7 +26,7 @@ class TestEseDbMethods(unittest.TestCase):
 		self.assertEqual(edb.get_row(tbl, edb.get_column(t, "UnsignedLong")), 4294967295)
 		self.assertEqual(edb.get_row(tbl, edb.get_column(t, "LongLong")), 9223372036854775807)
 		self.assertEqual(edb.get_row(tbl, edb.get_column(t, "UnsignedShort")), 65535)
-		self.assertEqual(datetime.utcfromtimestamp(edb.get_row(tbl, edb.get_column(t, "DateTime"))), datetime(2020, 12, 13, 11, 56, 32))
+		self.assertEqual(datetime.utcfromtimestamp(edb.get_row(tbl, edb.get_column(t, "DateTime"))), datetime(2021, 3, 2, 11, 11, 17))
 		self.assertEqual(edb.get_row(tbl, edb.get_column(t, "GUID")), "{4D36E96E-E325-11CE-BFC1-08002BE10318}")
 
 		b = edb.get_row(tbl, edb.get_column(t, "Binary"))
@@ -47,6 +47,13 @@ class TestEseDbMethods(unittest.TestCase):
 		ind = 0
 		for i in b:
 			self.assertEqual(i, abc[ind % len(abc)])
+			ind += 1
+
+		b = edb.get_row_mv(tbl, edb.get_column(t, "Text"), 2)
+		h = "Hello"
+		ind = 0
+		for i in range(0,len(b)-2):
+			self.assertEqual(b[i], ord(h[ind]))
 			ind += 1
 
 		b = edb.get_row(tbl, edb.get_column(t, "LongText"))
