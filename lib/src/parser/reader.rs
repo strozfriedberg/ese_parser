@@ -733,8 +733,13 @@ pub fn load_data(
                 }
             }
         }
+        // column not found?
         if col.identifier == column_id {
-            // column not found (empty)
+            // default present?
+            if col.default_value.len() > 0 {
+                return Ok(Some(col.default_value.clone()));
+            }
+            // empty
             return Ok(None)
         }
     }

@@ -105,13 +105,14 @@ fn test_edb_table_all_values() {
             let r = VariantTimeToSystemTime(dt, st.as_mut_ptr());
             assert_eq!(r, 1);
             let s = st.assume_init();
-            assert_eq!(s.wDayOfWeek, 1);
-            assert_eq!(s.wDay, 1);
+            println!("{:?}", s);
+            assert_eq!(s.wDayOfWeek, 2);
+            assert_eq!(s.wDay, 2);
             assert_eq!(s.wMonth, 3);
             assert_eq!(s.wYear, 2021);
-            assert_eq!(s.wHour, 14);
-            assert_eq!(s.wMinute, 4);
-            assert_eq!(s.wSecond, 25);
+            assert_eq!(s.wHour, 11);
+            assert_eq!(s.wMinute, 11);
+            assert_eq!(s.wSecond, 17);
             assert_eq!(s.wMilliseconds, 0);
         }
     }
@@ -144,9 +145,17 @@ fn test_edb_table_all_values() {
     // LongBinary
     {
         let long_binary = columns.iter().find(|x| x.name == "LongBinary" ).unwrap();
-        assert_eq!(long_binary.cbmax, 8600);
+        assert_eq!(long_binary.cbmax, 65536);
 
         let b = jdb.get_column_dyn_varlen(table_id, long_binary.id).unwrap().unwrap();
+        assert_eq!(b.len(), 128);
+        for i in 0..b.len() {
+            assert_eq!(b[i], (i % 255) as u8);
+        }
+
+        // multi-test value inside of long-value test
+        let b = jdb.get_column_dyn_mv(table_id, long_binary.id, 2).unwrap().unwrap();
+        assert_eq!(b.len(), 65536);
         for i in 0..b.len() {
             assert_eq!(b[i], (i % 255) as u8);
         }
@@ -194,6 +203,19 @@ fn test_edb_table_all_values() {
                 let r = abc.as_bytes()[i % abc.len()] as char;
                 assert_eq!(l, r);
             }
+        }
+    }
+
+    // Default value
+    {
+        let deftext = columns.iter().find(|x| x.name == "TextDefaultValue" ).unwrap();
+        assert_eq!(deftext.cbmax, 255);
+        assert_eq!(deftext.cp, 1252);
+        let str = jdb.get_column_str(table_id, deftext.id, deftext.cbmax as u32).unwrap().unwrap();
+        let defval = "Default value.".to_string();
+        assert_eq!(str.len()-1, defval.len());
+        for i in 0..str.len()-1 {
+            assert_eq!(str.as_bytes()[i], defval.as_bytes()[i]);
         }
     }
 
