@@ -6,7 +6,6 @@ use crate::esent;
 
 use simple_error::SimpleError;
 use std::cell::{RefCell, RefMut};
-use crate::parser::jet::uint32_t;
 
 struct Internal {
     cat: Box<jet::TableDefinition>,
@@ -16,7 +15,7 @@ struct Internal {
 }
 
 pub struct EseParser {
-    cache_size: uint32_t,
+    cache_size: usize,
     reader: Option<Reader>,
     tables: Vec<RefCell<Internal>>,
 }
@@ -159,7 +158,7 @@ impl EseParser {
     }
 
     // reserve room for cache_size recent entries, and cache_size frequent entries
-    pub fn init(cache_size: uint32_t) -> EseParser {
+    pub fn init(cache_size: usize) -> EseParser {
         EseParser { cache_size: cache_size, reader: None, tables: vec![] }
     }
 }
@@ -186,7 +185,7 @@ impl EseDb for EseParser {
         None
     }
 
-    fn error_to_string(&self, err: i32) -> String {
+    fn error_to_string(&self, _err: i32) -> String {
         "TODO".to_string()
     }
 
@@ -204,15 +203,13 @@ impl EseDb for EseParser {
         { // used to drop borrow mut
             let mut t = self.get_table(table, &mut index)?;
             let reader = self.get_reader()?;
-            let mut lv : Vec<LV_tags> = Vec::new();
             if t.cat.long_value_catalog_definition.is_some() {
-                lv = load_lv_metadata(&reader,
+                t.lv_tags = load_lv_metadata(&reader,
                     t.cat.long_value_catalog_definition.as_ref().unwrap().father_data_page_number)?;
-                t.lv_tags = lv;
             }
         }
         // ignore return result
-        self.move_row_helper(index as u64, esent::JET_MoveFirst);
+        self.move_row_helper(index as u64, esent::JET_MoveFirst)?;
 
         Ok(index as u64)
     }
@@ -254,7 +251,7 @@ impl EseDb for EseParser {
         }
     }
 
-    fn get_column_str(&self, table: u64, column: u32, size: u32) -> Result<Option<String>, SimpleError> {
+    fn get_column_str(&self, table: u64, column: u32, _size: u32) -> Result<Option<String>, SimpleError> {
         let v = self.get_column_dyn_helper(table, column, 0)?;
         if v.is_none() {
             return Ok(None);
@@ -265,7 +262,7 @@ impl EseDb for EseParser {
         }
     }
 
-    fn get_column_dyn(&self, table: u64, column: u32, size: usize) -> Result< Option<Vec<u8>>, SimpleError> {
+    fn get_column_dyn(&self, table: u64, column: u32, _size: usize) -> Result< Option<Vec<u8>>, SimpleError> {
         self.get_column_dyn_helper(table, column, 0)
     }
 
