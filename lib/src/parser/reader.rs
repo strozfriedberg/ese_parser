@@ -84,7 +84,7 @@ impl Reader {
         };
         let mut reader = Reader {
             file: RefCell::new(f),
-            cache: RefCell::new(Cache::new(cache_size as usize)),
+            cache: RefCell::new(Cache::new(cache_size)),
             page_size: 2 * 1024, //just to read header
             format_version: 0,
             format_revision: 0,
@@ -97,7 +97,7 @@ impl Reader {
         reader.page_size = db_fh.page_size;
         reader.last_page_number = (db_fh.page_size * 2) / db_fh.page_size;
 
-        reader.cache.get_mut().remove(&0);
+        reader.cache.get_mut().clear();
 
         Ok(reader)
     }
@@ -968,6 +968,7 @@ pub fn load_lv_data(
     }
 }
 
+#[allow(dead_code)]
 mod test {
     use super::*;
     use std::{str};
@@ -1108,10 +1109,10 @@ mod test {
     impl Drop for EseAPI {
         fn drop(&mut self) {
             if self.sesid != 0 {
-                jetcall!(JetEndSession(self.sesid, 0));
+                jettry!(JetEndSession(self.sesid, 0));
             }
             if self.instance != 0 {
-                jetcall!(JetTerm(self.instance));
+                jettry!(JetTerm(self.instance));
             }
         }
     }
@@ -1164,41 +1165,42 @@ mod test {
         dst_path
     }
 
-    #[test]
-    pub fn caching_test() -> () {
-        let cache_size = 10_u32;
+        #[test]
+    pub fn caching_test() -> Result<(), SimpleError> {
+        let cache_size = 10u32;
         let path = prepare_db("test_caching.edb", 1024 * 8);
-        let mut reader = Reader::new(&path, cache_size);
+        let mut reader = Reader::new(&path, cache_size as usize)?;
         let page_size = reader.page_size;
-        let num_of_pages = cmp::min(fs::metadata(&path).unwrap().len() as u32/ page_size, page_size);
+        let num_of_pages = std::cmp::min(fs::metadata(&path).unwrap().len() as u32 / page_size, page_size);
         let full_cache_size = 6 * cache_size;
         let stride = num_of_pages / full_cache_size;
         let chunk_size = page_size / num_of_pages;
         let mut chunks = Vec::<Vec<u8>>::with_capacity(stride as usize);
 
-        println!("cache_size: {}, page_size: {}, num_of_pages: {}, stride: {}, chunk_size: {}", cache_size, page_size, num_of_pages, stride, chunk_size);
+        println!("cache_size: {}, page_size: {}, num_of_pages: {}, stride: {}, chunk_size: {}",
+            cache_size, page_size, num_of_pages, stride, chunk_size);
 
-        for pass in 1..2 {
-            for pg_no in 1..num_of_pages {
+        for pass in 1..3 {
+            for pg_no in 1..12 {
                 let offset: u64 = (pg_no * (page_size + chunk_size)) as u64;
 
-                if pg_no < 10 || pg_no > (num_of_pages - 10) {
-                    println!("pg_no {}, offset {:x} ", pg_no, offset);
-                }
+                println!("pass {}, pg_no {}, offset {:x} ", pass, pg_no, offset);
 
                 if pass == 1 {
                     let mut chunk = Vec::<u8>::with_capacity(stride as usize);
-                    assert!(!reader.cache.get_mut().contains_key(&offset));
-                    reader.read(offset, &mut chunk);
+                    assert!(!reader.cache.get_mut().contains_key(&pg_no));
+                    reader.read(offset, &mut chunk)?;
                     chunks.push(chunk);
-                }
-                else {
+                } else {
                     let mut chunk = Vec::<u8>::with_capacity(stride as usize);
-                    assert!(reader.cache.get_mut().contains_key(&offset));
-                    reader.read(offset, &mut chunk);
+                    // pg_no == 1 was deleted, because cache_size is 10 pages
+                    // and we read 11, so least recently used page (1) was deleted
+                    assert_eq!(reader.cache.get_mut().contains_key(&pg_no), pg_no != 1);
+                    reader.read(offset, &mut chunk)?;
                     assert_eq!(chunk, chunks[pg_no as usize - 1]);
                 }
             }
         }
+        Ok(())
     }
 }

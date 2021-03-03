@@ -1,4 +1,3 @@
-#![allow(temporary_cstring_as_ptr)]
 use crate::ese_trait::*;
 use crate::esent::*;
 
