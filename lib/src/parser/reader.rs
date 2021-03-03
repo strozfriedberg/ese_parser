@@ -97,7 +97,7 @@ impl Reader {
         reader.page_size = db_fh.page_size;
         reader.last_page_number = (db_fh.page_size * 2) / db_fh.page_size;
 
-        reader.cache.get_mut().remove(&0);
+        reader.cache.get_mut().clear();
 
         Ok(reader)
     }
