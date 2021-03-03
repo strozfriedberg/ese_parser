@@ -1201,6 +1201,8 @@ mod test {
                 }
             }
         }
+        fs::remove_file(path.with_file_name("test_caching.jfm")).unwrap();
+        fs::remove_file(path).unwrap();
         Ok(())
     }
 }
