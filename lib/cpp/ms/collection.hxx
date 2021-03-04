@@ -253,7 +253,7 @@ public:
 
     VOID EnableExtensiveValidation() { fDoExtensiveValidation = fTrue; }
     VOID DisableExtensiveValidation() { fDoExtensiveValidation = fFalse; }
-    VOID EnableAssertOnCountAndSize() { fAssertOnCountandSize = fTrue; }
+    //VOID EnableAssertOnCountAndSize() { fAssertOnCountandSize = fTrue; }
     VOID DisableAssertOnCountAndSize() { fAssertOnCountAndSize = fFalse; }
 
 private:
@@ -2073,7 +2073,7 @@ KeyInsertLeast() const
 {
     const CBucket::ID cBucketHash = 1 << m_shfBucketHash;
 
-    CBucket::ID idFirstLeast = m_idRangeLast - m_didRangeMost;
+    typename CBucket::ID idFirstLeast = m_idRangeLast - m_didRangeMost;
     idFirstLeast = idFirstLeast + ( cBucketHash - idFirstLeast % cBucketHash ) % cBucketHash;
 
     return _KeyFromId( idFirstLeast );
@@ -2086,7 +2086,7 @@ KeyInsertMost() const
 {
     const CBucket::ID cBucketHash = 1 << m_shfBucketHash;
 
-    CBucket::ID idLastMost = m_idRangeFirst + m_didRangeMost;
+    typename CBucket::ID idLastMost = m_idRangeFirst + m_didRangeMost;
     idLastMost = idLastMost - ( idLastMost + 1 ) % cBucketHash;
 
     return _KeyFromId( idLastMost );
@@ -2113,7 +2113,7 @@ template< class CKey, class CEntry, PfnOffsetOf OffsetOfIC >
 inline typename CApproximateIndex< CKey, CEntry, OffsetOfIC >::ERR CApproximateIndex< CKey, CEntry, OffsetOfIC >::
 ErrInsertEntry( CLock* const plock, CEntry* const pentry, const BOOL fNextMost )
 {
-    CBucketTable::ERR err;
+    typename CBucketTable::ERR err;
 
 
     COLLAssert( !plock->m_bucket.m_il.FMember( pentry ) );
@@ -2195,7 +2195,7 @@ ErrReserveEntry( CLock* const plock )
     plock->m_bucket.m_cPin++;
 
 
-    CBucketTable::ERR errBT;
+    typename CBucketTable::ERR errBT;
 
     if ( ( errBT = m_bt.ErrReplaceEntry( &plock->m_lock, plock->m_bucket ) ) != CBucketTable::ERR::errSuccess )
     {
@@ -2227,7 +2227,7 @@ UnreserveEntry( CLock* const plock )
     plock->m_bucket.m_cPin--;
 
 
-    CBucketTable::ERR errBT = m_bt.ErrReplaceEntry( &plock->m_lock, plock->m_bucket );
+    typename CBucketTable::ERR errBT = m_bt.ErrReplaceEntry( &plock->m_lock, plock->m_bucket );
     COLLAssert( errBT == CBucketTable::ERR::errSuccess );
 }
 
@@ -2517,8 +2517,8 @@ _FExpandIdRange( const typename CBucket::ID idNew )
     }
 
 
-    CBucket::ID idFirstNew  = idFirst;
-    CBucket::ID idLastNew   = idLast;
+    typename CBucket::ID idFirstNew  = idFirst;
+    typename CBucket::ID idLastNew   = idLast;
 
     if ( _CmpId( idFirstMic, idNew ) < 0 && _CmpId( idNew, idFirst ) < 0 )
     {
@@ -2564,7 +2564,7 @@ _ErrInsertBucket( CLock* const plock )
     }
 
 
-    CBucketTable::ERR err;
+    typename CBucketTable::ERR err;
 
     if ( ( err = m_bt.ErrInsertEntry( &plock->m_lock, plock->m_bucket ) ) != CBucketTable::ERR::errSuccess )
     {
@@ -3882,6 +3882,7 @@ template< class CKey, class CEntry >
 inline typename CTable< CKey, CEntry >::ERR CTable< CKey, CEntry >::
 ErrLoad( const size_t centry, const CEntry* const rgentry )
 {
+    typename 
     CArray< CKeyEntry >::ERR    err         = CArray< CKeyEntry >::ERR::errSuccess;
     size_t                      ientry      = 0;
     size_t                      ientryMin   = Size();
@@ -3909,7 +3910,7 @@ template< class CKey, class CEntry >
 inline typename CTable< CKey, CEntry >::ERR CTable< CKey, CEntry >::
 ErrClone( const CTable& table )
 {
-    CArray< CKeyEntry >::ERR err = CArray< CKeyEntry >::ERR::errSuccess;
+    typename CArray< CKeyEntry >::ERR err = CArray< CKeyEntry >::ERR::errSuccess;
 
     if ( ( err = m_arrayKeyEntry.ErrClone( table.m_arrayKeyEntry ) ) != CArray< CKeyEntry >::ERR::errSuccess )
     {
@@ -3926,7 +3927,7 @@ template< class CKey, class CEntry >
 inline typename CTable< CKey, CEntry >::ERR CTable< CKey, CEntry >::
 ErrCloneArray(  const CArray< CEntry >& array )
 {
-    CArray< CKeyEntry >::ERR    err             = CArray< CKeyEntry >::ERR::errSuccess;
+    typename CArray< CKeyEntry >::ERR    err             = CArray< CKeyEntry >::ERR::errSuccess;
     const CArray< CKeyEntry >&  arrayKeyEntry   = reinterpret_cast< const CArray< CKeyEntry >& >( array );
 
     if ( ( err = m_arrayKeyEntry.ErrClone( arrayKeyEntry ) ) != CArray< CKeyEntry >::ERR::errSuccess )
@@ -3974,7 +3975,7 @@ template< class CKey, class CEntry >
 inline void CTable< CKey, CEntry >::
 Clear()
 {
-    CArray< CKeyEntry >::ERR err = m_arrayKeyEntry.ErrSetCapacity(0);
+    typename CArray< CKeyEntry >::ERR err = m_arrayKeyEntry.ErrSetCapacity(0);
     COLLAssert( err == CArray< CKeyEntry >::ERR::errSuccess );
 }
 
@@ -4410,16 +4411,16 @@ inline CStupidQueue::ERR CStupidQueue::ErrAdjustSize( void )
     m_cAlloc = cNew;
     m_rg = rgNew;
 
-    DWORD iT = ( m_iTail + 1 ) % ( m_cAlloc / mGrowth );
-    if ( iT != 0 )
     {
+        DWORD iT = (m_iTail + 1) % (m_cAlloc / mGrowth);
+        if (iT != 0) {
         memcpy( PvElement( m_cAlloc / mGrowth ), PvElement( 0 ), iT * m_cbElement );
         m_iTail = ( m_cAlloc / mGrowth ) + m_iTail;
         COLLAssert( m_iTail < m_cAlloc );
     }
-    else
-    {
+        else {
         COLLAssert( m_iHead == 0 );
+    }
     }
 
     err = ERR::errSuccess;
@@ -5461,7 +5462,7 @@ public:
 
 private:
     static CRedBlackTreeNode* ICToNode( typename BaseType::InvasiveContext* pic ) { return (CRedBlackTreeNode*) ( ( (BYTE*) pic ) - OffsetOfRedBlackTreeIC() ); }
-    static const CRedBlackTreeNode* ICToNode( const typename BaseType::InvasiveContext* const pic ) { return ICToNode( const_cast<BaseType::InvasiveContext*>( pic ) ); }
+    static const CRedBlackTreeNode* ICToNode( const typename BaseType::InvasiveContext* const pic ) { return ICToNode( const_cast<typename BaseType::InvasiveContext*>( pic ) ); }
 
 private:
     typename BaseType::InvasiveContext  m_icRedBlackTree;
@@ -5608,7 +5609,7 @@ void CRedBlackTree<KEY, DATA>::MakeEmpty()
     if ( m_irbtBase.PnodeRoot() != NULL )
     {
         Node* pnodeRoot = const_cast<Node*>( m_irbtBase.PnodeRoot() );
-        BaseType::InvasiveContext* picRoot = ( BaseType::InvasiveContext* ) ( ( (BYTE*) pnodeRoot ) + Node::OffsetOfRedBlackTreeIC() );
+        typename BaseType::InvasiveContext* picRoot = ( typename BaseType::InvasiveContext* ) ( ( (BYTE*) pnodeRoot ) + Node::OffsetOfRedBlackTreeIC() );
 
         MakeEmpty_( pnodeRoot->PnodeLeft() );
         MakeEmpty_( pnodeRoot->PnodeRight() );
