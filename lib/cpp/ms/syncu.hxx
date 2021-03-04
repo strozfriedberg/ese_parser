@@ -492,19 +492,20 @@ class PLS
                 goto Return;
             }
 
-            const ULONG cbPerfCountersNeeded = roundup( cb, OSMemoryPageCommitGranularity() );
-            Assert( cbPerfCountersNeeded > cbPerfCountersCommitted );
-            const ULONG dcbPerfCountersNeeded = cbPerfCountersNeeded - cbPerfCountersCommitted;
-
-            if ( FOSMemoryPageCommit( pbPerfCounters + cbPerfCountersCommitted, dcbPerfCountersNeeded ) )
             {
-                (void)AtomicExchange( (LONG*)&cbPerfCountersCommitted, cbPerfCountersNeeded );
-            }
-            else
-            {
-                fIsBufferLargeEnough = fFalse;
-            }
+                const ULONG cbPerfCountersNeeded = roundup(cb, OSMemoryPageCommitGranularity());
+                Assert(cbPerfCountersNeeded > cbPerfCountersCommitted);
+                {
+                    const ULONG dcbPerfCountersNeeded = cbPerfCountersNeeded - cbPerfCountersCommitted;
 
+                    if (FOSMemoryPageCommit(pbPerfCounters + cbPerfCountersCommitted, dcbPerfCountersNeeded)) {
+                        (void)AtomicExchange((LONG*)&cbPerfCountersCommitted, cbPerfCountersNeeded);
+                    }
+                    else {
+                        fIsBufferLargeEnough = fFalse;
+                    }
+                }
+            }
         Return:
             if ( fOwnsCritSec )
             {
