@@ -6,7 +6,7 @@
 
 
 #include <stdarg.h>
-
+#include "string.hxx"
 
 class CPRINTF
 {
@@ -89,7 +89,7 @@ class CPRINTINTRINBUF : public CPRINTF
         CHAR                m_rgchBuffer[ s_cchBuffer ];
         QWORD               m_cyichAppendMax;
 
-        void CPRINTINTRINBUF::Append_( const CHAR * const szPrint );
+        void Append_( const CHAR * const szPrint );
 
         ULONG IchAppendNext_() const
         {
