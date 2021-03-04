@@ -1239,9 +1239,9 @@ public:
         m_ptcCurr = tfnGetEtc();
         m_tcSaved = *m_ptcCurr;
 
-        iorp != iorpNone ? m_ptcCurr->iorReason.SetIorp( iorp ) : 0;
-        iors != iorsNone ? m_ptcCurr->iorReason.SetIors( iors ) : 0;
-        iort != iortNone ? m_ptcCurr->iorReason.SetIort( iort ) : 0;
+        if(iorp != iorpNone) m_ptcCurr->iorReason.SetIorp( iorp );
+        if(iors != iorsNone) m_ptcCurr->iorReason.SetIors( iors );
+        if(iort != iortNone) m_ptcCurr->iorReason.SetIort( iort );
         m_ptcCurr->iorReason.AddFlag( iorf );
     }
 
@@ -1250,8 +1250,8 @@ public:
         m_ptcCurr = tfnGetEtc();
         m_tcSaved = *m_ptcCurr;
 
-        iors != iorsNone ? m_ptcCurr->iorReason.SetIors( iors ) : 0;
-        iort != iortNone ? m_ptcCurr->iorReason.SetIort( iort ) : 0;
+        if(iors != iorsNone) m_ptcCurr->iorReason.SetIors( iors );
+        if(iort != iortNone) m_ptcCurr->iorReason.SetIort( iort );
         m_ptcCurr->iorReason.AddFlag( iorf );
     }
 
@@ -1260,7 +1260,8 @@ public:
         m_ptcCurr = tfnGetEtc();
         m_tcSaved = *m_ptcCurr;
 
-        iort != iortNone ? m_ptcCurr->iorReason.SetIort( iort ) : 0;
+        if (iort != iortNone) 
+            m_ptcCurr->iorReason.SetIort( iort );
         m_ptcCurr->iorReason.AddFlag( iorf );
     }
 
