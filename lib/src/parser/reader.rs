@@ -235,7 +235,7 @@ pub fn load_page_tags(
             offset = page_tag_offset & 0x1fff;
             size   = page_tag_size & 0x1fff;
         }
-        tags.push(PageTag{ flags: flags, offset: offset, size: size} );
+        tags.push(PageTag{ flags, offset, size } );
     }
 
     Ok(tags)
@@ -801,20 +801,19 @@ pub fn load_lv_tag(
         offset += local_page_key_size as u64;
     }
 
-    if (page_tag.size as u64) - (offset - page_tag_offset) == 8 {
-        let skey : u32 = reader.read_struct(offset)?;
+    return if (page_tag.size as u64) - (offset - page_tag_offset) == 8 {
+        let skey: u32 = reader.read_struct(offset)?;
         offset += 4;
 
         res.key = skey;
 
-        let _total_size : u32 = reader.read_struct(offset)?;
+        let _total_size: u32 = reader.read_struct(offset)?;
         offset += 4;
 
         // TODO: handle? page_tags with skey & total_size only
-        return Ok(None);
+        Ok(None)
     } else {
-
-        let mut page_key : Vec<u8> = vec![];
+        let mut page_key: Vec<u8> = vec![];
         if common_page_key_size + local_page_key_size == 8 {
             page_key.append(&mut res.common_page_key.clone());
             page_key.append(&mut res.local_page_key.clone());
@@ -823,12 +822,12 @@ pub fn load_lv_tag(
         } else if common_page_key_size >= 4 {
             page_key = res.common_page_key.clone();
         }
-        
+
         let skey = unsafe {
             match page_key[0..4].try_into() {
                 Ok(pk) => std::mem::transmute::<[u8; 4], u32>(pk),
                 Err(e) => return Err(SimpleError::new(format!("can't convert page_key {:?} into slice [0..4], error: {}",
-                    page_key, e)))
+                                                              page_key, e)))
             }
         }.to_be();
 
@@ -844,7 +843,7 @@ pub fn load_lv_tag(
         res.offset = offset;
         res.size = (page_tag.size as u64 - (offset - page_tag_offset)).try_into().unwrap();
 
-        return Ok(Some(res));
+        Ok(Some(res))
     }
 }
 
@@ -1073,9 +1072,9 @@ mod test {
         }
 
         fn create_table(self: &mut EseAPI,
-                               name: &str,
-                               columns: &mut Vec::<JET_COLUMNCREATE_A>,
-                               indexes: &mut Vec::<JET_INDEXCREATE_A>) -> JET_TABLEID {
+                        name: &str,
+                        columns: &mut Vec<JET_COLUMNCREATE_A>,
+                        indexes: &mut Vec<JET_INDEXCREATE_A>) -> JET_TABLEID {
 
             let mut table_def =  JET_TABLECREATE_A{
                         cbStruct: size_of::<JET_TABLECREATE_A>(),
