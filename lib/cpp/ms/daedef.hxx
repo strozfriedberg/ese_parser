@@ -1295,46 +1295,45 @@ INLINE ERR BOOKMARK_COPY::ErrCopyKeyData( const KEY& keySrc, const DATA& dataSrc
         goto HandleError;
     }
 
-    const DWORD_PTR cb = keySrc.Cb() + dataSrc.Cb();
-    DWORD_PTR cbMax = 0;
-    CallS( RESBOOKMARK.ErrGetParam( JET_resoperSize, &cbMax ) );
-    if ( cb > cbMax )
     {
-        Assert( fFalse );
-        Error( ErrERRCheck( JET_errOutOfMemory ) );
+        const DWORD_PTR cb = keySrc.Cb() + dataSrc.Cb();
+        DWORD_PTR cbMax = 0;
+        CallS(RESBOOKMARK.ErrGetParam(JET_resoperSize, &cbMax));
+        if (cb > cbMax) {
+            Assert(fFalse);
+            Error(ErrERRCheck(JET_errOutOfMemory));
+        }
+
+        Alloc(m_pb = (BYTE*)RESBOOKMARK.PvRESAlloc());
+        Nullify();
+        {
+            BYTE* pb = m_pb;
+
+            if (!keySrc.prefix.FNull()) {
+                key.prefix.SetPv(pb);
+                key.prefix.SetCb(keySrc.prefix.Cb());
+                UtilMemCpy(pb, keySrc.prefix.Pv(), key.prefix.Cb());
+                pb += key.prefix.Cb();
+            }
+
+            if (!keySrc.suffix.FNull()) {
+                key.suffix.SetPv(pb);
+                key.suffix.SetCb(keySrc.suffix.Cb());
+                UtilMemCpy(pb, keySrc.suffix.Pv(), key.suffix.Cb());
+                pb += key.suffix.Cb();
+            }
+
+            if (!dataSrc.FNull()) {
+                data.SetPv(pb);
+                data.SetCb(dataSrc.Cb());
+                UtilMemCpy(pb, dataSrc.Pv(), data.Cb());
+                pb += data.Cb();
+            }
+
+            Assert((DWORD_PTR)(pb - m_pb) == cb);
+            ASSERT_VALID(this);
+        }
     }
-
-    Alloc( m_pb = (BYTE *)RESBOOKMARK.PvRESAlloc() );
-    Nullify();
-    BYTE* pb = m_pb;
-
-    if ( !keySrc.prefix.FNull() )
-    {
-        key.prefix.SetPv( pb );
-        key.prefix.SetCb( keySrc.prefix.Cb() );
-        UtilMemCpy( pb, keySrc.prefix.Pv(), key.prefix.Cb() );
-        pb += key.prefix.Cb();
-    }
-
-    if ( !keySrc.suffix.FNull() )
-    {
-        key.suffix.SetPv( pb );
-        key.suffix.SetCb( keySrc.suffix.Cb() );
-        UtilMemCpy( pb, keySrc.suffix.Pv(), key.suffix.Cb() );
-        pb += key.suffix.Cb();
-    }
-
-    if ( !dataSrc.FNull() )
-    {
-        data.SetPv( pb );
-        data.SetCb( dataSrc.Cb() );
-        UtilMemCpy( pb, dataSrc.Pv(), data.Cb() );
-        pb += data.Cb();
-    }
-
-    Assert( (DWORD_PTR)( pb - m_pb ) == cb );
-    ASSERT_VALID( this );
-
 HandleError:
     return err;
 }
