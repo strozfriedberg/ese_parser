@@ -253,9 +253,9 @@ public:
 
     VOID EnableExtensiveValidation() { fDoExtensiveValidation = fTrue; }
     VOID DisableExtensiveValidation() { fDoExtensiveValidation = fFalse; }
-    //VOID EnableAssertOnCountAndSize() { fAssertOnCountandSize = fTrue; }
     VOID DisableAssertOnCountAndSize() { fAssertOnCountAndSize = fFalse; }
 
+    //VOID EnableAssertOnCountAndSize() { fAssertOnCountandSize = fTrue; }
 private:
     VOID Compact_();
 
