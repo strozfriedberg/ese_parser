@@ -23,7 +23,7 @@
 #endif
 
 
-#include <sync.hxx>
+#include "sync.hxx"
 
 
 #ifdef DEBUG
