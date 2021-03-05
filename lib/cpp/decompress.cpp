@@ -13,7 +13,6 @@
 #include <Esent.h>
 
 #define ESENT                                           1
-#define fInvalidUsage                                   0
 #define JET_cbKeyMost_OLD                               256
 #define JET_resoperSize                                 0
 #define JET_IOPriorityLowForCheckpoint                  0
@@ -31,21 +30,18 @@ class INST;
 using JET_RESID                 = int;
 using JET_RESOPER               = int;
 using JET_RECSIZE3              = void;
-using TICK                      = int;
 using JET_ENGINEFORMATVERSION   = long;
 using JET_DBINFOMISC7           = void;
 using JET_PFNINITCALLBACK       = void *;
 using JET_THREADSTATS4          = void *;
-using HRT                       = void *;
 
 BOOL FOSDllUp();
 BOOL FOSLayerUp();
-TICK TickOSTimeCurrent();
 
 #include "ms/cc.hxx"
 #include "ms/types.hxx"
 #include "ms/memory.hxx"
-#include "ms/error.hxx"
+//#include "ms/error.hxx"
 #include "ms/math.hxx"
 #include "ms/thread.hxx"
 #include "ms/sync.hxx"
@@ -63,6 +59,7 @@ TICK TickOSTimeCurrent();
 #include "ms/stat.hxx"
 #include "ms/daedef.hxx"
 
+#define Call( x )   x
 
 struct CDataCompressor {
     enum COMPRESSION_SCHEME
@@ -170,7 +167,7 @@ ERR CDataCompressor::ErrDecompress(
         Assert( JET_wrnBufferTruncated == err );
     }
 
-HandleError:
+//HandleError:
     Expected( ( bIdentifier != COMPRESS_SCRUB ) || ( err == wrnRECCompressionScrubDetected ) );
 
     return err;
