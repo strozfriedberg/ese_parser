@@ -6,11 +6,12 @@
 
 
 
-
 #ifdef STATAssert
 #else
 #define STATAssert Assert
 #endif
+
+#define STATAssertSz( x, y )
 #ifdef STATAssertSz
 #else
 #define STATAssertSz AssertSz

@@ -8,26 +8,30 @@
 #include <stdarg.h>
 #include "string.hxx"
 
+#ifndef Expected
+#define Expected( x )
+#endif // !Expected
+
 class CPRINTF
 {
     public:
         CPRINTF() {}
         virtual ~CPRINTF() {}
 
-        static void SetThreadPrintfPrefix( __in const _TCHAR * szPrefix );
+        static void SetThreadPrintfPrefix( __in const CHAR * szPrefix );
 
     public:
-        virtual void __cdecl operator()( const _TCHAR* szFormat, ... ) = 0;
+        virtual void __cdecl operator()( const CHAR* szFormat, ... ) = 0;
 };
 
 class CPRINTFNULL : public CPRINTF
 {
     public:
-        void __cdecl operator()( const _TCHAR* szFormat, ... );
+        void __cdecl operator()( const CHAR* szFormat, ... );
         static CPRINTF* PcprintfInstance();
 };
 
-INLINE void __cdecl CPRINTFNULL::operator()( const _TCHAR* szFormat, ... )
+INLINE void __cdecl CPRINTFNULL::operator()( const CHAR* szFormat, ... )
 {
     va_list arg_ptr;
     va_start( arg_ptr, szFormat );
@@ -44,7 +48,7 @@ INLINE CPRINTF* CPRINTFNULL::PcprintfInstance()
 class CPRINTFDBGOUT : public CPRINTF
 {
     public:
-        void __cdecl operator()( const _TCHAR* szFormat, ... );
+        void __cdecl operator()( const CHAR* szFormat, ... );
         static CPRINTF* PcprintfInstance();
 };
 
@@ -52,7 +56,7 @@ class CPRINTFDBGOUT : public CPRINTF
 class CPRINTFSTDOUT : public CPRINTF
 {
     public:
-        void __cdecl operator()( const _TCHAR* szFormat, ... );
+        void __cdecl operator()( const CHAR* szFormat, ... );
         static CPRINTF* PcprintfInstance();
 };
 
@@ -62,11 +66,11 @@ INLINE CPRINTF* CPRINTFSTDOUT::PcprintfInstance()
     return &g_cprintfStdout;
 }
 
-INLINE void __cdecl CPRINTFSTDOUT::operator()( const _TCHAR* szFormat, ... )
+INLINE void __cdecl CPRINTFSTDOUT::operator()( const CHAR* szFormat, ... )
 {
     va_list arg_ptr;
     va_start( arg_ptr, szFormat );
-    _vtprintf( szFormat, arg_ptr );
+    vprintf( szFormat, arg_ptr );
     va_end( arg_ptr );
 }
 
@@ -82,7 +86,7 @@ class CPRINTINTRINBUF : public CPRINTF
 
         void Print( CPRINTF & pcprintf );
 
-        void __cdecl operator()( const _TCHAR* szFormat, ... );
+        void __cdecl operator()( const CHAR* szFormat, ... );
 
     private:
         const static ULONG  s_cchBuffer = 2048;
@@ -165,7 +169,7 @@ INLINE void CPRINTINTRINBUF::Reset()
     m_cyichAppendMax = 0;
 }
 
-INLINE void __cdecl CPRINTINTRINBUF::operator()( const _TCHAR* szFormat, ... )
+INLINE void __cdecl CPRINTINTRINBUF::operator()( const CHAR* szFormat, ... )
 {
     CHAR rgchBuf[ 1024 ];
 
@@ -250,9 +254,9 @@ INLINE void CPRINTINTRINBUF::Print( CPRINTF & cprintf )
     while( ( szT = csr.SzNext() ) != NULL )
     {
         if ( fSzId )
-            cprintf( (_TCHAR*)"[%d] %hs", i, szT );
+            cprintf( (CHAR*)"[%d] %hs", i, szT );
         else
-            cprintf( (_TCHAR*)"%hs", szT );
+            cprintf( (CHAR*)"%hs", szT );
         i++;
     }
 }
@@ -262,7 +266,7 @@ INLINE void CPRINTINTRINBUF::Print( CPRINTF & cprintf )
 class CPRINTFDEBUG : public CPRINTF
 {
     public:
-        void __cdecl operator()( const _TCHAR* szFormat, ... );
+        void __cdecl operator()( const CHAR* szFormat, ... );
         static CPRINTF* PcprintfInstance();
 };
 
@@ -272,7 +276,7 @@ INLINE CPRINTF* CPRINTFDEBUG::PcprintfInstance()
     return &g_cprintfDEBUG;
 }
 
-INLINE void __cdecl CPRINTFDEBUG::operator()( const _TCHAR* szFormat, ... )
+INLINE void __cdecl CPRINTFDEBUG::operator()( const CHAR* szFormat, ... )
 {
     va_list arg_ptr;
     va_start( arg_ptr, szFormat );
@@ -290,7 +294,7 @@ class CPRINTFFILE : public CPRINTF
         CPRINTFFILE( const WCHAR* wszFile );
         ~CPRINTFFILE();
         
-        void __cdecl operator()( const _TCHAR* szFormat, ... );
+        void __cdecl operator()( const CHAR* szFormat, ... );
         
     private:
         void* m_hFile;
@@ -304,7 +308,7 @@ class CWPRINTFFILE : public CPRINTF
         ~CWPRINTFFILE();
 
 #ifndef _UNICODE
-        void __cdecl operator()( const _TCHAR* szFormat, ... );
+        void __cdecl operator()( const CHAR* szFormat, ... );
 #endif
         void __cdecl operator()( const wchar_t * wszFormat, ... );
         ERR m_errLast;
@@ -317,9 +321,9 @@ class CWPRINTFFILE : public CPRINTF
 class CPRINTFINDENT : public CPRINTF
 {
     public:
-        CPRINTFINDENT( CPRINTF* pcprintf, const _TCHAR* szPrefix = NULL );
+        CPRINTFINDENT( CPRINTF* pcprintf, const CHAR* szPrefix = NULL );
     
-        void __cdecl operator()( const _TCHAR* szFormat, ... );
+        void __cdecl operator()( const CHAR* szFormat, ... );
 
         virtual void Indent();
         virtual void Unindent();
@@ -330,34 +334,34 @@ class CPRINTFINDENT : public CPRINTF
     private:
         CPRINTF* const      m_pcprintf;
         INT                 m_cindent;
-        const _TCHAR* const m_szPrefix;
+        const CHAR* const m_szPrefix;
 };
 
-INLINE CPRINTFINDENT::CPRINTFINDENT( CPRINTF* pcprintf, const _TCHAR* szPrefix ) :
+INLINE CPRINTFINDENT::CPRINTFINDENT( CPRINTF* pcprintf, const CHAR* szPrefix ) :
     m_cindent( 0 ),
     m_pcprintf( pcprintf ),
     m_szPrefix( szPrefix )
 {
 }
     
-INLINE void __cdecl CPRINTFINDENT::operator()( const _TCHAR* szFormat, ... )
+INLINE void __cdecl CPRINTFINDENT::operator()( const CHAR* szFormat, ... )
 {
-    _TCHAR rgchBuf[1024];
+    CHAR rgchBuf[1024];
     va_list arg_ptr;
     va_start( arg_ptr, szFormat );
-    StringCbVPrintf( rgchBuf, sizeof(rgchBuf), szFormat, arg_ptr );
+    StringCbVPrintfA( rgchBuf, sizeof(rgchBuf), szFormat, arg_ptr );
     va_end( arg_ptr );
 
     for( INT i = 0; i < m_cindent; i++ )
     {
-        (*m_pcprintf)( _T( "\t" ) );
+        (*m_pcprintf)( "\t" );
     }
 
     if( m_szPrefix )
     {
-        (*m_pcprintf)( _T( "%s" ), m_szPrefix );
+        (*m_pcprintf)( "%s", m_szPrefix );
     }
-    (*m_pcprintf)( _T( "%s" ), rgchBuf );
+    (*m_pcprintf)( "%s", rgchBuf );
 }
 
 INLINE void CPRINTFINDENT::Indent()
@@ -384,9 +388,9 @@ INLINE CPRINTFINDENT::CPRINTFINDENT( ) :
 class CPRINTFTLSPREFIX : public CPRINTFINDENT
 {
     public:
-        CPRINTFTLSPREFIX( CPRINTF* pcprintf, const _TCHAR * const szPrefix = NULL );
+        CPRINTFTLSPREFIX( CPRINTF* pcprintf, const CHAR * const szPrefix = NULL );
     
-        void __cdecl operator()( const _TCHAR* szFormat, ... );
+        void __cdecl operator()( const CHAR* szFormat, ... );
 
         void Indent();
         void Unindent();
@@ -394,30 +398,30 @@ class CPRINTFTLSPREFIX : public CPRINTFINDENT
     private:
         CPRINTF* const      m_pcprintf;
         INT                 m_cindent;
-        const _TCHAR* const m_szPrefix;
+        const CHAR* const m_szPrefix;
 };
 
 
 class CPRINTFFN : public CPRINTF
 {
     public:
-        CPRINTFFN( INT (__cdecl *pfnPrintf)(const _TCHAR*, ... ) ) : m_pfnPrintf( pfnPrintf ) {}
+        CPRINTFFN( INT (__cdecl *pfnPrintf)(const CHAR*, ... ) ) : m_pfnPrintf( pfnPrintf ) {}
         ~CPRINTFFN() {}
 
-        void __cdecl operator()( const _TCHAR* szFormat, ... )
+        void __cdecl operator()( const CHAR* szFormat, ... )
         {
-            _TCHAR rgchBuf[1024];
+            CHAR rgchBuf[1024];
             
             va_list arg_ptr;
             va_start( arg_ptr, szFormat );
-            StringCbVPrintf(rgchBuf, sizeof(rgchBuf), szFormat, arg_ptr);
+            StringCbVPrintfA(rgchBuf, sizeof(rgchBuf), szFormat, arg_ptr);
             va_end( arg_ptr );
 
-            (*m_pfnPrintf)( _T( "%s" ), rgchBuf );
+            (*m_pfnPrintf)( "%s" , rgchBuf );
         }
 
     private:
-        INT (__cdecl *m_pfnPrintf)( const _TCHAR*, ... );
+        INT (__cdecl *m_pfnPrintf)( const CHAR*, ... );
 };
     
 

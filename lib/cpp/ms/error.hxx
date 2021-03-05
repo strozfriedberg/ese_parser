@@ -287,10 +287,11 @@ extern void (__stdcall *g_pfnEnforceContextFail)( const WCHAR* wszContext, const
                                                             OSTraceResumeGC_();                                                                                         \
                                                         }
 
-#define Enforce( exp )                                  if ( !( exp ) )                                 \
-                                                        {                                               \
-                                                            EnforceFail( #exp, __FILE__, __LINE__ );    \
-                                                        }
+//#define Enforce( exp )                                  if ( !( exp ) )                                 \
+//                                                        {                                               \
+//                                                            EnforceFail( #exp, __FILE__, __LINE__ );    \
+//                                                        }
+#define Enforce( exp )
 #endif
 
 

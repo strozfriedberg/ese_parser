@@ -11,6 +11,8 @@ const BYTE c_rgbCacheHeaderV1[ CBlockCacheHeaderHelpers::cbGuid ] = { 0xE4, 0x21
 
 #include <pshpack1.h>
 
+#define JET_filetypeCachingFile 0
+
 class CCacheHeader : CBlockCacheHeaderHelpers
 {
     public:

@@ -165,8 +165,9 @@ inline LONG __cdecl _InterlockedExchangeAdd( LONG volatile * _Addend, LONG _Valu
 NAMESPACE_BEGIN( OSSYNC );
 
 
+#ifndef __AFX_H__
 class CDumpContext;
-
+#endif//__AFX_H__
 
 
 class COwner;

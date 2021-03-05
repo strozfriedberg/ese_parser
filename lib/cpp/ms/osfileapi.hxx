@@ -394,10 +394,10 @@ ERR ErrIOWriteContiguous(   IFileAPI* const                         pfapi,
                             const size_t                            cData,
                             const OSFILEQOS                         grbitQOS );
 
-ERR ErrIORetrieveSparseSegmentsInRegion(    IFileAPI* const                             pfapi,
-                                            _In_ QWORD                                  ibFirst,
-                                            _In_ QWORD                                  ibLast,
-                                            _Inout_ CArray<SparseFileSegment>* const    parrsparseseg );
+//ERR ErrIORetrieveSparseSegmentsInRegion(    IFileAPI* const                             pfapi,
+//                                            _In_ QWORD                                  ibFirst,
+//                                            _In_ QWORD                                  ibLast,
+//                                            _Inout_ CArray<SparseFileSegment>* const    parrsparseseg );
 
 
 

@@ -4,8 +4,9 @@
 #ifndef _OS_SYSINFO_HXX_INCLUDED
 #define _OS_SYSINFO_HXX_INCLUDED
 
-
-
+#ifndef Enforce
+#define Enforce( x )
+#endif // !Enforce
 
 BOOL FSSEInstructionsAvailable();
 

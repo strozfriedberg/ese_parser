@@ -5,7 +5,7 @@
 #ifndef __OSFS_HXX_INCLUDED
 #define __OSFS_HXX_INCLUDED
 
-
+#include <Esent.h>
 
 class COSFileSystem
     :   public IFileSystemAPI

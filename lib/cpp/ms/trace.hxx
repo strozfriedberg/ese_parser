@@ -6,6 +6,11 @@
 
 #include <utility>
 
+#ifndef AssertPREFIX
+#define AssertPREFIX( x )
+#define EnforceSz( x, y )
+#endif // !AssertPREFIX
+
 class TRACEINFO
 {
     public:
@@ -90,15 +95,16 @@ void OSTraceResumeGC_();
         && ( 0 == g_tidTrace || DwUtilThreadId() == g_tidTrace )        \
         && ( __fMeetsExternalFilterCriteria ) )
 
-#define OSTrace( __tag, __szTrace )                                     \
-{                                                                       \
-    if ( FOSTraceTagEnabled_( __tag, fTrue ) )                          \
-    {                                                                   \
-        OSTraceSuspendGC_();                                            \
-        OSTrace_( __tag, __szTrace );                                   \
-        OSTraceResumeGC_();                                             \
-    }                                                                   \
-}
+#define OSTrace( __tag, __szTrace )
+//\
+//{                                                                       \
+//    if ( FOSTraceTagEnabled_( __tag, fTrue ) )                          \
+//    {                                                                   \
+//        OSTraceSuspendGC_();                                            \
+//        OSTrace_( __tag, __szTrace );                                   \
+//        OSTraceResumeGC_();                                             \
+//    }                                                                   \
+//}
 
 #define OSTraceIndent( __tag, __dLevel )                                \
 {                                                                       \

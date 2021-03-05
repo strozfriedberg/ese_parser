@@ -9,6 +9,12 @@ template< class I >
 class THashedLRUKCache
     :   public TCacheBase<I, CHashedLRUKCachedFileTableEntry>
 {
+    using TCacheBase<I, CHashedLRUKCachedFileTableEntry>::PffCaching;
+    using TCacheBase<I, CHashedLRUKCachedFileTableEntry>::Pcconfig;
+    using TCacheBase<I, CHashedLRUKCachedFileTableEntry>::Pfsconfig;
+    using TCacheBase<I, CHashedLRUKCachedFileTableEntry>::ErrGetCachedFile;
+    using TCacheBase<I, CHashedLRUKCachedFileTableEntry>::CComplete;
+
     public:
 
         ~THashedLRUKCache()
@@ -92,7 +98,6 @@ ERR THashedLRUKCache<I>::ErrCreate()
 
 
     Call( CHashedLRUKCacheHeader::ErrCreate( &pch ) );
-
 
     Call( PffCaching()->ErrSetSize( *tcScope, Pcconfig()->CbMaximumSize(), fFalse, qosIONormal ) );
 

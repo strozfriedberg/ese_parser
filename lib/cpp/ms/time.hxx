@@ -9,8 +9,9 @@
 #ifdef _M_IX86
 #endif
 
-
-
+#ifndef Assert
+#define Assert( xx )
+#endif // !Assert
 
 ULONG_PTR UlUtilGetSeconds();
 

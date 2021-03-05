@@ -877,7 +877,7 @@ ERR ErrOSMemoryPageResidenceMapScanStart( const size_t cbMax, __out DWORD * cons
     g_residencemap.cbMax = cbMax;
 
     const size_t cPage = g_residencemap.cbMax / OSMemoryPageCommitGranularity();
-    const size_t cbit = LNextPowerOf2( cPage );
+    const size_t cbit = LNextPowerOf2( (LONG) cPage );
 #ifdef DEBUG
     size_t cbitCheck;
     for ( cbitCheck = 1; cbitCheck < cPage; cbitCheck *= 2 );
@@ -889,42 +889,42 @@ ERR ErrOSMemoryPageResidenceMapScanStart( const size_t cbMax, __out DWORD * cons
     Alloc( g_residencemap.psbm = new CSparseBitmap );
 
     Call( ErrFaultInjection( 37584  ) );
-    IBitmapAPI::ERR errBM = g_residencemap.psbm->ErrInitBitmap( cbit );
-    if ( errBM != IBitmapAPI::ERR::errSuccess )
     {
-        Assert( errBM == IBitmapAPI::ERR::errOutOfMemory );
-        Call( ErrERRCheck( JET_errOutOfMemory ) );
-    }
+        IBitmapAPI::ERR errBM = g_residencemap.psbm->ErrInitBitmap( cbit );
+        if ( errBM != IBitmapAPI::ERR::errSuccess )
+        {
+            Assert( errBM == IBitmapAPI::ERR::errOutOfMemory );
+            Call( ErrERRCheck( JET_errOutOfMemory ) );
+        }
 
-    Assert( g_residencemap.cbmwsexinfoMax == 0 );
-    Assert( g_residencemap.pmwsexinfo == NULL );
-    g_residencemap.cbmwsexinfoMax = ( cPage ) * sizeof( PSAPI_WORKING_SET_EX_INFORMATION );
+        Assert( g_residencemap.cbmwsexinfoMax == 0 );
+        Assert( g_residencemap.pmwsexinfo == NULL );
+        g_residencemap.cbmwsexinfoMax = ( cPage ) * sizeof( PSAPI_WORKING_SET_EX_INFORMATION );
 
-    Alloc( g_residencemap.pmwsexinfo = (PPSAPI_WORKING_SET_EX_INFORMATION)PvOSMemoryPageAlloc( g_residencemap.cbmwsexinfoMax, NULL ) );
+        Alloc( g_residencemap.pmwsexinfo = (PPSAPI_WORKING_SET_EX_INFORMATION)PvOSMemoryPageAlloc( g_residencemap.cbmwsexinfoMax, NULL ) );
 
 
-    Call( g_pfnNtQuerySystemInformation.ErrIsPresent() );
+        Call( g_pfnNtQuerySystemInformation.ErrIsPresent() );
 
-    const BOOL fAlwaysRun = BOOL( UlConfigOverrideInjection( 62160, 0 )  +
-                                    UlConfigOverrideInjection( 41680, 0 ) );
+        SYSTEM_PERFORMANCE_INFORMATION sysperfinfo;
+        const BOOL fAlwaysRun = BOOL( UlConfigOverrideInjection( 62160, 0 )  +
+            UlConfigOverrideInjection( 41680, 0 ) );
+        ULONG cbStructActual = 0;
+        NTSTATUS status = g_pfnNtQuerySystemInformation(SystemPerformanceInformation,
+            &sysperfinfo,
+            sizeof(sysperfinfo),
+            &cbStructActual);
 
-    SYSTEM_PERFORMANCE_INFORMATION sysperfinfo;
-    ULONG cbStructActual = 0;
-    NTSTATUS status         = g_pfnNtQuerySystemInformation(    SystemPerformanceInformation,
-                                                            &sysperfinfo,
-                                                            sizeof( sysperfinfo ),
-                                                            &cbStructActual );
+        if (NT_SUCCESS(status) &&
+            cbStructActual >= CbElementInStruct(sysperfinfo, DirtyPagesWriteCount))     {
+            cPageOutputCurrent = sysperfinfo.DirtyPagesWriteCount;
+        }
 
-    if (    NT_SUCCESS( status ) &&
-            cbStructActual >= CbElementInStruct( sysperfinfo, DirtyPagesWriteCount ) )
-    {
-        cPageOutputCurrent = sysperfinfo.DirtyPagesWriteCount;
-    }
-
-    if ( ( cPageOutputCurrent != g_residencemap.cPageOutput ) || fAlwaysRun )
-    {
-        g_residencemap.cPageOutput = cPageOutputCurrent;
-        g_residencemap.dwUpdateId++;
+        if ( ( cPageOutputCurrent != g_residencemap.cPageOutput ) || fAlwaysRun )
+        {
+            g_residencemap.cPageOutput = cPageOutputCurrent;
+            g_residencemap.dwUpdateId++;
+        }
     }
 
     g_residencemap.iMapReq = 0;
@@ -964,6 +964,8 @@ VOID OSMemoryPageResidenceMapScanStop()
 
 ERR ErrOSMemoryPageResidenceMapRetrieve( void* const pv, const size_t cb, IBitmapAPI** const ppbmapi )
 {
+    throw __FUNCTION__;
+    /*
     ERR                                 err         = JET_errSuccess;
 
     Assert( ( (ULONG_PTR)pv % OSMemoryPageCommitGranularity() ) == 0 );
@@ -1084,6 +1086,7 @@ HandleError:
     }
 
     return err;
+    */
 }
 
 BOOL FOSMemoryPageResident( void* const pv, const size_t cb )
@@ -1111,21 +1114,20 @@ BOOL FOSMemoryPageResident( void* const pv, const size_t cb )
         goto HandleError;
     }
 
-
-    const size_t cbmwsexinfo = sizeof( MEMORY_WORKING_SET_EX_INFORMATION ) * cPageVM;
-    pmwsexinfo = (MEMORY_WORKING_SET_EX_INFORMATION*)_alloca( cbmwsexinfo );
-
-    for ( iPageVM = 0; iPageVM < cPageVM; iPageVM++ )
     {
-        pmwsexinfo[ iPageVM ].VirtualAddress = (BYTE*)pvVMStart + iPageVM * OSMemoryPageCommitGranularity();
-        memset( &pmwsexinfo[ iPageVM ].u1.VirtualAttributes, 0, sizeof( pmwsexinfo[ iPageVM ].u1.VirtualAttributes ) );
-    }
-    if ( g_pfnQueryWorkingSetEx.ErrIsPresent() < JET_errSuccess ||
-         !g_pfnQueryWorkingSetEx( GetCurrentProcess(), (void*)pmwsexinfo, cbmwsexinfo ) )
-    {
-        goto HandleError;
-    }
+        const size_t cbmwsexinfo = sizeof(MEMORY_WORKING_SET_EX_INFORMATION) * cPageVM;
+        pmwsexinfo = (MEMORY_WORKING_SET_EX_INFORMATION*)_alloca(cbmwsexinfo);
 
+        for (iPageVM = 0; iPageVM < cPageVM; iPageVM++)     {
+            pmwsexinfo[iPageVM].VirtualAddress = (BYTE*)pvVMStart + iPageVM * OSMemoryPageCommitGranularity();
+            memset(&pmwsexinfo[iPageVM].u1.VirtualAttributes, 0, sizeof(pmwsexinfo[iPageVM].u1.VirtualAttributes));
+        }
+        if (g_pfnQueryWorkingSetEx.ErrIsPresent() < JET_errSuccess ||
+            !g_pfnQueryWorkingSetEx(GetCurrentProcess(), (void*)pmwsexinfo, cbmwsexinfo))     {
+            goto HandleError;
+        }
+
+    }
 
     fResident = fTrue;
     for ( iPageVM = 0; fResident && iPageVM < cPageVM; iPageVM++ )
@@ -1134,7 +1136,7 @@ BOOL FOSMemoryPageResident( void* const pv, const size_t cb )
                         (   !pmwsexinfo[ iPageVM ].u1.VirtualAttributes.Valid &&
                             pmwsexinfo[ iPageVM ].u1.VirtualAttributes.Invalid.Location == MemoryLocationResident );
     }
-
+    
 HandleError:
     return fResident;
 }
@@ -1377,7 +1379,8 @@ BOOL                g_fcsosmmInit;
 
 void OSMemoryPostterm()
 {
-
+    throw __FUNCTION__;
+    /*
     OSMemoryIPageResidenceMapPostterm();
 
 
@@ -1475,6 +1478,7 @@ void OSMemoryPostterm()
     }
 
     g_fMemCheck = fFalse;
+*/
 }
 
 

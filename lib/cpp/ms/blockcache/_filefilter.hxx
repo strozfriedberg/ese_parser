@@ -753,8 +753,8 @@ ERR TFileFilter<I>::ErrRename(  _In_z_  const WCHAR* const  wszPathDest,
                             OSFormat( this ),
                             wszPathDest, 
                             OSFormatBoolean( fOverwriteExisting ) ) );
-
-    return m_pfsf->ErrFileRename( m_piInner, wszPathDest, fOverwriteExisting );
+    throw __FUNCTION__;
+    //return m_pfsf->ErrFileRename( m_piInner, wszPathDest, fOverwriteExisting );
 }
 
 template< class I >
@@ -805,7 +805,8 @@ ERR TFileFilter<I>::ErrIORead(  _In_                    const TraceContext&     
                                 _In_                    const IFileAPI::PfnIOHandoff        pfnIOHandoff,
                                 _In_                    const VOID *                        pioreq )
 {
-    return ErrRead( tc, ibOffset, cbData, pbData, grbitQOS, IOMode::iomEngine, pfnIOComplete, keyIOComplete, pfnIOHandoff, pioreq );
+    throw __FUNCTION__;
+    //return ErrRead( tc, ibOffset, cbData, pbData, grbitQOS, IOMode::iomEngine, pfnIOComplete, keyIOComplete, pfnIOHandoff, pioreq );
 }
 
 template< class I >
@@ -818,13 +819,15 @@ ERR TFileFilter<I>::ErrIOWrite( _In_                    const TraceContext&     
                                 _In_                    const DWORD_PTR                 keyIOComplete,
                                 _In_                    const IFileAPI::PfnIOHandoff    pfnIOHandoff )
 {
-    return ErrWrite( tc, ibOffset, cbData, pbData, grbitQOS, IOMode::iomEngine, pfnIOComplete, keyIOComplete, pfnIOHandoff );
+    throw __FUNCTION__;
+    //return ErrWrite( tc, ibOffset, cbData, pbData, grbitQOS, IOMode::iomEngine, pfnIOComplete, keyIOComplete, pfnIOHandoff );
 }
 
 template< class I >
 ERR TFileFilter<I>::ErrIOIssue()
 {
-    return ErrIssue( IOMode::iomEngine );
+    throw __FUNCTION__;
+    //return ErrIssue( IOMode::iomEngine );
 }
 
 template< class I >
@@ -848,7 +851,8 @@ ERR TFileFilter<I>::ErrRead(    _In_                    const TraceContext&     
     Assert( cbData > 0 );
     Assert( iom == IOMode::iomRaw || iom == IOMode::iomEngine || iom == IOMode::iomCacheMiss );
 
-
+    throw __FUNCTION__;
+    /*
     if ( iom == IOMode::iomEngine )
     {
         Call( ErrBeginAccess( offsets, fFalse, &group, &psem ) );
@@ -892,6 +896,7 @@ HandleError:
                                 pioreq,
                                 fIOREQUsed,
                                 err );
+    */
 }
 
 template< class I >
@@ -925,7 +930,8 @@ ERR TFileFilter<I>::ErrWrite(   _In_                    const TraceContext&     
                             OSFormatBoolean( CCachedFileHeader::FValid( m_pfsconfig, pbData, cbData ) ),
                             iom ) );
 
-
+    throw __FUNCTION__;
+    /*
     if ( iom == IOMode::iomEngine )
     {
         Call( ErrBeginAccess( offsets, fTrue, &group, &psem ) );
@@ -952,6 +958,7 @@ HandleError:
         EndAccess( group, psem );
     }
     return err;
+    */
 }
 
 template< class I >
@@ -967,7 +974,8 @@ ERR TFileFilter<I>::ErrIssue( _In_ const IFileFilter::IOMode iom )
             iom == IOMode::iomCacheWriteBack );
 
     OSTrace( JET_tracetagBlockCache, OSFormat( "%s ErrIOIssue iom=%u", OSFormat( this ), iom ) );
-
+    throw __FUNCTION__;
+    /*
     switch ( iom )
     {
         case IOMode::iomRaw:
@@ -1003,6 +1011,7 @@ ERR TFileFilter<I>::ErrIssue( _In_ const IFileFilter::IOMode iom )
 
 HandleError:
     return err;
+    */
 }
 
 template< class I >
@@ -1295,6 +1304,8 @@ ERR TFileFilter<I>::ErrTryEnqueueWriteBack( _In_                    const TraceC
     const size_t cPendingWriteBacks = CPendingWriteBacks();
     const size_t cPendingWriteBackMax = CPendingWriteBackMax();
 
+    throw __FUNCTION__;
+    /*
     if ( cPendingWriteBacks >= cPendingWriteBackMax )
     {
         Call( ErrERRCheck( errDiskTilt ) );
@@ -1343,6 +1354,7 @@ HandleError:
         err = writeBackComplete.ErrComplete();
     }
     return err;
+    */
 }
 
 template<class I>
@@ -1557,7 +1569,8 @@ void TFileFilter<I>::GetWriteBackOffsets(   _In_ CArray<COffsets>&              
 template< class I >
 BOOL TFileFilter<I>::FTooManyWrites( _In_ const ERR err )
 {
-    return err == errDiskTilt;
+    throw __FUNCTION__;
+    //return err == errDiskTilt;
 }
 
 template< class I >
@@ -1567,6 +1580,7 @@ ICache::CachingPolicy TFileFilter<I>::CpGetCachingPolicy( _In_ const TraceContex
     return cpBestEffort;
 }
 
+/*
 template< class I >
 ERR TFileFilter<I>::ErrCacheRead(   _In_                    const TraceContext&             tc,
                                     _In_                    const QWORD                     ibOffset,
@@ -1625,7 +1639,6 @@ ERR TFileFilter<I>::ErrCacheRead(   _In_                    const TraceContext& 
             }
         }
 
-
         if ( pioreq )
         {
             fIOREQUsed = fTrue;
@@ -1680,7 +1693,9 @@ HandleError:
         piocomplete->Release( err, tc, grbitQOS );
     }
     return err;
+
 }
+*/
 
 template< class I >
 ERR TFileFilter<I>::ErrCacheMiss(   _In_                    const TraceContext&             tc,
@@ -1783,7 +1798,8 @@ ERR TFileFilter<I>::ErrCacheWrite(  _In_                    const TraceContext& 
 
     const ICache::CachingPolicy cp = CpGetCachingPolicy( tc, fTrue );
 
-
+    throw __FUNCTION__;
+    /*
     if ( FAttached() )
     {
         
@@ -1867,6 +1883,7 @@ HandleError:
         piocomplete->Release( err, tc, grbitQOS );
     }
     return err;
+    */
 }
 
 template< class I >
@@ -2069,7 +2086,8 @@ ERR TFileFilterWrapper<I>::ErrGetPhysicalId(    _Out_ VolumeId* const   pvolumei
                                                 _Out_ FileId* const     pfileid,
                                                 _Out_ FileSerial* const pfileserial )
 {
-    return m_piInner->ErrGetPhysicalId( pvolumeid, pfileid, pfileserial );
+    throw __FUNCTION__;
+    //return m_piInner->ErrGetPhysicalId( pvolumeid, pfileid, pfileserial );
 }
 
 template< class I >
@@ -2117,7 +2135,8 @@ ERR TFileFilterWrapper<I>::ErrRead( _In_                    const TraceContext& 
                                     _In_                    const IFileAPI::PfnIOHandoff    pfnIOHandoff,
                                     _In_                    const VOID *                    pioreq )
 {
-    return m_piInner->ErrRead( tc, ibOffset, cbData, pbData, grbitQOS, iom, pfnIOComplete, keyIOComplete, pfnIOHandoff, pioreq );
+    throw __FUNCTION__;
+    //return m_piInner->ErrRead( tc, ibOffset, cbData, pbData, grbitQOS, iom, pfnIOComplete, keyIOComplete, pfnIOHandoff, pioreq );
 }
 
 template< class I >
@@ -2131,13 +2150,15 @@ ERR TFileFilterWrapper<I>::ErrWrite(    _In_                    const TraceConte
                                         _In_                    const DWORD_PTR                 keyIOComplete,
                                         _In_                    const IFileAPI::PfnIOHandoff    pfnIOHandoff )
 {
-    return m_piInner->ErrWrite( tc, ibOffset, cbData, pbData, grbitQOS, iom, pfnIOComplete, keyIOComplete, pfnIOHandoff );
+    throw __FUNCTION__;
+    //return m_piInner->ErrWrite( tc, ibOffset, cbData, pbData, grbitQOS, iom, pfnIOComplete, keyIOComplete, pfnIOHandoff );
 }
 
 template< class I >
 ERR TFileFilterWrapper<I>::ErrIssue( _In_ const IFileFilter::IOMode iom )
 {
-    return m_piInner->ErrIssue( iom );
+    throw __FUNCTION__;
+    //return m_piInner->ErrIssue( iom );
 }
 
 

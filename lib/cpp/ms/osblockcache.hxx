@@ -156,12 +156,12 @@ class ICache
         virtual ERR ErrDump( _In_ CPRINTF* const pcprintf ) = 0;
 
 
-        virtual ERR ErrGetCacheType( _Out_writes_( cbGuid ) BYTE* const rgbCacheType ) = 0;
+        virtual ERR ErrGetCacheType( _Out_writes_( cbGuid ) BYTE* const rgbCacheType, DWORD cbGuid ) = 0;
 
 
         virtual ERR ErrGetPhysicalId(   _Out_                   VolumeId* const pvolumeid,
                                         _Out_                   FileId* const   pfileid,
-                                        _Out_writes_( cbGuid )  BYTE* const     rgbUniqueId ) = 0;
+                                        _Out_writes_( cbGuid )  BYTE* const     rgbUniqueId, DWORD cbGuid ) = 0;
 
 
         virtual ERR ErrClose(   _In_ const VolumeId     volumeid,

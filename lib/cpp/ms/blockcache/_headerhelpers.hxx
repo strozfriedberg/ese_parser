@@ -3,6 +3,7 @@
 
 #pragma once
 
+#include "_common.hxx"
 
 class CBlockCacheHeaderHelpers
 {

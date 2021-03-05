@@ -8,6 +8,18 @@
 
 #define ISAMAPI
 
+struct JET_SETDBPARAM {
+};
+
+struct JET_DBUTIL_W {
+};
+
+struct JET_TABLECREATE5_A {
+};
+
+struct JET_RBSREVERTINFOMISC {
+};
+
 struct CPCOL
 {
     JET_COLUMNID columnidSrc;

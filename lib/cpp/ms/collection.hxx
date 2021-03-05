@@ -4,23 +4,26 @@
 #ifndef _COLLECTION_HXX_INCLUDED
 #define _COLLECTION_HXX_INCLUDED
 
-
+#define COLLAssert( x )
 #ifdef COLLAssert
 #else
 #define COLLAssert Assert
 
 #endif
 
+#define COLLAssertSz( x, y )
 #ifdef COLLAssertSz
 #else
 #define COLLAssertSz AssertSz
 #endif
 
+#define COLLEnforce( x )
 #ifdef COLLEnforce
 #else
 #define COLLEnforce Enforce
 #endif
 
+#define COLLAssertTrack( x )
 #ifdef COLLAssertTrack
 #else
 #define COLLAssertTrack( X ) AssertTrack( ( X ), OSFormat( "COLLECTION_LINE:%d", __LINE__ ) )
@@ -28,6 +31,7 @@
 
 #define APPROXIMATE_INDEX_STATS 1
 
+//#include "esestd.hxx"
 #include "dht.hxx"
 
 #include <memory.h>
@@ -751,7 +755,7 @@ inline typename CInvasiveConcurrentModSet< CObject, OffsetOfIAE>::ERR CInvasiveC
     for ( ; ; )
     {
         if ( FEmbeddedSinglePointer_() ) {
-            CObject *pInitial = ( CObject * )AtomicCompareExchangePointer( ( PVOID * )&m_pObject, nullptr, pObject );
+            CObject *pInitial = ( CObject * )AtomicCompareExchangePointer( ( void ** )&m_pObject, nullptr, pObject );
             if ( nullptr == pInitial ) {
                 AtomicIncrement( &m_ulArrayUsed );
                 _PiaeFromPobj( pObject )->_SetArrayIndex( 0 );

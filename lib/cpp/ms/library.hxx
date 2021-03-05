@@ -4,7 +4,8 @@
 #ifndef _OS_LIBRARY_HXX_INCLUDED
 #define _OS_LIBRARY_HXX_INCLUDED
 
-
+#define WIN32_LEAN_AND_MEAN
+#include <windows.h>
 
 #ifdef ENABLE_LOAD_LIB_TRACE
 #define PreinitTrace( ... )     wprintf( L"[%hs:%d] ", SzSourceFileName( __FILE__ ), __LINE__ ); wprintf( __VA_ARGS__ )
@@ -54,7 +55,6 @@ DEFINE_ENUM_FLAG_OPERATORS_BASIC( OSLoadFlags );
 
 extern DWORD ErrorThunkNotSupported();
 extern INT NtstatusThunkNotSupported();
-
 
 template< typename... Args >
 INLINE VOID VoidWithGLE( Args... )

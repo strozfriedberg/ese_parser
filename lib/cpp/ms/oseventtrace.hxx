@@ -7,6 +7,7 @@
 
 #include "oseventtrace.g.hxx"
 
+#define OnDebug( x )
 
 void __cdecl OSEventTrace_( const ULONG etguid,
                             const size_t cData = 0,

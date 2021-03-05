@@ -3,7 +3,7 @@
 
 #pragma once
 
-
+#include "_cachebase.hxx"
 
 template< class I >
 class TPassThroughCache
@@ -129,7 +129,7 @@ ERR TPassThroughCache<I>::ErrInvalidate(    _In_ const VolumeId     volumeid,
 
    
 
-    Call( ErrGetCachedFile( volumeid, fileid, fileserial, fFalse, &pcfte ) );
+    Call( (TCacheBase<I, CPassThroughCachedFileTableEntry>::ErrGetCachedFile( volumeid, fileid, fileserial, fFalse, &pcfte )) );
 
 
     if ( offsets.FOverlaps( s_offsetsCachedFileHeader ) && offsets.Cb() > 0 )
@@ -168,26 +168,26 @@ ERR TPassThroughCache<I>::ErrRead(  _In_                    const TraceContext& 
     CPassThroughCachedFileTableEntry*   pcfte           = NULL;
     const COffsets                      offsets         = COffsets( ibOffset, ibOffset + cbData - 1 );
     DWORD                               cbHeaderRead    = 0;
-    CComplete*                          pcomplete       = NULL;
+    typename TCacheBase<I, CPassThroughCachedFileTableEntry>::CComplete* pcomplete       = NULL;
 
     if ( pfnComplete )
     {
-        Alloc( pcomplete = new CComplete(   volumeid,
+        Alloc( (pcomplete = new typename TCacheBase<I, CPassThroughCachedFileTableEntry>::CComplete(   volumeid,
                                             fileid,
                                             fileserial,
                                             ibOffset, 
                                             cbData,
                                             pbData,
                                             pfnComplete, 
-                                            keyComplete ) );
+                                            keyComplete )) );
     }
 
 
-    Call( ErrGetCachedFile( volumeid, fileid, fileserial, fFalse, &pcfte ) );
+    Call( (TCacheBase<I, CPassThroughCachedFileTableEntry>::ErrGetCachedFile( volumeid, fileid, fileserial, fFalse, &pcfte )) );
 
 
 
-    ReportMiss( pcfte, ibOffset, cbData, fTrue, cp != cpDontCache );
+    TCacheBase<I, CPassThroughCachedFileTableEntry>::ReportMiss( pcfte, ibOffset, cbData, fTrue, cp != cpDontCache );
 
 
     if ( offsets.FOverlaps( s_offsetsCachedFileHeader ) )
@@ -202,9 +202,9 @@ ERR TPassThroughCache<I>::ErrRead(  _In_                    const TraceContext& 
                                                     cbHeaderRead,
                                                     pbData, 
                                                     grbitQOS,
-                                                    pcomplete ? (IFileAPI::PfnIOComplete)CComplete::IOComplete_ : NULL,
+                                                    pcomplete ? (IFileAPI::PfnIOComplete)TCacheBase<I, CPassThroughCachedFileTableEntry>::CComplete::IOComplete_ : NULL,
                                                     DWORD_PTR( pcomplete ),
-                                                    pcomplete ? (IFileAPI::PfnIOHandoff)CComplete::IOHandoff_ : NULL ) );
+                                                    pcomplete ? (IFileAPI::PfnIOHandoff)TCacheBase<I, CPassThroughCachedFileTableEntry>::CComplete::IOHandoff_ : NULL ) );
         CallS( pcfte->PffDisplacedData()->ErrIOIssue() );
     }
 
@@ -217,9 +217,9 @@ ERR TPassThroughCache<I>::ErrRead(  _In_                    const TraceContext& 
                                         pbData + cbHeaderRead,
                                         grbitQOS,
                                         iomCacheMiss,
-                                        pcomplete ? (IFileAPI::PfnIOComplete)CComplete::IOComplete_ : NULL, 
+                                        pcomplete ? (IFileAPI::PfnIOComplete)TCacheBase<I, CPassThroughCachedFileTableEntry>::CComplete::IOComplete_ : NULL, 
                                         DWORD_PTR( pcomplete ),
-                                        pcomplete ? (IFileAPI::PfnIOHandoff)CComplete::IOHandoff_ : NULL,
+                                        pcomplete ? (IFileAPI::PfnIOHandoff)TCacheBase<I, CPassThroughCachedFileTableEntry>::CComplete::IOHandoff_ : NULL,
                                         NULL ) );
     }
 
@@ -248,28 +248,28 @@ ERR TPassThroughCache<I>::ErrWrite( _In_                    const TraceContext& 
     CPassThroughCachedFileTableEntry*   pcfte           = NULL;
     const COffsets                      offsets         = COffsets( ibOffset, ibOffset + cbData - 1 );
     DWORD                               cbHeaderWritten = 0;
-    CComplete*                          pcomplete       = NULL;
+    typename TCacheBase<I, CPassThroughCachedFileTableEntry>::CComplete* pcomplete = NULL;
     
     if ( pfnComplete )
     {
-        Alloc( pcomplete = new CComplete(   volumeid,
+        Alloc( (pcomplete = new typename TCacheBase<I, CPassThroughCachedFileTableEntry>::CComplete(   volumeid,
                                             fileid,
                                             fileserial,
                                             ibOffset, 
                                             cbData,
                                             pbData,
                                             pfnComplete, 
-                                            keyComplete ) );
+                                            keyComplete )) );
     }
 
 
-    Call( ErrGetCachedFile( volumeid, fileid, fileserial, fFalse, &pcfte ) );
+    Call( (TCacheBase<I, CPassThroughCachedFileTableEntry>::ErrGetCachedFile( volumeid, fileid, fileserial, fFalse, &pcfte )) );
 
 
   
-    ReportMiss( pcfte, ibOffset, cbData, fFalse, cp != cpDontCache );
-    ReportUpdate( pcfte, ibOffset, cbData );
-    ReportWrite( pcfte, ibOffset, cbData, fTrue );
+    TCacheBase<I, CPassThroughCachedFileTableEntry>::ReportMiss( pcfte, ibOffset, cbData, fFalse, cp != cpDontCache );
+    TCacheBase<I, CPassThroughCachedFileTableEntry>::ReportUpdate( pcfte, ibOffset, cbData );
+    TCacheBase<I, CPassThroughCachedFileTableEntry>::ReportWrite( pcfte, ibOffset, cbData, fTrue );
 
 
     if ( offsets.FOverlaps( s_offsetsCachedFileHeader ) )
@@ -284,9 +284,9 @@ ERR TPassThroughCache<I>::ErrWrite( _In_                    const TraceContext& 
                                                         cbHeaderWritten, 
                                                         pbData, 
                                                         qosIONormal,
-                                                        pcomplete ? (IFileAPI::PfnIOComplete)CComplete::IOComplete_ : NULL, 
+                                                        pcomplete ? (IFileAPI::PfnIOComplete)TCacheBase<I, CPassThroughCachedFileTableEntry>::CComplete::IOComplete_ : NULL, 
                                                         DWORD_PTR( pcomplete ),
-                                                        pcomplete ? (IFileAPI::PfnIOHandoff)CComplete::IOHandoff_ : NULL ) );
+                                                        pcomplete ? (IFileAPI::PfnIOHandoff)TCacheBase<I, CPassThroughCachedFileTableEntry>::CComplete::IOHandoff_ : NULL ) );
         CallS( pcfte->PffDisplacedData()->ErrIOIssue() );
         pcfte->PffDisplacedData()->SetNoFlushNeeded();
     }
@@ -300,9 +300,9 @@ ERR TPassThroughCache<I>::ErrWrite( _In_                    const TraceContext& 
                                         pbData + cbHeaderWritten,
                                         qosIONormal,
                                         iomCacheWriteThrough,
-                                        pcomplete ? (IFileAPI::PfnIOComplete)CComplete::IOComplete_ : NULL, 
+                                        pcomplete ? (IFileAPI::PfnIOComplete)TCacheBase<I, CPassThroughCachedFileTableEntry>::CComplete::IOComplete_ : NULL, 
                                         DWORD_PTR( pcomplete ),
-                                        pcomplete ? (IFileAPI::PfnIOHandoff)CComplete::IOHandoff_ : NULL ) );
+                                        pcomplete ? (IFileAPI::PfnIOHandoff)TCacheBase<I, CPassThroughCachedFileTableEntry>::CComplete::IOHandoff_ : NULL ) );
     }
 
 HandleError:

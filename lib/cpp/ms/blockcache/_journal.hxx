@@ -753,29 +753,27 @@ INLINE BOOL TJournal<I>::CEntryVisitor::FVisitRegion(   _In_ const RegionPositio
         Error( ErrERRCheck( JET_errInternalError ) );
     }
 
-
-    const int cb = max( 1, m_cbEntry );
-    if ( m_jb.Cb() < cb )
     {
-        Alloc( rgb = new BYTE[ cb ] );
+        const int cb = max(1, m_cbEntry);
+        if (m_jb.Cb() < cb)     {
+            Alloc(rgb = new BYTE[cb]);
 
-        delete m_jb.Rgb();
-        m_jb = CJournalBuffer( cb, rgb );
-        rgb = NULL;
+            delete m_jb.Rgb();
+            m_jb = CJournalBuffer(cb, rgb);
+            rgb = NULL;
+        }
+
+
+        UtilMemCpy((VOID*)(m_jb.Rgb() + m_ibEntry), pef->RgbFragment(), cbFragment);
+
+        m_ibEntry += cbFragment;
+        m_cbEntryRem -= cbFragment;
+
+
+        if (m_cbEntryRem == 0)     {
+            m_pfnVisitEntry(m_jpos, CJournalBuffer(m_cbEntry, m_jb.Rgb()), m_keyVisitEntry);
+        }
     }
-
-
-    UtilMemCpy( (VOID*)( m_jb.Rgb() + m_ibEntry ), pef->RgbFragment(), cbFragment );
-
-    m_ibEntry += cbFragment;
-    m_cbEntryRem -= cbFragment;
-
-
-    if ( m_cbEntryRem == 0 )
-    {
-        m_pfnVisitEntry( m_jpos, CJournalBuffer( m_cbEntry, m_jb.Rgb() ), m_keyVisitEntry );
-    }
-
 HandleError:
     delete[] rgb;
     m_err = m_err >= JET_errSuccess ? err : m_err;

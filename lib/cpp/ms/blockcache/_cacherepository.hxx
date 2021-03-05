@@ -3,6 +3,7 @@
 
 #pragma once
 
+#include "_common.hxx"
 
 class CCacheReference;
 static SIZE_T CCacheReferenceOffsetOfILE();
@@ -36,13 +37,13 @@ class TCacheRepository
                         _Inout_ ICacheConfiguration** const     ppcconfig,
                         _Out_   ICache** const                  ppc ) override;
 
-        ERR ErrOpenById(    _In_                IFileSystemFilter* const        pfsf,
+        /*ERR ErrOpenById(    _In_                IFileSystemFilter* const        pfsf,
                             _In_                IFileSystemConfiguration* const pfsconfig,
                             _In_                IBlockCacheConfiguration* const pbcconfig,
                             _In_                const VolumeId                  volumeid,
                             _In_                const FileId                    fileid,
-                            _In_reads_(cbGuid)  const BYTE* const               rgbUniqueId,
-                            _Out_               ICache** const                  ppc ) override;
+                            _In_reads_(cbGuid)  const BYTE* const               rgbUniqueId, DWORD cbGuid ,
+                            _Out_               ICache** const                  ppc ) override;*/
 
     private:
 
@@ -253,13 +254,14 @@ HandleError:
     return err;
 }
 
+/*
 template< class I >
 ERR TCacheRepository<I>::ErrOpenById(   _In_                    IFileSystemFilter* const        pfsf,
                                         _In_                    IFileSystemConfiguration* const pfsconfig,
                                         _In_                    IBlockCacheConfiguration* const pbcconfig,
                                         _In_                    const VolumeId                  volumeid,
                                         _In_                    const FileId                    fileid,
-                                        _In_reads_( cbGuid )    const BYTE* const               rgbUniqueId,
+                                        _In_reads_( cbGuid )    const BYTE* const               rgbUniqueId, DWORD cbGuid ,
                                         _Out_                   ICache** const                  ppc )
 {
     ERR                     err                                 = JET_errSuccess;
@@ -325,7 +327,8 @@ ERR TCacheRepository<I>::ErrOpenById(   _In_                    IFileSystemFilte
         }
 
 
-        Call( pcr->ErrGetPhysicalId( &volumeidActual, &fileidActual, rgbUniqueIdActual ) );
+        throw __FUNCTION__;
+        //Call( pcr->ErrGetPhysicalId( &volumeidActual, &fileidActual, rgbUniqueIdActual ) );
     }
 
 
@@ -355,6 +358,7 @@ HandleError:
     }
     return err;
 }
+*/
 
 template< class I >
 INLINE TCacheRepository<I>::CCachePathTableEntry::CCachePathTableEntry( _Inout_z_ const WCHAR** const pwszKeyPath )

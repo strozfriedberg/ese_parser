@@ -4,7 +4,7 @@
 #ifndef _TLS_HXX_INCLUDED
 #define _TLS_HXX_INCLUDED
 
-
+#include "task.hxx"
 
 
 class CBFIssueList;
@@ -81,7 +81,7 @@ public:
     }
 };
 
-static_assert( sizeof( TLS ) == ESE_USER_TLS_SIZE, "The OS layer is configured early in DLLEntryPoint() with this size. If you're changing the TLS size, please update ESE_USER_TLS_SIZE accordingly." );
+//static_assert( sizeof( TLS ) == ESE_USER_TLS_SIZE, "The OS layer is configured early in DLLEntryPoint() with this size. If you're changing the TLS size, please update ESE_USER_TLS_SIZE accordingly." );
 
 #endif
 

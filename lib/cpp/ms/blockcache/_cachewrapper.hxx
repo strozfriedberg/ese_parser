@@ -23,11 +23,11 @@ class TCacheWrapper
 
         ERR ErrDump( _In_ CPRINTF* const pcprintf ) override;
 
-        ERR ErrGetCacheType( _Out_writes_( cbGuid ) BYTE* const rgbCacheType ) override;
+        ERR ErrGetCacheType( _Out_writes_( cbGuid ) BYTE* const rgbCacheType, DWORD cbGuid ) override;
 
         ERR ErrGetPhysicalId(   _Out_                   VolumeId* const pvolumeid,
                                 _Out_                   FileId* const   pfileid,
-                                _Out_writes_( cbGuid )  BYTE* const     rgbUniqueId ) override;
+                                _Out_writes_( cbGuid )  BYTE* const     rgbUniqueId, DWORD cbGuid ) override;
                         
         ERR ErrClose(   _In_ const VolumeId     volumeid,
                         _In_ const FileId       fileid,
@@ -116,18 +116,18 @@ ERR TCacheWrapper<I>::ErrDump( _In_ CPRINTF* const pcprintf )
 }
 
 template< class I >
-ERR TCacheWrapper<I>::ErrGetCacheType( _Out_writes_( cbGuid ) BYTE* const rgbCacheType )
+ERR TCacheWrapper<I>::ErrGetCacheType( _Out_writes_( cbGuid ) BYTE* const rgbCacheType, DWORD cbGuid )
 {
-    return m_piInner->ErrGetCacheType( rgbCacheType );
+    return m_piInner->ErrGetCacheType( rgbCacheType, cbGuid );
 }
 
 
 template< class I >
 ERR TCacheWrapper<I>::ErrGetPhysicalId( _Out_                   VolumeId* const pvolumeid,
                                         _Out_                   FileId* const   pfileid,
-                                        _Out_writes_( cbGuid )  BYTE* const     rgbUniqueId )
+                                        _Out_writes_( cbGuid )  BYTE* const     rgbUniqueId, DWORD cbGuid  )
 {
-    return m_piInner->ErrGetPhysicalId( pvolumeid, pfileid, rgbUniqueId );
+    return m_piInner->ErrGetPhysicalId( pvolumeid, pfileid, rgbUniqueId, cbGuid );
 }
         
 template< class I >

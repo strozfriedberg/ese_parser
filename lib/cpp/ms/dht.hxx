@@ -17,6 +17,7 @@
 #endif
 
 
+#define DHTAssert( x )
 #ifdef DHTAssert
 #else
 #define DHTAssert Assert

@@ -3,6 +3,8 @@
 
 #pragma once
 
+#include "_common.hxx"
+
 class CFileFilter;
 class CFileFilterReference;
 static SIZE_T CFileFilterReferenceOffsetOfILE();
@@ -68,7 +70,7 @@ class CFilePathTableEntry
                 CFilePathTableEntry* Pfpte() const { return m_pfpte; }
                 CFileFilter* Pff() const { return m_pff; }
                 ICache* Pc() const { return m_pc;  }
-                int CReference() const { return m_ilReferences.Count();  }
+                int CReference() const { return (int) m_ilReferences.Count();  }
 
                 void AddReference( _In_ CFileFilterReference* const pffr )
                 {
@@ -571,7 +573,8 @@ template< class I >
 void TFileSystemFilter<I>::RemoveFileReference( _In_ CFileFilterReference* const            pffr,
                                                 _In_ CFilePathTableEntry::COpenFile* const  pof )
 {
-
+    throw __FUNCTION__;
+    /*
     if ( !pffr->FCacheOpen() && pof->Pc() )
     {
         VolumeId    volumeid    = volumeidInvalid;
@@ -584,6 +587,7 @@ void TFileSystemFilter<I>::RemoveFileReference( _In_ CFileFilterReference* const
 
 
     ReleaseFile( pof->Pfpte(), NULL, pof, pffr );
+    */
 }
 
 template< class I >
@@ -593,6 +597,8 @@ ERR TFileSystemFilter<I>::ErrFileOpenById(  _In_    const VolumeId              
                                             _In_    const IFileAPI::FileModeFlags   fmf,
                                             _Out_   IFileAPI** const                ppfapi )
 {
+    throw __FUNCTION__;
+    /*
     ERR                     err                                 = JET_errSuccess;
     const DWORD             cwchAnyAbsPathMax                   = OSFSAPI_MAX_PATH;
     WCHAR                   wszAnyAbsPath[ cwchAnyAbsPathMax ]  = { 0 };
@@ -668,6 +674,7 @@ HandleError:
         }
     }
     return err;
+    */
 }
 
 template< class I >

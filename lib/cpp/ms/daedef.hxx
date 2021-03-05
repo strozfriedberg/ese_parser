@@ -9,6 +9,14 @@
 
 #include "collection.hxx"
 
+#define AssertSz( x, y )
+#define ASSERT_VALID( x )
+#define Error( x )
+#define AssertRTL( x )
+#define AssertSzRTL( x, y )
+#define CallS( x )              (x)
+#define ErrERRCheck( x )        (x)
+#define Alloc( x )              x
 
 #ifdef DATABASE_FORMAT_CHANGE
 #endif
@@ -4698,7 +4706,7 @@ class TableClassNamesLifetimeManager
             Assert( m_cchTableClassNames == 0 || m_cchTableClassNames == cchTableClassNames );
 
             m_cchTableClassNames = cchTableClassNames;
-        HandleError:
+        //HandleError:
             return err;
         }
 
@@ -4722,9 +4730,10 @@ inline LONG CbAssertGlobalPageSizeMatchRTL_( _In_ const LONG cbGlobalPageReplace
 {
     if ( g_cbPage != cbGlobalPageReplacementSource )
     {
-        CHAR szT[ 140 ];
-        OSStrCbFormatA( szT, sizeof(szT), "PageSizeReplaceMismatch-%hs:%d", SzSourceFileName( szFile ), lLine );
-        FireWall( szT );
+        throw szFile;
+        //CHAR szT[ 140 ];
+        //OSStrCbFormatA( szT, sizeof(szT), "PageSizeReplaceMismatch-%hs:%d", SzSourceFileName( szFile ), lLine );
+        //FireWall( szT );
     }
     return g_cbPage;
 }
