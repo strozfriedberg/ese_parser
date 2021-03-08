@@ -52,10 +52,83 @@
 
 #endif
 
-#define C_ASSERT(e) typedef char __C_ASSERT__[(e)?1:-1]
+#define C_ASSERT(e) //typedef char __C_ASSERT__[(e)?1:-1]
 
+enum {
+    GENERAL_CATEGORY, INTERNAL_TRACE_ID, ENFORCE_FAIL,
+    PERFORMANCE_CATEGORY, PLAIN_TEXT_ID,
+    IOMGR_HUNG_WRITE_IO_DETECTED_ID, IOMGR_HUNG_READ_IO_DETECTED_ID,
+    TASK_INFO_STATS_TOO_LONG_ID, TASK_INFO_STATS_TOO_LONG_AGAIN_ID,
+    LANGUAGE_NOT_SUPPORTED_ID, INVALID_LCMAPFLAGS_ID
+};
 
+enum {
+    wrnIOPending,
+    wrnIOSlow,
+    wrnLossy,
+    wrnSlow,
+    wrnFLDKeyTooBig,
+    errCodeInconsistency,
+    errDiskTilt,
+    errNotFound,
+};
 
+enum {
+    OSFILE_FLUSH_ERROR_ID, 
+    OSFILE_WRITE_TOO_LONG_ID,
+    OSFILE_READ_TOO_LONG_ID,
+    OSFILE_WRITE_TOO_LONG_AGAIN_ID,
+    OSFILE_READ_TOO_LONG_AGAIN_ID,
+    OSFILE_WRITE_ERROR_ID,
+    OSFILE_READ_ERROR_ID
+};
+
+enum {
+    OSFS_DISK_SPACE_ERROR_ID = 1,
+    OSFS_OPEN_DEVICE_ERROR_ID,
+    OSFS_SECTOR_SIZE_ERROR_ID,
+    OSFS_CREATE_FOLDER_ERROR_ID,
+    OSFS_REMOVE_FOLDER_ERROR_ID,
+    OSFS_DELETE_FILE_ERROR_ID,
+    OSFS_MOVE_FILE_ERROR_ID,
+    OSFS_COPY_FILE_ERROR_ID,
+    OSFS_CREATE_FILE_ERROR_ID,
+    OSFS_OPEN_COMPRESSED_FILE_RW_ERROR_ID,
+    OSFS_OPEN_FILE_RO_ERROR_ID,
+    OSFS_OPEN_FILE_RW_ERROR_ID,
+};
+
+enum {
+    CONFIG_STORE_READ_INHIBIT_PAUSE_ID
+};
+
+enum {
+    JET_bitHungIOEnforce                    = 0b000000001,
+    JET_bitHungIOTimeout                    = 0b000000010,
+    JET_bitIOSessTraceReads                 = 0b000000100,
+    JET_bitIOSessTraceWrites                = 0b000001000,
+    JET_bitIOSessTraceHDD                   = 0b000010000,
+    JET_bitIOSessTraceSSD                   = 0b000100000,
+    JET_bitConfigStorePopulateControlOff    = 0b001000000,
+    JET_bitConfigStorePopulateControlOn     = 0b010000000,
+};
+
+enum {
+    JET_tracetagNull,
+    JET_tracetagSysInitTerm,
+    JET_tracetagMax
+};
+
+enum {
+    JET_filetypeFTL
+};
+
+enum {
+    JET_paramStageFlighting,
+    JET_EncryptionAlgorithmAes256,
+};
+
+#define JET_wszConfigStorePopulateControl   L"ConfigStorePopulateControl"
 
 #ifndef _MSC_VER
 #include <stdint.h>

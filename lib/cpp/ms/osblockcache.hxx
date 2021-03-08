@@ -289,13 +289,13 @@ class ICacheRepository
                                 _Out_   ICache** const                  ppc ) = 0;
 
 
-        virtual ERR ErrOpenById(    _In_                IFileSystemFilter* const        pfsf,
-                                    _In_                IFileSystemConfiguration* const pfsconfig,
-                                    _In_                IBlockCacheConfiguration* const pbcconfig,
-                                    _In_                const VolumeId                  volumeid,
-                                    _In_                const FileId                    fileid,
-                                    _In_reads_(cbGuid)  const BYTE* const               rgbUniqueId,
-                                    _Out_               ICache** const                  ppc ) = 0;
+        //virtual ERR ErrOpenById(    _In_                IFileSystemFilter* const        pfsf,
+        //                            _In_                IFileSystemConfiguration* const pfsconfig,
+        //                            _In_                IBlockCacheConfiguration* const pbcconfig,
+        //                            _In_                const VolumeId                  volumeid,
+        //                            _In_                const FileId                    fileid,
+        //                            _In_reads_(cbGuid)  const BYTE* const               rgbUniqueId,
+        //                            _Out_               ICache** const                  ppc ) = 0;
 };
 
 

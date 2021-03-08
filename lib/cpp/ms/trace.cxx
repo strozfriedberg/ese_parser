@@ -6,16 +6,16 @@
 #include "errdata.hxx"
 
 
-#include "_tracetagimpl.h"
+//#include "_tracetagimpl.h"
 
 BOOL            g_fDisableTracingForced     = fFalse;
 BOOL            g_fTracing                  = fFalse;
 TRACEINFO       g_rgtraceinfo[ JET_tracetagMax ];
 DWORD           g_tidTrace                  = 0;
 
-const WCHAR* const g_rgwszTraceDesc[] =
+const WCHAR * const g_rgwszTraceDesc[] =
 {
-    ESE_TRACETAG_SZ_ARRAY
+    L"ESE_TRACETAG_SZ_ARRAY"
 };
 
 C_ASSERT( JET_tracetagMax == _countof(g_rgwszTraceDesc) );
@@ -934,7 +934,7 @@ const char* SzOSFormatStringLossyW( const WCHAR* wsz )
         }
         else
         {
-            szFormatted = OSTRACENULLPARAM;
+            szFormatted = const_cast<char *> (OSTRACENULLPARAM);
         }
     }
     __except( EXCEPTION_EXECUTE_HANDLER )
@@ -2498,107 +2498,100 @@ ERR CFastTraceLog::CFTLReader::ErrFTLGetNextTrace( FTLTrace * pftltrace )
         m_tickBase = *((TICK*)m_rgbufReadBuffers[m_ibufReadLast].pbReadBuffer);
     }
 
-
-    BYTE * pbTrace = m_rgbufReadBuffers[m_ibufReadLast].pbReadBuffer + m_ibBookmarkNext - m_rgbufReadBuffers[m_ibufReadLast].ibBookmark;
-
-    pftltrace->ibBookmark = m_ibBookmarkNext;
-
-    if ( 0 == ( ( pftltrace->ibBookmark - m_rgbufReadBuffers[m_ibufReadLast].ibBookmark ) % m_pftl->m_ftlb.CbFTLBBuffer() ) ||
-            pbTrace[0] == 0 )
     {
+        BYTE* pbTrace = m_rgbufReadBuffers[m_ibufReadLast].pbReadBuffer + m_ibBookmarkNext - m_rgbufReadBuffers[m_ibufReadLast].ibBookmark;
 
-        while ( 0 == ( ( pftltrace->ibBookmark - m_rgbufReadBuffers[m_ibufReadLast].ibBookmark ) % m_pftl->m_ftlb.CbFTLBBuffer() ) ||
-                pbTrace[0] == 0 )
-        {
+        pftltrace->ibBookmark = m_ibBookmarkNext;
 
-            Assert( ( pftltrace->ibBookmark - m_rgbufReadBuffers[m_ibufReadLast].ibBookmark ) >= 0 );
-            Assert( m_pftl->m_ftlb.CbFTLBHeader() <= m_cbReadBufferSize );
-            Assert( m_pftl->m_ftlb.CbFTLBBuffer() <= m_cbReadBufferSize );
-            Expected( m_pftl->m_ftlb.CbFTLBBuffer() < m_cbReadBufferSize );
+        if (0 == ((pftltrace->ibBookmark - m_rgbufReadBuffers[m_ibufReadLast].ibBookmark) % m_pftl->m_ftlb.CbFTLBBuffer()) ||
+            pbTrace[0] == 0)     {
 
-            Assert( (INT)( pftltrace->ibBookmark - m_rgbufReadBuffers[m_ibufReadLast].ibBookmark ) <= m_cbReadBufferSize );
-            Assert( ( pftltrace->ibBookmark - m_rgbufReadBuffers[m_ibufReadLast].ibBookmark ) <= (QWORD)m_cbReadBufferSize );
+            while (0 == ((pftltrace->ibBookmark - m_rgbufReadBuffers[m_ibufReadLast].ibBookmark) % m_pftl->m_ftlb.CbFTLBBuffer()) ||
+                pbTrace[0] == 0)         {
+
+                Assert((pftltrace->ibBookmark - m_rgbufReadBuffers[m_ibufReadLast].ibBookmark) >= 0);
+                Assert(m_pftl->m_ftlb.CbFTLBHeader() <= m_cbReadBufferSize);
+                Assert(m_pftl->m_ftlb.CbFTLBBuffer() <= m_cbReadBufferSize);
+                Expected(m_pftl->m_ftlb.CbFTLBBuffer() < m_cbReadBufferSize);
+
+                Assert((INT)(pftltrace->ibBookmark - m_rgbufReadBuffers[m_ibufReadLast].ibBookmark) <= m_cbReadBufferSize);
+                Assert((pftltrace->ibBookmark - m_rgbufReadBuffers[m_ibufReadLast].ibBookmark) <= (QWORD)m_cbReadBufferSize);
 
 
-            const INT cbBlankFTLBufferLeft = (INT)( roundup( pftltrace->ibBookmark, (QWORD)m_pftl->m_ftlb.CbFTLBBuffer() ) - pftltrace->ibBookmark );
-            Assert( (QWORD)cbBlankFTLBufferLeft == ( roundup( pftltrace->ibBookmark, (QWORD)m_pftl->m_ftlb.CbFTLBBuffer() ) - pftltrace->ibBookmark ) );
+                const INT cbBlankFTLBufferLeft = (INT)(roundup(pftltrace->ibBookmark, (QWORD)m_pftl->m_ftlb.CbFTLBBuffer()) - pftltrace->ibBookmark);
+                Assert((QWORD)cbBlankFTLBufferLeft == (roundup(pftltrace->ibBookmark, (QWORD)m_pftl->m_ftlb.CbFTLBBuffer()) - pftltrace->ibBookmark));
 
-            Assert( cbBlankFTLBufferLeft >= 0 );
-            Assert( pftltrace->ibBookmark + cbBlankFTLBufferLeft == roundup( pftltrace->ibBookmark, m_pftl->m_ftlb.CbFTLBBuffer() ) );
+                Assert(cbBlankFTLBufferLeft >= 0);
+                Assert(pftltrace->ibBookmark + cbBlankFTLBufferLeft == roundup(pftltrace->ibBookmark, m_pftl->m_ftlb.CbFTLBBuffer()));
 
-            if ( cbBlankFTLBufferLeft >= (INT)( m_pftl->m_ftlb.CbFTLBBuffer() - m_pftl->m_ftlb.CbFTLBHeader() ) )
-            {
-                m_cBlankBuffers++;
-                m_cbBlankEmpty += m_pftl->m_ftlb.CbFTLBBuffer();
-            }
-            else if ( cbBlankFTLBufferLeft == 0 )
-            {
-                m_cFullBuffers++;
-            }
-            else
-            {
-                Assert( cbBlankFTLBufferLeft );
-                m_cPartialBuffers++;
-                m_cbPartialEmpty += cbBlankFTLBufferLeft;
-            }
-
-            const QWORD ibNextFTLBuffer = pftltrace->ibBookmark + cbBlankFTLBufferLeft;
-
-     
-            if ( !FBounded( ibNextFTLBuffer, m_rgbufReadBuffers[m_ibufReadLast].ibBookmark, m_cbReadBufferSize ) )
-            {
-                const INT ibufPrev = m_ibufReadLast;
-                Call( ErrFTLIFillBuffer( ibNextFTLBuffer ) );
-
-                if ( err == JET_wrnBufferTruncated )
-                {
-                    err = JET_errSuccess;
+                if (cbBlankFTLBufferLeft >= (INT)(m_pftl->m_ftlb.CbFTLBBuffer() - m_pftl->m_ftlb.CbFTLBHeader()))             {
+                    m_cBlankBuffers++;
+                    m_cbBlankEmpty += m_pftl->m_ftlb.CbFTLBBuffer();
                 }
-                
-                Assert( ibufPrev != m_ibufReadLast );
-                Assert( m_rgbufReadBuffers[m_ibufReadLast].ibBookmark == ibNextFTLBuffer );
+                else if (cbBlankFTLBufferLeft == 0)             {
+                    m_cFullBuffers++;
+                }
+                else             {
+                    Assert(cbBlankFTLBufferLeft);
+                    m_cPartialBuffers++;
+                    m_cbPartialEmpty += cbBlankFTLBufferLeft;
+                }
+
+                const QWORD ibNextFTLBuffer = pftltrace->ibBookmark + cbBlankFTLBufferLeft;
+
+
+                if (!FBounded(ibNextFTLBuffer, m_rgbufReadBuffers[m_ibufReadLast].ibBookmark, m_cbReadBufferSize))             {
+                    const INT ibufPrev = m_ibufReadLast;
+                    Call(ErrFTLIFillBuffer(ibNextFTLBuffer));
+
+                    if (err == JET_wrnBufferTruncated)                 {
+                        err = JET_errSuccess;
+                    }
+
+                    Assert(ibufPrev != m_ibufReadLast);
+                    Assert(m_rgbufReadBuffers[m_ibufReadLast].ibBookmark == ibNextFTLBuffer);
+                }
+
+                m_tickBase = *((TICK*)(m_rgbufReadBuffers[m_ibufReadLast].pbReadBuffer + ibNextFTLBuffer - m_rgbufReadBuffers[m_ibufReadLast].ibBookmark));
+                m_ibBookmarkNext = ibNextFTLBuffer + m_pftl->m_ftlb.CbFTLBHeader();
+
+                pbTrace = m_rgbufReadBuffers[m_ibufReadLast].pbReadBuffer + m_ibBookmarkNext - m_rgbufReadBuffers[m_ibufReadLast].ibBookmark;
+                pftltrace->ibBookmark = m_ibBookmarkNext;
             }
+        }
 
-            m_tickBase = *((TICK*)( m_rgbufReadBuffers[m_ibufReadLast].pbReadBuffer + ibNextFTLBuffer - m_rgbufReadBuffers[m_ibufReadLast].ibBookmark ));
-            m_ibBookmarkNext = ibNextFTLBuffer + m_pftl->m_ftlb.CbFTLBHeader();
 
-            pbTrace = m_rgbufReadBuffers[m_ibufReadLast].pbReadBuffer + m_ibBookmarkNext - m_rgbufReadBuffers[m_ibufReadLast].ibBookmark;
-            pftltrace->ibBookmark = m_ibBookmarkNext;
+        err = CFastTraceLogBuffer::ErrFTLBParseTraceHeader(pbTrace,
+            &(pftltrace->ftltid),
+            m_tickBase,
+            &(pftltrace->tick));
+
+        if (err == errNotFound)     {
+            return err;
+        }
+
+        Call(err);
+
+        {
+            const FTLTDESC ftltdesc = m_pftl->FtltdescFTLIGetDescriptor(pftltrace->ftltid);
+
+
+            Call(CFastTraceLogBuffer::ErrFTLBParseTraceData(pbTrace,
+                pftltrace->ftltid,
+                ftltdesc,
+                &(pftltrace->cbTraceData),
+                &(pftltrace->pbTraceData)));
+
+            m_ibBookmarkNext = pftltrace->ibBookmark + (pftltrace->pbTraceData - pbTrace) + pftltrace->cbTraceData;
+
+            #ifdef DEBUG
+            m_ftltracePrevPrev = m_ftltracePrev;
+            m_ibufTracePrevPrev = m_ibufTracePrev;
+            m_ftltracePrev = *pftltrace;
+            m_ibufTracePrev = m_ibufReadLast;
+            #endif
         }
     }
-
-
-    err = CFastTraceLogBuffer::ErrFTLBParseTraceHeader( pbTrace,
-                                                        &(pftltrace->ftltid),
-                                                        m_tickBase,
-                                                        &(pftltrace->tick) );
-
-    if ( err == errNotFound )
-    {
-        return err;
-    }
-
-    Call( err );
-
-
-    const FTLTDESC ftltdesc = m_pftl->FtltdescFTLIGetDescriptor( pftltrace->ftltid );
-
-
-    Call( CFastTraceLogBuffer::ErrFTLBParseTraceData( pbTrace,
-                                                        pftltrace->ftltid,
-                                                        ftltdesc,
-                                                        &(pftltrace->cbTraceData),
-                                                        &(pftltrace->pbTraceData) ) );
-
-    m_ibBookmarkNext = pftltrace->ibBookmark + ( pftltrace->pbTraceData - pbTrace ) + pftltrace->cbTraceData;
-
-#ifdef DEBUG
-    m_ftltracePrevPrev = m_ftltracePrev;
-    m_ibufTracePrevPrev = m_ibufTracePrev;
-    m_ftltracePrev = *pftltrace;
-    m_ibufTracePrev = m_ibufReadLast;
-#endif
-
 HandleError:
 
 

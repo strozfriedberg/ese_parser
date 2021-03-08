@@ -195,7 +195,7 @@ xorloop:
     emit4( 0x66, 0x0f, 0xef, 0xc2 );
     emit4( 0x66, 0x0f, 0x7e, 0xc0 );
 
-    __asm xor eax, 0x89abcdef
+    __asm xor_ eax, 0x89abcdef
     __asm ret 0x8
 }
 
@@ -480,8 +480,8 @@ Start:
     const ULONG mask = ( cb << 19 ) - 1;
 
     const ULONG ecc = p & 0xffe0ffe0 & mask | r & 0x001f001f;
-    const ULONG xor = r2;
-    return MakeChecksumFromECCXORAndPgno( ecc, xor, pgno );
+    const ULONG xor_ = r2;
+    return MakeChecksumFromECCXORAndPgno( ecc, xor_, pgno );
 }
 
 
@@ -591,8 +591,8 @@ Start:
     const ULONG mask = ( cb << 19 ) - 1;
 
     const ULONG ecc = p & 0xffe0ffe0 & mask | r & 0x001f001f;
-    const ULONG xor = r2;
-    return MakeChecksumFromECCXORAndPgno( ecc, xor, pgno );
+    const ULONG xor_ = r2;
+    return MakeChecksumFromECCXORAndPgno( ecc, xor_, pgno );
 }
 
 
@@ -805,8 +805,8 @@ Start:
     const ULONG mask = ( cb << 19 ) - 1;
 
     const ULONG ecc = p & 0xfe00fe00 & mask | q & 0x01e001e0 | r & 0x001f001f;
-    const ULONG xor = dw0;
-    return MakeChecksumFromECCXORAndPgno( ecc, xor, pgno );
+    const ULONG xor_ = dw0;
+    return MakeChecksumFromECCXORAndPgno( ecc, xor_, pgno );
 }
 
 template XECHECKSUM ChecksumNewFormatSSE2<ParityMaskFuncDefault>( const unsigned char * const pb, const ULONG cb, const ULONG pgno, BOOL fHeaderBlock );
@@ -913,7 +913,7 @@ static __declspec( naked ) XECHECKSUM __stdcall ChecksumSSE2_Emitted( const unsi
 
     __asm push ecx
     __asm shr ecx, 7
-    __asm xor ebx, ebx
+    __asm xor_ ebx, ebx
     __asm mov edx, 0xfe000000
     __asm mov ebp, 0xfe000200
 
@@ -948,16 +948,16 @@ loop_page_to_64B_start:
     emit4( 0x66, 0x0f, 0x7e, 0xc6 );
     __asm mov edi, esi
     __asm shr edi, 16
-    __asm xor esi, edi
+    __asm xor_ esi, edi
     __asm mov edi, esi
     __asm shr edi, 8
-    __asm xor esi, edi
+    __asm xor_ esi, edi
     __asm and esi, 0xff
 
     __asm movsx esi, [ g_bParityLookupTable + esi ]
     __asm and esi, edx
     __asm add edx, ebp
-    __asm xor ebx, esi
+    __asm xor_ ebx, esi
 
     emit5( 0x66, 0x0f, 0x6f, 0x40, 0x40 );
     emit5( 0x66, 0x0f, 0x6f, 0x48, 0x50 );
@@ -980,16 +980,16 @@ loop_page_to_64B_start:
     emit4( 0x66, 0x0f, 0x7e, 0xc6 );
     __asm mov edi, esi
     __asm shr edi, 16
-    __asm xor esi, edi
+    __asm xor_ esi, edi
     __asm mov edi, esi
     __asm shr edi, 8
-    __asm xor esi, edi
+    __asm xor_ esi, edi
     __asm and esi, 0xff
 
     __asm movsx esi, [ g_bParityLookupTable + esi ]
     __asm and esi, edx
     __asm add edx, ebp
-    __asm xor ebx, esi
+    __asm xor_ ebx, esi
 
     __asm sub eax, -128
     __asm dec ecx
@@ -1009,26 +1009,26 @@ loop_page_to_64B_start:
 
     __asm lea eax, [ esp + STKOFF ]
     __asm mov ecx, 16
-    __asm xor edx, edx
-    __asm xor ebx, ebx
+    __asm xor_ edx, edx
+    __asm xor_ ebx, ebx
     __asm mov ebp, 0xffe00000
 
 loop_64B_to_4B:
     __asm mov esi, [ eax ]
-    __asm xor edx, esi
+    __asm xor_ edx, esi
 
     __asm mov edi, esi
     __asm shr edi, 16
-    __asm xor esi, edi
+    __asm xor_ esi, edi
     __asm mov edi, esi
     __asm shr edi, 8
-    __asm xor esi, edi
+    __asm xor_ esi, edi
     __asm and esi, 0xff
 
     __asm movsx esi, [ g_bParityLookupTable + esi ]
     __asm and esi, ebp
     __asm add ebp, 0xffe00020
-    __asm xor ebx, esi
+    __asm xor_ ebx, esi
 
     __asm add eax, 4
     __asm dec ecx
@@ -1037,7 +1037,7 @@ loop_64B_to_4B:
     __asm and ebx, 0x01e001e0
     __asm push ebx
 
-    __asm xor ecx, ecx
+    __asm xor_ ecx, ecx
     __asm mov ebx, 0xffff0000
     __asm mov eax, 1
 
@@ -1048,7 +1048,7 @@ loop_4B_to_End:
     __asm sbb esi, esi
     __asm and esi, ebx
     __asm add ebx, 0xffff0001
-    __asm xor ecx, esi
+    __asm xor_ ecx, esi
     __asm add eax, eax
     __asm jnz loop_4B_to_End
 

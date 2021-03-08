@@ -1455,84 +1455,78 @@ ERR COSFileSystem::ErrFileCreate(   _In_z_ const WCHAR* const       wszPath,
     cbFileSize      = ( QWORD( bhfi.nFileSizeHigh ) << 32 ) + bhfi.nFileSizeLow;
     fIsCompressed   = !!( bhfi.dwFileAttributes & FILE_ATTRIBUTE_COMPRESSED );
 
-
-    IVolumeAPI * pvolapi = NULL;
-    Call( ErrOSVolumeConnect( this, wszAbsPath, &pvolapi ) );
-    Assert( pvolapi );
-    posv = PosvFromVolAPI( pvolapi );
-    ASSERT_VALID( posv );
-    Assert( posv->CRef() >= 1 );
-
-    Call( ErrFileSectorSize( wszAbsPath, &cbSectorSize ) );
-    if ( cbSectorSize > 4096 )
     {
-        cbSectorSize = 4096;
-    }
+        IVolumeAPI* pvolapi = NULL;
+        Call(ErrOSVolumeConnect(this, wszAbsPath, &pvolapi));
+        Assert(pvolapi);
+        posv = PosvFromVolAPI(pvolapi);
+        ASSERT_VALID(posv);
+        Assert(posv->CRef() >= 1);
 
-    cbIOSize = !fCached ? cbSectorSize : 1;
+        Call(ErrFileSectorSize(wszAbsPath, &cbSectorSize));
+        if (cbSectorSize > 4096)     {
+            cbSectorSize = 4096;
+        }
+
+        cbIOSize = !fCached ? cbSectorSize : 1;
 
 
-    if ( fIsCompressed && !fTemporary )
-    {
-        USHORT      usCompressionState  = COMPRESSION_FORMAT_NONE;
-        OVERLAPPED  overlapped          = { 0 };
-        DWORD       cbTransferred       = 0;
+        if (fIsCompressed && !fTemporary)     {
+            USHORT      usCompressionState = COMPRESSION_FORMAT_NONE;
+            OVERLAPPED  overlapped = { 0 };
+            DWORD       cbTransferred = 0;
 
 
-        Alloc( hEvent = CreateEventW( NULL, FALSE, FALSE, NULL ) );
-        overlapped.hEvent = hEvent;
-        if (    (   !DeviceIoControl(   hFile,
-                                        FSCTL_SET_COMPRESSION,
-                                        &usCompressionState,
-                                        sizeof( usCompressionState ),
-                                        NULL,
-                                        0,
-                                        &cbTransferred,
-                                        &overlapped ) &&
-                    GetLastError() != ERROR_IO_PENDING ) ||
-                (   !GetOverlappedResult(   hFile,
-                                            &overlapped,
-                                            &cbTransferred,
-                                            TRUE ) ) )
-        {
-            error = GetLastError();
-            CallJ( ErrGetLastError( error ), HandleWin32Error );
+            Alloc(hEvent = CreateEventW(NULL, FALSE, FALSE, NULL));
+            overlapped.hEvent = hEvent;
+            if ((!DeviceIoControl(hFile,
+                FSCTL_SET_COMPRESSION,
+                &usCompressionState,
+                sizeof(usCompressionState),
+                NULL,
+                0,
+                &cbTransferred,
+                &overlapped) &&
+                GetLastError() != ERROR_IO_PENDING) ||
+                (!GetOverlappedResult(hFile,
+                    &overlapped,
+                    &cbTransferred,
+                    TRUE)))         {
+                error = GetLastError();
+                CallJ(ErrGetLastError(error), HandleWin32Error);
+            }
+
+
+            SetHandleInformation(hFile, HANDLE_FLAG_PROTECT_FROM_CLOSE, 0);
+            CloseHandle(hFile);
+            OSVolumeDisconnect(posv);
+            delete posf;
+            CloseHandle(hEvent);
+
+            if ((err = ErrFileOpen(wszAbsPath, (fCached ? IFileAPI::fmfCached : IFileAPI::fmfNone) | (fLossyWriteBack ? IFileAPI::fmfLossyWriteBack : IFileAPI::fmfNone), ppfapi)) < JET_errSuccess)         {
+                DeleteFileW(wszAbsPath);
+            }
+            return err;
+        }
+
+        if (!(bhfi.dwFileAttributes & FILE_ATTRIBUTE_SPARSE_FILE))     {
+            Assert(0 == (fmf & IFileAPI::fmfSparse));
+        }
+        else     {
+            fmf |= IFileAPI::fmfSparse;
         }
 
 
-        SetHandleInformation( hFile, HANDLE_FLAG_PROTECT_FROM_CLOSE, 0 );
-        CloseHandle( hFile );
-        OSVolumeDisconnect( posv );
-        delete posf;
-        CloseHandle( hEvent );
 
-        if ( ( err = ErrFileOpen( wszAbsPath, ( fCached ? IFileAPI::fmfCached : IFileAPI::fmfNone ) | ( fLossyWriteBack ? IFileAPI::fmfLossyWriteBack : IFileAPI::fmfNone ), ppfapi ) ) < JET_errSuccess )
-        {
-            DeleteFileW( wszAbsPath );
-        }
-        return err;
+
+        Call(posf->ErrInitFile(this, posv, wszAbsPath, hFile, cbFileSize, fmf, cbIOSize, cbSectorSize));
+        OSTrace(JET_tracetagFile, OSFormat("ErrFileCreate( %ws, 0x%x ) -> 0x%p{0x%p} )", wszAbsPath, fmf, posf, hFile));
+        hFile = INVALID_HANDLE_VALUE;
+        posv = NULL;
+
+
+        *ppfapi = posf;
     }
-
-    if ( !( bhfi.dwFileAttributes & FILE_ATTRIBUTE_SPARSE_FILE ) )
-    {
-        Assert( 0 == ( fmf & IFileAPI::fmfSparse ) );
-    }
-    else
-    {
-        fmf |= IFileAPI::fmfSparse;
-    }
-
-
-
-
-    Call( posf->ErrInitFile( this, posv, wszAbsPath, hFile, cbFileSize, fmf, cbIOSize, cbSectorSize ) );
-    OSTrace( JET_tracetagFile, OSFormat( "ErrFileCreate( %ws, 0x%x ) -> 0x%p{0x%p} )", wszAbsPath, fmf, posf, hFile ) );
-    hFile = INVALID_HANDLE_VALUE;
-    posv = NULL;
-
-
-    *ppfapi = posf;
-
 HandleWin32Error:
     ReportFileError( OSFS_CREATE_FILE_ERROR_ID, wszAbsPath, NULL, err, error );
 
@@ -1607,151 +1601,142 @@ ERR COSFileSystem::ErrFileOpen( _In_z_ const WCHAR* const       wszPath,
 
     Call( ErrPathComplete( wszPath, wszAbsPath ) );
 
-
-    const DWORD dwDesiredAccess = DwDesiredAccessFromFileModeFlags( fmf );
-    const DWORD dwShareMode = DwShareModeFromFileModeFlags( fmf );
-    const DWORD dwCreationDisposition = DwCreationDispositionFromFileModeFlags( fFalse, fmf );
-    const DWORD dwFlagsAndAttributes = DwFlagsAndAttributesFromFileModeFlags( fmf );
-
-    do
     {
-        err     = JET_errSuccess;
-        error   = ERROR_SUCCESS;
-        
-        OSTrace( JET_tracetagFile, OSFormat( "OS CreateFileW( path, %#x, %#x, NULL, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL | FILE_FLAG_OVERLAPPED | %hs | %hs, NULL )",
-                                    dwDesiredAccess,
-                                    dwShareMode,
-                                    ( ( dwFlagsAndAttributes & FILE_FLAG_WRITE_THROUGH ) == 0 ? "0" : "FILE_FLAG_WRITE_THROUGH" ),
-                                    ( ( dwFlagsAndAttributes & FILE_FLAG_RANDOM_ACCESS ) != 0 ) ? "FILE_FLAG_RANDOM_ACCESS" : "FILE_FLAG_NO_BUFFERING" ) );
+        const DWORD dwDesiredAccess = DwDesiredAccessFromFileModeFlags(fmf);
+        const DWORD dwShareMode = DwShareModeFromFileModeFlags(fmf);
+        const DWORD dwCreationDisposition = DwCreationDispositionFromFileModeFlags(fFalse, fmf);
+        const DWORD dwFlagsAndAttributes = DwFlagsAndAttributesFromFileModeFlags(fmf);
 
-        hFile = CreateFileW(    wszAbsPath,
-                                dwDesiredAccess,
-                                dwShareMode,
-                                NULL,
-                                dwCreationDisposition,
-                                dwFlagsAndAttributes,
-                                NULL );
+        do     {
+            err = JET_errSuccess;
+            error = ERROR_SUCCESS;
 
-        if ( hFile == INVALID_HANDLE_VALUE )
-        {
-            error   = GetLastError();
-            err     = ErrGetLastError( error );
+            OSTrace(JET_tracetagFile, OSFormat("OS CreateFileW( path, %#x, %#x, NULL, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL | FILE_FLAG_OVERLAPPED | %hs | %hs, NULL )",
+                dwDesiredAccess,
+                dwShareMode,
+                ((dwFlagsAndAttributes & FILE_FLAG_WRITE_THROUGH) == 0 ? "0" : "FILE_FLAG_WRITE_THROUGH"),
+                ((dwFlagsAndAttributes & FILE_FLAG_RANDOM_ACCESS) != 0) ? "FILE_FLAG_RANDOM_ACCESS" : "FILE_FLAG_NO_BUFFERING"));
+
+            hFile = CreateFileW(wszAbsPath,
+                dwDesiredAccess,
+                dwShareMode,
+                NULL,
+                dwCreationDisposition,
+                dwFlagsAndAttributes,
+                NULL);
+
+            if (hFile == INVALID_HANDLE_VALUE)         {
+                error = GetLastError();
+                err = ErrGetLastError(error);
+            }
+        }     while (OsfsRetry.FRetry(err));
+        CallJ(err, HandleWin32Error);
+
+        SetHandleInformation(hFile, HANDLE_FLAG_PROTECT_FROM_CLOSE, HANDLE_FLAG_PROTECT_FROM_CLOSE);
+
+
+        if (!GetFileInformationByHandle(hFile, &bhfi))     {
+            error = GetLastError();
+            CallJ(ErrGetLastError(error), HandleWin32Error);
         }
-    }
-    while ( OsfsRetry.FRetry( err ) );
-    CallJ( err, HandleWin32Error );
-
-    SetHandleInformation( hFile, HANDLE_FLAG_PROTECT_FROM_CLOSE, HANDLE_FLAG_PROTECT_FROM_CLOSE );
+        cbFileSize = (QWORD(bhfi.nFileSizeHigh) << 32) + bhfi.nFileSizeLow;
+        fIsCompressed = !!(bhfi.dwFileAttributes & FILE_ATTRIBUTE_COMPRESSED);
 
 
-    if ( !GetFileInformationByHandle( hFile, &bhfi ) )
-    {
-        error = GetLastError();
-        CallJ( ErrGetLastError( error ), HandleWin32Error );
-    }
-    cbFileSize      = ( QWORD( bhfi.nFileSizeHigh ) << 32 ) + bhfi.nFileSizeLow;
-    fIsCompressed   = !!( bhfi.dwFileAttributes & FILE_ATTRIBUTE_COMPRESSED );
+        IVolumeAPI* pvolapi = NULL;
+        Call(ErrOSVolumeConnect(this, wszAbsPath, &pvolapi));
+        Assert(pvolapi);
+        posv = PosvFromVolAPI(pvolapi);
+        ASSERT_VALID(posv);
+        Assert(posv->CRef() >= 1);
 
-
-    IVolumeAPI * pvolapi = NULL;
-    Call( ErrOSVolumeConnect( this, wszAbsPath, &pvolapi ) );
-    Assert( pvolapi );
-    posv = PosvFromVolAPI( pvolapi );
-    ASSERT_VALID( posv );
-    Assert( posv->CRef() >= 1 );
-
-    Call( ErrFileSectorSize( wszAbsPath, &cbSectorSize ) );
-    if ( cbSectorSize > 4096 )
-    {
-        FireWall( "SectorSizeTooBig" );
-        cbSectorSize = 4096;
-    }
-
-    cbIOSize = ( dwFlagsAndAttributes & FILE_FLAG_NO_BUFFERING ) ? cbSectorSize : 1;
- 
-    const QWORD cbFileSizeDecompressMax = 128 * 1024 * 1024;
-
-    if ( !fReadOnly && fIsCompressed && !FOSSetupRunning() )
-    {
-        USHORT      usCompressionState  = COMPRESSION_FORMAT_NONE;
-        OVERLAPPED  overlapped          = { 0 };
-        DWORD       cbTransferred       = 0;
-
-
-        Alloc( hEvent = CreateEventW( NULL, FALSE, FALSE, NULL ) );
-        overlapped.hEvent = hEvent;
-        if (    cbFileSize >= cbFileSizeDecompressMax ||
-                (   !DeviceIoControl(   hFile,
-                                        FSCTL_SET_COMPRESSION,
-                                        &usCompressionState,
-                                        sizeof( usCompressionState ),
-                                        NULL,
-                                        0,
-                                        &cbTransferred,
-                                        &overlapped ) &&
-                    GetLastError() != ERROR_IO_PENDING ) ||
-                (   !GetOverlappedResult(   hFile,
-                                            &overlapped,
-                                            &cbTransferred,
-                                            TRUE ) ) )
-        {
-            const WCHAR*    rgpwsz[ 2 ];
-            DWORD           irgpwsz         = 0;
-            WCHAR           wszError[ 64 ];
-
-            OSStrCbFormatW( wszError, sizeof( wszError ), L"%i (0x%08x)", JET_errFileCompressed, JET_errFileCompressed );
-
-            rgpwsz[ irgpwsz++ ]   = wszAbsPath;
-            rgpwsz[ irgpwsz++ ]   = wszError;
-
-            Pfsconfig()->EmitEvent( eventError,
-                                    GENERAL_CATEGORY,
-                                    OSFS_OPEN_COMPRESSED_FILE_RW_ERROR_ID,
-                                    irgpwsz,
-                                    rgpwsz,
-                                    JET_EventLoggingLevelMin );
-
-#if defined( USE_HAPUBLISH_API )            
-            Pfsconfig()->EmitEvent( HaDbFailureTagConfiguration,
-                                    Ese2HaId( GENERAL_CATEGORY ),
-                                    Ese2HaId( OSFS_OPEN_COMPRESSED_FILE_RW_ERROR_ID ),
-                                    irgpwsz,
-                                    rgpwsz,
-                                    HaDbIoErrorMeta,
-                                    wszAbsPath );
-#endif
-
-            Call( ErrERRCheck( JET_errFileCompressed ) );
+        Call(ErrFileSectorSize(wszAbsPath, &cbSectorSize));
+        if (cbSectorSize > 4096)     {
+            FireWall("SectorSizeTooBig");
+            cbSectorSize = 4096;
         }
 
+        cbIOSize = (dwFlagsAndAttributes & FILE_FLAG_NO_BUFFERING) ? cbSectorSize : 1;
 
-        SetHandleInformation( hFile, HANDLE_FLAG_PROTECT_FROM_CLOSE, 0 );
-        CloseHandle( hFile );
-        OSVolumeDisconnect( posv );
-        delete posf;
-        CloseHandle( hEvent );
+        const QWORD cbFileSizeDecompressMax = 128 * 1024 * 1024;
 
-        return ErrFileOpen( wszAbsPath, fmf, ppfapi );
+        if (!fReadOnly && fIsCompressed && !FOSSetupRunning())     {
+            USHORT      usCompressionState = COMPRESSION_FORMAT_NONE;
+            OVERLAPPED  overlapped = { 0 };
+            DWORD       cbTransferred = 0;
+
+
+            Alloc(hEvent = CreateEventW(NULL, FALSE, FALSE, NULL));
+            overlapped.hEvent = hEvent;
+            if (cbFileSize >= cbFileSizeDecompressMax ||
+                (!DeviceIoControl(hFile,
+                    FSCTL_SET_COMPRESSION,
+                    &usCompressionState,
+                    sizeof(usCompressionState),
+                    NULL,
+                    0,
+                    &cbTransferred,
+                    &overlapped) &&
+                    GetLastError() != ERROR_IO_PENDING) ||
+                (!GetOverlappedResult(hFile,
+                    &overlapped,
+                    &cbTransferred,
+                    TRUE)))         {
+                const WCHAR* rgpwsz[2];
+                DWORD           irgpwsz = 0;
+                WCHAR           wszError[64];
+
+                OSStrCbFormatW(wszError, sizeof(wszError), L"%i (0x%08x)", JET_errFileCompressed, JET_errFileCompressed);
+
+                rgpwsz[irgpwsz++] = wszAbsPath;
+                rgpwsz[irgpwsz++] = wszError;
+
+                Pfsconfig()->EmitEvent(eventError,
+                    GENERAL_CATEGORY,
+                    OSFS_OPEN_COMPRESSED_FILE_RW_ERROR_ID,
+                    irgpwsz,
+                    rgpwsz,
+                    JET_EventLoggingLevelMin);
+
+                #if defined( USE_HAPUBLISH_API )            
+                Pfsconfig()->EmitEvent(HaDbFailureTagConfiguration,
+                    Ese2HaId(GENERAL_CATEGORY),
+                    Ese2HaId(OSFS_OPEN_COMPRESSED_FILE_RW_ERROR_ID),
+                    irgpwsz,
+                    rgpwsz,
+                    HaDbIoErrorMeta,
+                    wszAbsPath);
+                #endif
+
+                Call(ErrERRCheck(JET_errFileCompressed));
+            }
+
+
+            SetHandleInformation(hFile, HANDLE_FLAG_PROTECT_FROM_CLOSE, 0);
+            CloseHandle(hFile);
+            OSVolumeDisconnect(posv);
+            delete posf;
+            CloseHandle(hEvent);
+
+            return ErrFileOpen(wszAbsPath, fmf, ppfapi);
+        }
+
+        if (!(bhfi.dwFileAttributes & FILE_ATTRIBUTE_SPARSE_FILE))     {
+            Assert(0 == (fmf & IFileAPI::fmfSparse));
+        }
+        else     {
+            fmf |= IFileAPI::fmfSparse;
+        }
+
+
+        Call(posf->ErrInitFile(this, posv, wszAbsPath, hFile, cbFileSize, fmf, cbIOSize, cbSectorSize));
+        OSTrace(JET_tracetagFile, OSFormat("ErrFileOpen( %ws, 0x%x ) -> 0x%p{0x%p} )", wszAbsPath, fmf, posf, hFile));
+        hFile = INVALID_HANDLE_VALUE;
+        posv = NULL;
+
+
+        *ppfapi = posf;
     }
-
-    if ( !( bhfi.dwFileAttributes & FILE_ATTRIBUTE_SPARSE_FILE ) )
-    {
-        Assert( 0 == ( fmf & IFileAPI::fmfSparse ) );
-    }
-    else
-    {
-        fmf |= IFileAPI::fmfSparse;
-    }
-
-
-    Call( posf->ErrInitFile( this, posv, wszAbsPath, hFile, cbFileSize, fmf, cbIOSize, cbSectorSize ) );
-    OSTrace( JET_tracetagFile, OSFormat( "ErrFileOpen( %ws, 0x%x ) -> 0x%p{0x%p} )", wszAbsPath, fmf, posf, hFile ) );
-    hFile = INVALID_HANDLE_VALUE;
-    posv = NULL;
-
-
-    *ppfapi = posf;
-
 HandleWin32Error:
     ReportFileErrorWithFilter( ( fReadOnly ? OSFS_OPEN_FILE_RO_ERROR_ID : OSFS_OPEN_FILE_RW_ERROR_ID ), wszAbsPath, NULL, err, error );
 
@@ -1956,132 +1941,120 @@ ERR COSFileSystem::ErrDiskId(   const WCHAR* const wszVolumeCanonicalPath,
         Call( ErrGetLastError() );
     }
 
-    BOOL fGetVolumeExtents = fFalse;
-
-
-    size_t cbBufferVolume = sizeof( VOLUME_DISK_EXTENTS );
-
-    do
     {
-        DWORD cbWritten;
+        BOOL fGetVolumeExtents = fFalse;
 
-        delete[] pbBufferVolume;
-        pbBufferVolume = new BYTE[ cbBufferVolume ];
-        Alloc( pbBufferVolume );
-        
-        fGetVolumeExtents = DeviceIoControl( hVolume,
-                                                IOCTL_VOLUME_GET_VOLUME_DISK_EXTENTS,
-                                                NULL, 0,
-                                                pbBufferVolume, cbBufferVolume,
-                                                &cbWritten,
-                                                NULL );
 
-        if ( !fGetVolumeExtents )
-        {
-            const DWORD error = GetLastError();
-            if ( error == ERROR_MORE_DATA )
-            {
-                cbBufferVolume += sizeof( DISK_EXTENT );
+        size_t cbBufferVolume = sizeof(VOLUME_DISK_EXTENTS);
+
+        do     {
+            DWORD cbWritten;
+
+            delete[] pbBufferVolume;
+            pbBufferVolume = new BYTE[cbBufferVolume];
+            Alloc(pbBufferVolume);
+
+            fGetVolumeExtents = DeviceIoControl(hVolume,
+                IOCTL_VOLUME_GET_VOLUME_DISK_EXTENTS,
+                NULL, 0,
+                pbBufferVolume, cbBufferVolume,
+                &cbWritten,
+                NULL);
+
+            if (!fGetVolumeExtents)         {
+                const DWORD error = GetLastError();
+                if (error == ERROR_MORE_DATA)             {
+                    cbBufferVolume += sizeof(DISK_EXTENT);
+                }
+                else             {
+                    Call(ErrGetLastError(error));
+                }
             }
-            else
-            {
-                Call( ErrGetLastError( error ) );
-            }
+        }     while (!fGetVolumeExtents);
+
+        const VOLUME_DISK_EXTENTS* const pvde = (VOLUME_DISK_EXTENTS*)pbBufferVolume;
+
+
+        if (pvde->NumberOfDiskExtents < 1)     {
+            Call(ErrERRCheck(errNotFound));
         }
-    }
-    while( !fGetVolumeExtents );
-
-    const VOLUME_DISK_EXTENTS* const pvde = (VOLUME_DISK_EXTENTS*)pbBufferVolume;
 
 
-    if ( pvde->NumberOfDiskExtents < 1 )
-    {
-        Call( ErrERRCheck( errNotFound ) );
-    }
+        *pdwDiskNumber = pvde->Extents[0].DiskNumber;
 
 
-    *pdwDiskNumber = pvde->Extents[ 0 ].DiskNumber;
+        WCHAR wszDiskPath[IFileSystemAPI::cchPathMax];
+        OSStrCbFormatW(wszDiskPath, sizeof(wszDiskPath), L"\\\\.\\PhysicalDrive%u", *pdwDiskNumber);
 
 
-    WCHAR wszDiskPath[ IFileSystemAPI::cchPathMax ];
-    OSStrCbFormatW( wszDiskPath, sizeof( wszDiskPath ), L"\\\\.\\PhysicalDrive%u", *pdwDiskNumber );
+        hDisk = CreateFileW(wszDiskPath,
+            0,
+            FILE_SHARE_READ,
+            NULL,
+            OPEN_EXISTING,
+            0,
+            NULL);
 
-
-    hDisk = CreateFileW( wszDiskPath,
-                            0,
-                            FILE_SHARE_READ,
-                            NULL,
-                            OPEN_EXISTING,
-                            0,
-                            NULL );
-    
-    if ( hDisk == INVALID_HANDLE_VALUE )
-    {
-        Call( ErrGetLastError() );
-    }
-
-    BOOL fGetDriveLayout = fFalse;
-
-
-    size_t cbBufferDisk = sizeof( DRIVE_LAYOUT_INFORMATION_EX ) + sizeof( PARTITION_INFORMATION_EX );
-
-    do
-    {
-        DWORD cbWritten;
-
-        delete[] pbBufferDisk;
-        pbBufferDisk = new BYTE[ cbBufferDisk ];
-        Alloc( pbBufferDisk );
-
-        fGetDriveLayout = DeviceIoControl( hVolume,
-                                            IOCTL_DISK_GET_DRIVE_LAYOUT_EX,
-                                            NULL, 0,
-                                            pbBufferDisk, cbBufferDisk,
-                                            &cbWritten,
-                                            NULL );
-
-        if ( !fGetDriveLayout )
-        {
-            const DWORD error = GetLastError();
-            if ( error == ERROR_INSUFFICIENT_BUFFER )
-            {
-                cbBufferDisk += sizeof( PARTITION_INFORMATION_EX );
-            }
-            else
-            {
-                Call( ErrGetLastError( error ) );
-            }
+        if (hDisk == INVALID_HANDLE_VALUE)     {
+            Call(ErrGetLastError());
         }
-    }
-    while( !fGetDriveLayout );
+
+        BOOL fGetDriveLayout = fFalse;
 
 
-    const DRIVE_LAYOUT_INFORMATION_EX* const pdli = (DRIVE_LAYOUT_INFORMATION_EX*)pbBufferDisk;
+        size_t cbBufferDisk = sizeof(DRIVE_LAYOUT_INFORMATION_EX) + sizeof(PARTITION_INFORMATION_EX);
 
-    switch ( pdli->PartitionStyle )
-    {
-        case PARTITION_STYLE_MBR:
-            OSStrCbFormatW( wszDiskId, cchDiskId, L"MBR:%08X", pdli->Mbr.Signature );
+        do     {
+            DWORD cbWritten;
+
+            delete[] pbBufferDisk;
+            pbBufferDisk = new BYTE[cbBufferDisk];
+            Alloc(pbBufferDisk);
+
+            fGetDriveLayout = DeviceIoControl(hVolume,
+                IOCTL_DISK_GET_DRIVE_LAYOUT_EX,
+                NULL, 0,
+                pbBufferDisk, cbBufferDisk,
+                &cbWritten,
+                NULL);
+
+            if (!fGetDriveLayout)         {
+                const DWORD error = GetLastError();
+                if (error == ERROR_INSUFFICIENT_BUFFER)             {
+                    cbBufferDisk += sizeof(PARTITION_INFORMATION_EX);
+                }
+                else             {
+                    Call(ErrGetLastError(error));
+                }
+            }
+        }     while (!fGetDriveLayout);
+
+
+        const DRIVE_LAYOUT_INFORMATION_EX* const pdli = (DRIVE_LAYOUT_INFORMATION_EX*)pbBufferDisk;
+
+        switch (pdli->PartitionStyle)     {
+            case PARTITION_STYLE_MBR:
+                OSStrCbFormatW(wszDiskId, cchDiskId, L"MBR:%08X", pdli->Mbr.Signature);
+                break;
+
+            case PARTITION_STYLE_GPT:
+            {
+                const GUID guid = pdli->Gpt.DiskId;
+                OSStrCbFormatW(wszDiskId, cchDiskId, L"GPT:%08X-%04X-%04X-%02X%02X-%02X%02X%02X%02X%02X%02X",
+                    guid.Data1,
+                    guid.Data2,
+                    guid.Data3,
+                    guid.Data4[0], guid.Data4[1],
+                    guid.Data4[2], guid.Data4[3], guid.Data4[4], guid.Data4[5], guid.Data4[6], guid.Data4[7]);
+            }
             break;
 
-        case PARTITION_STYLE_GPT:
-        {
-            const GUID guid = pdli->Gpt.DiskId;
-            OSStrCbFormatW( wszDiskId, cchDiskId, L"GPT:%08X-%04X-%04X-%02X%02X-%02X%02X%02X%02X%02X%02X",
-                            guid.Data1,
-                            guid.Data2,
-                            guid.Data3,
-                            guid.Data4[ 0 ], guid.Data4[ 1 ],
-                            guid.Data4[ 2 ], guid.Data4[ 3 ], guid.Data4[ 4 ], guid.Data4[ 5 ], guid.Data4[ 6 ], guid.Data4[ 7 ] );
+            default:
+                AssertSz(fFalse, "We should not have a partition of this type (%u)!", pdli->PartitionStyle);
+                Call(ErrERRCheck(JET_errInternalError));
+                break;
         }
-            break;
-
-        default:
-            AssertSz( fFalse, "We should not have a partition of this type (%u)!", pdli->PartitionStyle );
-            Call( ErrERRCheck( JET_errInternalError ) );
-            break;
     }
-
 HandleError:
 
     delete[] pbBufferVolume;
@@ -2889,56 +2862,54 @@ ERR ErrOSVolumeConnect(
     Assert( JET_errSuccess == err || NULL == *ppvolapi &&
                 JET_errSuccess != err || NULL != *ppvolapi );
 
-    const WCHAR * wszDiskIdToUse = wszDiskId;
-
-    if ( *ppvolapi )
     {
-        COSVolume * const posvAcquired = ((COSVolume*)*ppvolapi);
-        posvAcquired->AddRef();
-        OSTrace( JET_tracetagDiskVolumeManagement, OSFormat( "Add Ref Volume p=%p, Path=%ws, CanonicalPath=%ws, Cref=%d", posvAcquired, posvAcquired->WszVolPath(), posvAcquired->WszVolCanonicalPath(), posvAcquired->CRef() ) );
-        posv = PosvFromVolAPI( *ppvolapi );
-        Assert( posv->m_posd != NULL );
-        wszDiskIdToUse = posv->m_posd->WszDiskPathId();
-    }
-    else
-    {
-        Call( ErrOSVolumeICreate( wszVolumePath, wszVolumeCanonicalPathToUse, &posvCreated, NULL ) );
-        Assert( NULL == posvCreated->m_posd );
-        *ppvolapi = posvCreated;
-        OSTrace( JET_tracetagDiskVolumeManagement, OSFormat( "Created Volume p=%p, Path=%ws, CanonicalPath=%ws", posvCreated, posvCreated->WszVolPath(), posvCreated->WszVolCanonicalPath() ) );
-        Assert( *ppvolapi );
-        posv = PosvFromVolAPI( *ppvolapi );
+        const WCHAR* wszDiskIdToUse = wszDiskId;
 
-        switch( GetDiskMappingMode() )
-        {
-            case eOSDiskLastDiskOnEarthMode:
-                wszDiskIdToUse = wszLastDiskOnEarth;
-                break;
-
-            case eOSDiskOneDiskPerVolumeMode:
-            case eOSDiskMonogamousMode:
-                wszDiskIdToUse = posv->WszVolCanonicalPath();
-                break;
-
-            case eOSDiskOneDiskPerPhysicalDisk:
-                break;
-
-            default:
-                AssertSz( fFalse, "Code problem" );
-                Call( ErrERRCheck( JET_errInternalError ) );
-                break;
+        if (*ppvolapi)     {
+            COSVolume* const posvAcquired = ((COSVolume*)*ppvolapi);
+            posvAcquired->AddRef();
+            OSTrace(JET_tracetagDiskVolumeManagement, OSFormat("Add Ref Volume p=%p, Path=%ws, CanonicalPath=%ws, Cref=%d", posvAcquired, posvAcquired->WszVolPath(), posvAcquired->WszVolCanonicalPath(), posvAcquired->CRef()));
+            posv = PosvFromVolAPI(*ppvolapi);
+            Assert(posv->m_posd != NULL);
+            wszDiskIdToUse = posv->m_posd->WszDiskPathId();
         }
+        else     {
+            Call(ErrOSVolumeICreate(wszVolumePath, wszVolumeCanonicalPathToUse, &posvCreated, NULL));
+            Assert(NULL == posvCreated->m_posd);
+            *ppvolapi = posvCreated;
+            OSTrace(JET_tracetagDiskVolumeManagement, OSFormat("Created Volume p=%p, Path=%ws, CanonicalPath=%ws", posvCreated, posvCreated->WszVolPath(), posvCreated->WszVolCanonicalPath()));
+            Assert(*ppvolapi);
+            posv = PosvFromVolAPI(*ppvolapi);
+
+            switch (GetDiskMappingMode())         {
+                case eOSDiskLastDiskOnEarthMode:
+                    wszDiskIdToUse = wszLastDiskOnEarth;
+                    break;
+
+                case eOSDiskOneDiskPerVolumeMode:
+                case eOSDiskMonogamousMode:
+                    wszDiskIdToUse = posv->WszVolCanonicalPath();
+                    break;
+
+                case eOSDiskOneDiskPerPhysicalDisk:
+                    break;
+
+                default:
+                    AssertSz(fFalse, "Code problem");
+                    Call(ErrERRCheck(JET_errInternalError));
+                    break;
+            }
+        }
+
+        Assert(wszDiskIdToUse != NULL);
+
+        IDiskAPI** const ppidiskapi = (IDiskAPI**)&(posv->m_posd);
+        OnDebug(const IDiskAPI* const pidiskapi = *ppidiskapi; );
+        Call(ErrOSDiskConnect(wszDiskIdToUse, dwDiskNumber, ppidiskapi));
+        Assert((pidiskapi == NULL && *ppidiskapi != NULL) || pidiskapi == *ppidiskapi);
+
+        err = JET_errSuccess;
     }
-
-    Assert( wszDiskIdToUse != NULL );
-
-    IDiskAPI** const ppidiskapi = (IDiskAPI**)&( posv->m_posd );
-    OnDebug( const IDiskAPI* const pidiskapi = *ppidiskapi; );
-    Call( ErrOSDiskConnect( wszDiskIdToUse, dwDiskNumber, ppidiskapi ) );
-    Assert( ( pidiskapi == NULL && *ppidiskapi != NULL ) || pidiskapi == *ppidiskapi );
-
-    err = JET_errSuccess;
-
 HandleError:
 
     if ( err < JET_errSuccess )
@@ -3042,7 +3013,7 @@ DWORD DwFlagsAndAttributesFromFileModeFlags( const IFileAPI::FileModeFlags fmf )
 #ifdef ESENT
 
 #include <appmodel.h>
-#include <statemanager.h>
+//#include <statemanager.h>
 
 #else
 
@@ -3097,6 +3068,8 @@ INLINE Ret HandleFailedWithGLE()
 
 LOCAL ERR ErrOSFSInitDefaultPath()
 {
+    throw __FUNCTION__;
+    #if 0
     ERR err = JET_errSuccess;
     WCHAR* wszDefaultPath = NULL;
     HSTATE hstate = INVALID_STATE_HANDLE;
@@ -3181,6 +3154,7 @@ HandleError:
     delete [] wszDefaultPath;
 
     return err;
+#endif
 }
 
 

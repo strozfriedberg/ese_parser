@@ -110,7 +110,7 @@ typedef struct _UtilSystemBetaConfig
 }
 UtilSystemBetaConfig;
 extern UtilSystemBetaConfig g_rgbetaconfigs[];
-void UtilReportBetaFeatureInUse( const INST * const pinst, const UtilSystemBetaSiteMode usbsmCurrent, const ULONG featureid, PCWSTR const wszFeatureName );
+#define UtilReportBetaFeatureInUse( x1, x2, x3, x4 ) // const INST * const pinst, const UtilSystemBetaSiteMode usbsmCurrent, const ULONG featureid, PCWSTR const wszFeatureName );
 
 #define fUninitBetaFeature                  (-3)
 
@@ -131,6 +131,8 @@ enum EseBetaFeatures
 };
 
 
+#define FUtilSystemBetaFeatureEnabled_( x1, x2, x3, x4, x5) 0
+/*
 inline BOOL FUtilSystemBetaFeatureEnabled_( const INST * const pinst, BOOL * const rgfStaticFeatures, const UtilSystemBetaSiteMode usbsmCurrent, const ULONG featureid, PCWSTR const wszFeatureName, const BOOL fTestStagingOnly = fFalse )
 {
     extern INT usbsmPrimaryEnvironments;
@@ -207,7 +209,7 @@ inline BOOL FUtilSystemBetaFeatureEnabled_( const INST * const pinst, BOOL * con
 
     return fEnabled;
 }
-
+*/
 
 #define RgfStaticFeatures( pinst )          ( ( pinst == NULL ) ?  NULL : ( (BOOL*)(pinst->m_rgfStaticBetaFeatures) ) )
 #define FUtilSystemBetaFeatureEnabled( pinst, featureid )       \

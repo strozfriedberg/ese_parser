@@ -1520,13 +1520,14 @@ ERR TFileSystemFilter<I>::ErrGetCache(  _In_    CFileFilter* const  pff,
     {
         Call( ErrGetConfiguration( &pbcconfig ) );
         Call( pbcconfig->ErrGetCachedFileConfiguration( wszKeyPath, &pcfconfig ) );
-        Call( m_pcrep->ErrOpenById( this,
-                                    m_pfsconfig,
-                                    pbcconfig,
-                                    pcfh->VolumeidCache(),
-                                    pcfh->FileidCache(),
-                                    pcfh->RgbUniqueIdCache(),
-                                    &pc ) );
+        throw __FUNCTION__;
+        //Call( m_pcrep->ErrOpenById( this,
+        //                            m_pfsconfig,
+        //                            pbcconfig,
+        //                            pcfh->VolumeidCache(),
+        //                            pcfh->FileidCache(),
+        //                            pcfh->RgbUniqueIdCache(),
+        //                            &pc ) );
 
         *ppc = pc;
         *pfAttached = fTrue;

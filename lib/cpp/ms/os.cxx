@@ -1,7 +1,7 @@
 // Copyright (c) Microsoft Corporation.
 // Licensed under the MIT License.
-
 #include "osstd.hxx"
+#include "assert.h"
 
 
 volatile BOOL g_fOsLayerUp = fFalse;
@@ -127,7 +127,7 @@ LOCAL VOID InitFailurePointsFromRegistry()
 
     HKEY hkeyPath;
     DWORD dw = pfnRegOpenKeyExW(    HKEY_LOCAL_MACHINE,
-                                    L"SOFTWARE\\Microsoft\\" WSZVERSIONNAME L"\\Global",
+                                    L"SOFTWARE\\Microsoft\\" /*WSZVERSIONNAME*/ L"\\Global",
                                     0,
                                     KEY_READ,
                                     &hkeyPath );

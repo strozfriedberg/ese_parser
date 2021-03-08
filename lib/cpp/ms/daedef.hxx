@@ -9,14 +9,34 @@
 
 #include "collection.hxx"
 
+#ifndef AssertSz
 #define AssertSz( x, y )
+#endif // !AssertSz
+
+#ifndef ASSERT_VALID
 #define ASSERT_VALID( x )
+#endif // !ASSERT_VALID
+
+#ifndef Error
 #define Error( x )
+#endif // !Error
+
+#ifndef AssertRTL
 #define AssertRTL( x )
-#define AssertSzRTL( x, y )
-#define CallS( x )              (x)
-#define ErrERRCheck( x )        (x)
-#define Alloc( x )              x
+#endif // !AssertRTL
+
+#ifndef AssertSzRTL
+#define AssertSzRTL( x )
+#endif // !AssertSzRTL
+#ifndef CallS
+#define CallS( x )  (x)
+#endif // !CallS
+#ifndef ErrERRCheck
+#define ErrERRCheck( x )  (x)
+#endif // !ErrERRCheck
+#ifndef Alloc
+#define Alloc( x )  x
+#endif // !Alloc
 
 #ifdef DATABASE_FORMAT_CHANGE
 #endif
@@ -85,7 +105,7 @@ enum DIRLOCK { readLock, writeLock };
 
 #define pNil            0
 #define pbNil           ((BYTE *)0)
-#define pinstNil        ((INST *)0)
+#define pinstNil        ((void /*INST*/ *)0)
 #define plineNil        ((LINE *)0)
 #define pkeyNil         ((KEY *)0)
 #define ppibNil         ((PIB *)0)
@@ -2012,8 +2032,8 @@ inline JET_ENGINEFORMATVERSION EfvMaxSupported() { return PfmtversEngineMax()->e
 inline JET_ENGINEFORMATVERSION EfvDefault()      { return EfvMaxSupported(); }
 
 
-ERR ErrGetDesiredVersion( _In_ const INST * const pinstStaging, _In_ const JET_ENGINEFORMATVERSION efv, _Out_ const FormatVersions ** const ppfmtversDesired, const BOOL fTestStagingOnly = fFalse );
-ERR ErrDBFindHighestMatchingDbMajors( _In_ const DbVersion& dbvFromFileHeader, _Out_ const FormatVersions ** const ppfmtversMatching, _In_ const INST * const pinstStaging, const BOOL fDbMayBeTooHigh = fFalse );
+ERR ErrGetDesiredVersion( _In_ const void /*INST*/ * const pinstStaging, _In_ const JET_ENGINEFORMATVERSION efv, _Out_ const FormatVersions ** const ppfmtversDesired, const BOOL fTestStagingOnly = fFalse );
+ERR ErrDBFindHighestMatchingDbMajors( _In_ const DbVersion& dbvFromFileHeader, _Out_ const FormatVersions ** const ppfmtversMatching, _In_ const void /*INST*/ * const pinstStaging, const BOOL fDbMayBeTooHigh = fFalse );
 ERR ErrLGFindHighestMatchingLogMajors( _In_ const LogVersion& lgv, _Out_ const FormatVersions ** const ppfmtversMatching );
 INLINE ERR ErrDBFindHighestMatchingDbMajors( _In_ const DbVersion& dbvFromFileHeader, _Out_ const FormatVersions ** const ppfmtversMatching, const BOOL fDbMayBeTooHigh = fFalse )
 {
@@ -2921,7 +2941,7 @@ struct JetParam
     typedef
     ERR
     PfnGet( const CJetParam* const  pjetparam,
-            INST* const             pinst,
+            void /*INST*/* const             pinst,
             PIB* const              ppib,
             ULONG_PTR* const        pulParam,
             WCHAR* const            wszParam,
@@ -2929,17 +2949,17 @@ struct JetParam
     typedef
     ERR
     PfnSet( CJetParam* const    pjetparam,
-            INST* const         pinst,
+            void /*INST*/* const         pinst,
             PIB* const          ppib,
             const ULONG_PTR     ulParam,
             __in_opt PCWSTR     wszParam );
     typedef
     ERR
     PfnClone(   CJetParam* const    pjetparamSrc,
-                INST* const         pinstSrc,
+                void /*INST*/* const         pinstSrc,
                 PIB* const          ppibSrc,
                 CJetParam* const    pjetparamDst,
-                INST* const         pinstDst,
+                void /*INST*/* const         pinstDst,
                 PIB* const          ppibDst );
 
     const CHAR* m_szParamName;
@@ -2978,21 +2998,21 @@ class CJetParam
 
         CJetParam();
 
-        ERR Get(    INST* const         pinst,
+        ERR Get(    void /*INST*/* const         pinst,
                     PIB* const          ppib,
                     ULONG_PTR* const    pulParam,
                     __out_bcount(cbParamMax) WCHAR* const   wszParam,
                     const size_t        cbParamMax ) const;
-        ERR Set(    INST* const         pinst,
+        ERR Set(    void /*INST*/* const         pinst,
                     PIB* const          ppib,
                     const ULONG_PTR     ulParam,
                     __in_opt PCWSTR     wszParam );
-        ERR Reset(  INST* const         pinst,
+        ERR Reset(  void /*INST*/* const         pinst,
                     const ULONG_PTR     ulpValue );
-        ERR Clone(  INST* const         pinstSrc,
+        ERR Clone(  void /*INST*/* const         pinstSrc,
                     PIB* const          ppibSrc,
                     CJetParam* const    pjetparamDst,
-                    INST* const         pinstDst,
+                    void /*INST*/* const         pinstDst,
                     PIB* const          ppibDst );
 
         Type Type_() const          { return Type( m_type ); }
@@ -3006,103 +3026,103 @@ class CJetParam
     public:
 
         static ERR IgnoreGet(   const CJetParam* const  pjetparam,
-                                INST* const             pinst,
+                                void /*INST*/* const             pinst,
                                 PIB* const              ppib,
                                 ULONG_PTR* const        pulParam,
                                 __out_bcount(cbParamMax) WCHAR* const   wszParam,
                                 const size_t            cbParamMax );
         static ERR IllegalGet(  const CJetParam* const  pjetparam,
-                                INST* const             pinst,
+                                void /*INST*/* const             pinst,
                                 PIB* const              ppib,
                                 ULONG_PTR* const        pulParam,
                                 __out_bcount(cbParamMax) WCHAR* const           wszParam,
                                 const size_t            cbParamMax );
         static ERR GetInteger(  const CJetParam* const  pjetparam,
-                                INST* const             pinst,
+                                void /*INST*/* const             pinst,
                                 PIB* const              ppib,
                                 ULONG_PTR* const        pulParam,
                                 __out_bcount(cbParamMax) WCHAR* const   wszParam,
                                 const size_t            cbParamMax );
         static ERR GetString(   const CJetParam* const  pjetparam,
-                                INST* const             pinst,
+                                void /*INST*/* const             pinst,
                                 PIB* const              ppib,
                                 ULONG_PTR* const        pulParam,
                                 __out_bcount(cbParamMax) WCHAR* const   wszParam,
                                 const size_t            cbParamMax );
 
         static ERR IgnoreSet(   CJetParam* const    pjetparam,
-                                INST* const         pinst,
+                                void /*INST*/* const         pinst,
                                 PIB* const          ppib,
                                 const ULONG_PTR     ulParam,
                                 PCWSTR          wszParam );
         static ERR IllegalSet(  CJetParam* const    pjetparam,
-                                INST* const         pinst,
+                                void /*INST*/* const         pinst,
                                 PIB* const          ppib,
                                 const ULONG_PTR     ulParam,
                                 PCWSTR          wszParam );
         static ERR ValidateSet( CJetParam* const    pjetparam,
-                                INST* const         pinst,
+                                void /*INST*/* const         pinst,
                                 PIB* const          ppib,
                                 const ULONG_PTR     ulParam,
                                 PCWSTR          wszParam,
                                 const BOOL          fString     = fFalse );
         static ERR SetBoolean(  CJetParam* const    pjetparam,
-                                INST* const         pinst,
+                                void /*INST*/* const         pinst,
                                 PIB* const          ppib,
                                 const ULONG_PTR     ulParam,
                                 PCWSTR          wszParam );
         static ERR SetGrbit(    CJetParam* const    pjetparam,
-                                INST* const         pinst,
+                                void /*INST*/* const         pinst,
                                 PIB* const          ppib,
                                 const ULONG_PTR     ulParam,
                                 PCWSTR          wszParam );
         static ERR SetInteger(  CJetParam* const    pjetparam,
-                                INST* const         pinst,
+                                void /*INST*/* const         pinst,
                                 PIB* const          ppib,
                                 const ULONG_PTR     ulParam,
                                 PCWSTR          wszParam );
         static ERR SetString(   CJetParam* const    pjetparam,
-                                INST* const         pinst,
+                                void /*INST*/* const         pinst,
                                 PIB* const          ppib,
                                 const ULONG_PTR     ulParam,
                                 PCWSTR          wszParam );
         static ERR SetPointer(  CJetParam* const    pjetparam,
-                                INST* const         pinst,
+                                void /*INST*/* const         pinst,
                                 PIB* const          ppib,
                                 const ULONG_PTR     ulParam,
                                 PCWSTR          wszParam );
         static ERR SetFolder(   CJetParam* const    pjetparam,
-                                INST* const         pinst,
+                                void /*INST*/* const         pinst,
                                 PIB* const          ppib,
                                 const ULONG_PTR     ulParam,
                                 PCWSTR          wszParam );
         static ERR SetPath( CJetParam* const    pjetparam,
-                            INST* const         pinst,
+                            void /*INST*/* const         pinst,
                             PIB* const          ppib,
                             const ULONG_PTR     ulParam,
                             PCWSTR          wszParam );
         static ERR SetBlockSize(    CJetParam* const    pjetparam,
-                                    INST* const         pinst,
+                                    void /*INST*/* const         pinst,
                                     PIB* const          ppib,
                                     const ULONG_PTR     ulParam,
                                     PCWSTR          wszParam );
         static ERR CloneDefault(    CJetParam* const    pjetparamSrc,
-                                    INST* const         pinstSrc,
+                                    void /*INST*/* const         pinstSrc,
                                     PIB* const          ppibSrc,
                                     CJetParam* const    pjetparamDst,
-                                    INST* const         pinstDst,
+                                    void /*INST*/* const         pinstDst,
                                     PIB* const          ppibDst );
         static ERR CloneString(     CJetParam* const    pjetparamSrc,
-                                    INST* const         pinstSrc,
+                                    void /*INST*/* const         pinstSrc,
                                     PIB* const          ppibSrc,
                                     CJetParam* const    pjetparamDst,
-                                    INST* const         pinstDst,
+                                    void /*INST*/* const         pinstDst,
                                     PIB* const          ppibDst );
         static ERR IllegalClone(    CJetParam* const    pjetparamSrc,
-                                    INST* const         pinstSrc,
+                                    void /*INST*/* const         pinstSrc,
                                     PIB* const          ppibSrc,
                                     CJetParam* const    pjetparamDst,
-                                    INST* const         pinstDst,
+                                    void /*INST*/* const         pinstDst,
                                     PIB* const          ppibDst );
 };
 
@@ -3292,18 +3312,18 @@ public:
 
     void    SnapshotThreadProc( const ULONG ulTimeOut );
 
-    ERR     ErrTruncateLogs( INST * pinstTruncate, const JET_GRBIT grbit);
+    ERR     ErrTruncateLogs( void /*INST*/ * pinstTruncate, const JET_GRBIT grbit);
 
     void    SaveSnapshotInfo(const JET_GRBIT grbit);
 
-    void    ResetBackupInProgress( const INST * pinstLastBackupInProgress );
+    void    ResetBackupInProgress( const void /*INST*/ * pinstLastBackupInProgress );
 
 private:
     ERR     ErrFreeze();
     void    Thaw( const BOOL fTimeOut );
 
     ERR     ErrFreezeInstance();
-    void    ThawInstance( const INST * pinstLastAPI = NULL, const INST * pinstLastCheckpoint = NULL, const INST * pinstLastLGFlush = NULL );
+    void    ThawInstance( const void /*INST*/ * pinstLastAPI = NULL, const void /*INST*/ * pinstLastCheckpoint = NULL, const void /*INST*/ * pinstLastLGFlush = NULL );
 
 
     ERR     ErrFreezeDatabase();
@@ -3348,14 +3368,14 @@ public:
     void                ResetContinueAfterThaw()        { m_fContinueAfterThaw = fFalse; }
     BOOL                FContinueAfterThaw() const      { return m_fContinueAfterThaw; }
 
-    BOOL                FFreezeInstance( const INST * pinst ) const;
+    BOOL                FFreezeInstance( const void /*INST*/ * pinst ) const;
 
 private:
     BOOL                m_fFreezeAllInstances;
     INT                 m_ipinstCurrent;
-    INST *              GetFirstInstance();
-    INST *              GetNextInstance();
-    INST *              GetNextNotNullInstance();
+    void /*INST*/ *              GetFirstInstance();
+    void /*INST*/ *              GetNextInstance();
+    void /*INST*/ *              GetNextNotNullInstance();
 
     void                SetFreezeInstances();
 
@@ -3391,7 +3411,7 @@ private:
     static JET_OSSNAPID g_idSnapshot;
 
 
-    static const INST * const g_pinstInvalid;
+    static const void /*INST*/ * const g_pinstInvalid;
 
 };
 
@@ -3422,7 +3442,7 @@ typedef struct
 class BACKUP_CONTEXT : public CZeroInit
 {
 public:
-    BACKUP_CONTEXT( INST * pinst );
+    BACKUP_CONTEXT( void /*INST*/ * pinst );
 
     ERR ErrBKBackup(
         const WCHAR *wszBackup,
@@ -3600,7 +3620,7 @@ public:
 
 private:
 
-    INST            *m_pinst;
+    void /*INST*/            *m_pinst;
 
     BACKUP_STATUS m_fBackupStatus;
 
@@ -4051,15 +4071,15 @@ static const INT perfStatusRuntime          = 3;
 static const INT perfStatusTerm             = 4;
 static const INT perfStatusError            = 5;
 
-
-class INST
+#if 0
+class void /*INST*/
     :   public CZeroInit
 {
-    friend class APICALL_INST;
+    friend class APICALL_void /*INST*/;
 public:
 
-    INST( INT iInstance );
-    ~INST();
+    void /*INST*/( INT iInstance );
+    ~void /*INST*/();
 
 #pragma push_macro( "new" )
 #undef new
@@ -4069,11 +4089,11 @@ public:
     public:
         void* operator new( size_t cbAlloc )
         {
-            return RESINST.PvRESAlloc_( SzNewFile(), UlNewLine() );
+            return RESvoid /*INST*/.PvRESAlloc_( SzNewFile(), UlNewLine() );
         }
         void operator delete( void* pv )
         {
-            RESINST.Free( pv );
+            RESvoid /*INST*/.Free( pv );
         }
 #pragma pop_macro( "new" )
 
@@ -4085,7 +4105,7 @@ public:
     BOOL                m_fJetInitialized;
     BOOL                m_fTermInProgress;
     BOOL                m_fTermAbruptly;
-    INST_STINIT         m_fSTInit;
+    void /*INST*/_STINIT         m_fSTInit;
     INT                 m_perfstatusEvent;
     
     BOOL                m_fBackupAllowed;
@@ -4192,7 +4212,7 @@ private:
 
     const VOID * const  m_rgEDBGGlobals;
     const VOID * const  m_rgfmp;
-    INST ** const       m_rgpinst;
+    void /*INST*/ ** const       m_rgpinst;
 
     struct ListNodePPIB
     {
@@ -4259,22 +4279,22 @@ public:
 private:
     ERR ErrAPIAbandonEnter_( const LONG lOld );
 
-    static ERR ErrINSTCreateTempDatabase_( void* const pvInst );
+    static ERR Errvoid /*INST*/CreateTempDatabase_( void* const pvInst );
 
 public:
 
     friend
     ERR ErrNewInst(
-        INST **         ppinst,
+        void /*INST*/ **         ppinst,
         const WCHAR *   wszInstanceName,
         const WCHAR *   wszDisplayName,
         INT *           pipinst );
 
-    ERR ErrINSTInit();
+    ERR Errvoid /*INST*/Init();
 
-    ERR ErrINSTTerm( TERMTYPE termtype );
+    ERR Errvoid /*INST*/Term( TERMTYPE termtype );
 
-    ERR ErrINSTCreateTempDatabase();
+    ERR Errvoid /*INST*/CreateTempDatabase();
 
     VOID SaveDBMSParams( DBMS_PARAM *pdbms_param );
     VOID RestoreDBMSParams( DBMS_PARAM *pdbms_param );
@@ -4354,20 +4374,21 @@ public:
     static BOOL FOwnerCritInst();
 #endif
 
-    static INST * GetInstanceByName( PCWSTR wszInstanceName );
-    static INST * GetInstanceByFullLogPath( PCWSTR wszLogPath );
+    static void /*INST*/ * GetInstanceByName( PCWSTR wszInstanceName );
+    static void /*INST*/ * GetInstanceByFullLogPath( PCWSTR wszLogPath );
 
     static LONG AllocatedInstances() { return cInstancesCounter; }
     static LONG IncAllocInstances() { return AtomicIncrement( &cInstancesCounter ); }
     static LONG DecAllocInstances() { return AtomicDecrement( &cInstancesCounter ); }
-    static ERR  ErrINSTSystemInit();
-    static VOID INSTSystemTerm();
+    static ERR  Errvoid /*INST*/SystemInit();
+    static VOID void /*INST*/SystemTerm();
 };
+#endif
 
-VOID FreePinst( INST *pinst );
+VOID FreePinst( void /*INST*/ *pinst );
 
 extern ULONG    g_cpinstMax;
-extern INST **  g_rgpinst;
+extern void /*INST*/ **  g_rgpinst;
 
 extern IFileSystemConfiguration* const g_pfsconfigGlobal;
 
@@ -4375,7 +4396,7 @@ extern IFileSystemConfiguration* const g_pfsconfigGlobal;
 #include "perfctrs.hxx"
 
 
-INLINE ULONG IpinstFromPinst( INST *pinst )
+INLINE ULONG IpinstFromPinst( void /*INST*/ *pinst )
 {
     ULONG   ipinst;
 
@@ -4413,13 +4434,13 @@ INLINE void UtilAssertCriticalSectionCanDoIO()
 #endif
 }
 
-
-INLINE BOOL INST::FInstanceUnavailable() const
+#if 0
+INLINE BOOL void /*INST*/::FInstanceUnavailable() const
 {
     return ( JET_errSuccess != m_errInstanceUnavailable );
 }
 
-INLINE ERR INST::ErrInstanceUnavailableErrorCode() const
+INLINE ERR void /*INST*/::ErrInstanceUnavailableErrorCode() const
 {
     Assert( FInstanceUnavailable() );
 
@@ -4430,7 +4451,7 @@ INLINE ERR INST::ErrInstanceUnavailableErrorCode() const
 }
 
 
-INLINE ERR INST::ErrCheckForTermination() const
+INLINE ERR void /*INST*/::ErrCheckForTermination() const
 {
     if( m_fStopJetService )
     {
@@ -4438,6 +4459,7 @@ INLINE ERR INST::ErrCheckForTermination() const
     }
     return JET_errSuccess;
 }
+#endif
 
 template< class CEntry >
 class CSimpleHashTable
@@ -4554,13 +4576,15 @@ inline BOOL FJetConfigRunSilent()
 }
 
 
-inline CJetParam* const Param_( const INST* const pinst, const ULONG paramid )
+inline CJetParam* const Param_( const void /*INST*/* const pinst, const ULONG paramid )
 {
+    throw __FUNCTION__;
+    #if 0
     extern CJetParam* const g_rgparam;
     CJetParam*              pjetparam   = NULL;
 
     Assert( pinst != pinstNil ||
-            ( 0 == INST::AllocatedInstances() ) ||
+            ( 0 == void /*INST*/::AllocatedInstances() ) ||
             g_rgparam[ paramid ].FGlobal() );
 
     if ( pinst == pinstNil || g_rgparam[ paramid ].FGlobal() )
@@ -4573,9 +4597,10 @@ inline CJetParam* const Param_( const INST* const pinst, const ULONG paramid )
     }
 
     return pjetparam;
+    #endif
 }
 
-inline CJetParam* const Param( const INST* const pinst, const ULONG paramid )
+inline CJetParam* const Param( const void /*INST*/* const pinst, const ULONG paramid )
 {
     extern CJetParam* const g_rgparam;
 
@@ -4589,7 +4614,7 @@ inline CJetParam* const Param( const INST* const pinst, const ULONG paramid )
 }
 
 inline ERR SetParam(
-            INST* const         pinst,
+            void /*INST*/* const         pinst,
             PIB* const          ppib,
             const ULONG paramid,
             const ULONG_PTR     ulParam,
@@ -4602,7 +4627,7 @@ inline BOOL BoolParam( const ULONG paramid )
 {
     return (BOOL)Param( pinstNil, paramid )->Value();
 }
-inline BOOL BoolParam( const INST* const pinst, const ULONG paramid )
+inline BOOL BoolParam( const void /*INST*/* const pinst, const ULONG paramid )
 {
     return (BOOL)Param( pinst, paramid )->Value();
 }
@@ -4610,7 +4635,7 @@ inline JET_GRBIT GrbitParam( const ULONG paramid )
 {
     return (JET_GRBIT)Param( pinstNil, paramid )->Value();
 }
-inline JET_GRBIT GrbitParam( const INST* const pinst, const ULONG paramid )
+inline JET_GRBIT GrbitParam( const void /*INST*/* const pinst, const ULONG paramid )
 {
     return (JET_GRBIT)Param( pinst, paramid )->Value();
 }
@@ -4618,7 +4643,7 @@ inline ULONG_PTR UlParam( const ULONG paramid )
 {
     return (ULONG_PTR)Param( pinstNil, paramid )->Value();
 }
-inline ULONG_PTR UlParam( const INST* const pinst, const ULONG paramid )
+inline ULONG_PTR UlParam( const void /*INST*/* const pinst, const ULONG paramid )
 {
     return (ULONG_PTR)Param( pinst, paramid )->Value();
 }
@@ -4626,7 +4651,7 @@ inline PCWSTR SzParam( const ULONG paramid )
 {
     return (WCHAR*)Param( pinstNil, paramid )->Value();
 }
-inline PCWSTR SzParam( const INST* const pinst, const ULONG paramid )
+inline PCWSTR SzParam( const void /*INST*/* const pinst, const ULONG paramid )
 {
     return (WCHAR*)Param( pinst, paramid )->Value();
 }
@@ -4634,7 +4659,7 @@ inline const void* PvParam( const ULONG paramid )
 {
     return (void*)Param( pinstNil, paramid )->Value();
 }
-inline const void* PvParam( const INST* const pinst, const ULONG paramid )
+inline const void* PvParam( const void /*INST*/* const pinst, const ULONG paramid )
 {
     return (void*)Param( pinst, paramid )->Value();
 }
@@ -4643,7 +4668,7 @@ inline BOOL FDefaultParam( const ULONG paramid )
 {
     return !Param( pinstNil, paramid )->FWritten();
 }
-inline BOOL FDefaultParam( const INST* const pinst, const ULONG paramid )
+inline BOOL FDefaultParam( const void /*INST*/* const pinst, const ULONG paramid )
 {
     return !Param( pinst, paramid )->FWritten();
 }
@@ -4699,7 +4724,7 @@ class TableClassNamesLifetimeManager
             if ( !m_wszTableClassNames )
             {
                 Assert( m_cchTableClassNames == 0 );
-                Alloc( m_wszTableClassNames = new WCHAR[cchTableClassNames] );
+                /*Alloc(*/ m_wszTableClassNames = new WCHAR[cchTableClassNames] /*)*/;
                 memset( m_wszTableClassNames, 0, cchTableClassNames * sizeof( m_wszTableClassNames[0] ) );
             }
 
@@ -4722,7 +4747,7 @@ class TableClassNamesLifetimeManager
 LONG CbSYSMaxPageSize();
 
 
-LONG CbINSTMaxPageSize( const INST * const pinst );
+LONG CbINSTMaxPageSize( const void /*INST*/ * const pinst );
 
 #define g_cbPage    ((LONG)UlParam( JET_paramDatabasePageSize ))
 
@@ -4809,7 +4834,7 @@ inline bool FErrIsDbHeaderCorruption( __in const ERR err )
     return ( JET_errReadVerifyFailure == err ) || ( JET_errDiskReadVerificationFailure == err );
 }
 
-INLINE ULONG_PTR PctINSTCachePriority( const INST* const pinst )
+INLINE ULONG_PTR PctINSTCachePriority( const void /*INST*/* const pinst )
 {
     Assert( pinst != pinstNil );
     const ULONG_PTR pctCachePriority = UlParam( pinst, JET_paramCachePriority );

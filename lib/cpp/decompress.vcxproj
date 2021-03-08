@@ -22,7 +22,7 @@
     <ConfigurationType>Application</ConfigurationType>
     <UseDebugLibraries>true</UseDebugLibraries>
     <PlatformToolset>v142</PlatformToolset>
-    <CharacterSet>Unicode</CharacterSet>
+    <CharacterSet>MultiByte</CharacterSet>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'" Label="Configuration">
     <ConfigurationType>Application</ConfigurationType>
@@ -53,10 +53,10 @@
     <ClCompile>
       <WarningLevel>Level3</WarningLevel>
       <SDLCheck>true</SDLCheck>
-      <PreprocessorDefinitions>ESENT;_DEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <PreprocessorDefinitions>ESENT;SORTPP_PASS;_DEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <ConformanceMode>true</ConformanceMode>
       <RuntimeLibrary>MultiThreadedDebug</RuntimeLibrary>
-      <DisableSpecificWarnings>4267</DisableSpecificWarnings>
+      <DisableSpecificWarnings>4267;4291</DisableSpecificWarnings>
     </ClCompile>
     <Link>
       <SubSystem>Console</SubSystem>
@@ -69,10 +69,10 @@
       <FunctionLevelLinking>true</FunctionLevelLinking>
       <IntrinsicFunctions>true</IntrinsicFunctions>
       <SDLCheck>true</SDLCheck>
-      <PreprocessorDefinitions>ESENT;NDEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <PreprocessorDefinitions>ESENT;SORTPP_PASS;NDEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <ConformanceMode>true</ConformanceMode>
       <RuntimeLibrary>MultiThreaded</RuntimeLibrary>
-      <DisableSpecificWarnings>4267</DisableSpecificWarnings>
+      <DisableSpecificWarnings>4267;4291</DisableSpecificWarnings>
     </ClCompile>
     <Link>
       <SubSystem>Console</SubSystem>
@@ -83,7 +83,41 @@
   </ItemDefinitionGroup>
   <ItemGroup>
     <ClCompile Include="decompress.cpp" />
+    <ClCompile Include="ms\checksum.cxx" />
+    <ClCompile Include="ms\checksum_amd64.cxx" />
+    <ClCompile Include="ms\checksum_avx.cxx" />
+    <ClCompile Include="ms\config.cxx" />
+    <ClCompile Include="ms\cprintf.cxx" />
+    <ClCompile Include="ms\currproc.cxx" />
+    <ClCompile Include="ms\dllentry.cxx" />
+    <ClCompile Include="ms\edbg.cxx" />
+    <ClCompile Include="ms\encrypt.cxx" />
+    <ClCompile Include="ms\error.cxx" />
+    <ClCompile Include="ms\event.cxx" />
+    <ClCompile Include="ms\hapublish.cxx" />
+    <ClCompile Include="ms\library.cxx" />
+    <ClCompile Include="ms\math.cxx" />
     <ClCompile Include="ms\memory.cxx" />
+    <ClCompile Include="ms\norm.cxx" />
+    <ClCompile Include="ms\os.cxx" />
+    <ClCompile Include="ms\osblockcache.cxx" />
+    <ClCompile Include="ms\osdiag.cxx" />
+    <ClCompile Include="ms\osdisk.cxx" />
+    <ClCompile Include="ms\oseventtrace.cxx" />
+    <ClCompile Include="ms\osfile.cxx" />
+    <ClCompile Include="ms\osfs.cxx" />
+    <ClCompile Include="ms\ostimerqueue.cxx" />
+    <ClCompile Include="ms\perfmon.cxx" />
+    <ClCompile Include="ms\reftrace.cxx" />
+    <ClCompile Include="ms\string.cxx" />
+    <ClCompile Include="ms\sync.cxx" />
+    <ClCompile Include="ms\sysinfo.cxx" />
+    <ClCompile Include="ms\task.cxx" />
+    <ClCompile Include="ms\thread.cxx" />
+    <ClCompile Include="ms\time.cxx" />
+    <ClCompile Include="ms\trace.cxx" />
+    <ClCompile Include="ms\violated.cxx" />
+    <ClCompile Include="ms\_xpress\xdecode.c" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">

@@ -26,7 +26,6 @@
 #define COLLAssertTrack( X )
 #define MSINTERNAL
 
-class INST;
 using JET_RESID                 = int;
 using JET_RESOPER               = int;
 using JET_RECSIZE3              = void;
@@ -41,7 +40,7 @@ BOOL FOSLayerUp();
 #include "ms/cc.hxx"
 #include "ms/types.hxx"
 #include "ms/memory.hxx"
-//#include "ms/error.hxx"
+#include "ms/osstd.hxx"
 #include "ms/math.hxx"
 #include "ms/thread.hxx"
 #include "ms/sync.hxx"
@@ -59,7 +58,7 @@ BOOL FOSLayerUp();
 #include "ms/stat.hxx"
 #include "ms/daedef.hxx"
 
-#define Call( x )   x
+#include "ms/_xpress/xpress.h"
 
 struct CDataCompressor {
     enum COMPRESSION_SCHEME
@@ -114,6 +113,19 @@ struct CDataCompressor {
         const BOOL fForceSoftwareDecompression,
         BOOL * pfUsedCorsica );
     #endif
+
+    INT m_cdecodeCachedMax;
+    XpressDecodeStream* m_rgdecodeXpress;
+    ERR ErrXpressDecodeOpen_( _Out_ XpressDecodeStream * const pdecode );
+    void XpressDecodeClose_( XpressDecodeStream decode );
+    void XpressDecodeRelease_( XpressDecodeStream decode );
+
+    static void * XPRESS_CALL PvXpressAlloc_(
+        _In_opt_ void * pvContext,
+        INT             cbAlloc );
+    static void XPRESS_CALL XpressFree_(
+        _In_opt_ void *             pvContext,
+        _Post_ptr_invalid_ void *   pvAlloc );
 };
 
 ERR CDataCompressor::ErrDecompress(
@@ -167,10 +179,297 @@ ERR CDataCompressor::ErrDecompress(
         Assert( JET_wrnBufferTruncated == err );
     }
 
-//HandleError:
+HandleError:
     Expected( ( bIdentifier != COMPRESS_SCRUB ) || ( err == wrnRECCompressionScrubDetected ) );
 
     return err;
+}
+
+ERR CDataCompressor::ErrDecompress7BitAscii_(
+    const DATA& dataCompressed,
+    _Out_writes_bytes_to_opt_( cbDataMax, *pcbDataActual ) BYTE * const pbData,
+    const INT cbDataMax,
+    _Out_ INT * const pcbDataActual )
+{
+    ERR err = JET_errSuccess;
+
+    const BYTE * const pbCompressed = (BYTE *)dataCompressed.Pv();
+    const BYTE bHeader = *(BYTE *)dataCompressed.Pv();
+    const BYTE bIdentifier = bHeader >> 3;
+    Assert( bIdentifier == COMPRESS_7BITASCII );
+    const INT cbitFinal = (bHeader & 0x7)+1;
+    Assert( cbitFinal > 0 );
+    Assert( cbitFinal <= 8 );
+
+    const INT cbitTotal = ( ( dataCompressed.Cb() - 2 ) * 8 ) + cbitFinal;
+    Assert( 0 == cbitTotal % 7 );
+    const INT cbTotal = cbitTotal / 7;
+
+    *pcbDataActual = cbTotal;
+    if( cbTotal > cbDataMax )
+    {
+        err = ErrERRCheck( JET_wrnBufferTruncated );
+    }
+
+    if( 0 == cbDataMax || NULL == pbData )
+    {
+        goto HandleError;
+    }
+
+    {
+        const INT ibDataMax = min(cbTotal, cbDataMax);
+
+        INT ibCompressed = 1;
+        INT ibitCompressed = 0;
+        for (INT ibData = 0; ibData < ibDataMax; ++ibData)     {
+            Assert(ibCompressed < dataCompressed.Cb());
+            BYTE bDecompressed;
+            if (ibitCompressed <= 1)         {
+                const BYTE bCompressed = pbCompressed[ibCompressed];
+                bDecompressed = (BYTE)((bCompressed >> ibitCompressed) & 0x7F);
+            }
+            else         {
+                Assert(ibCompressed < dataCompressed.Cb() - 1);
+                const WORD wCompressed = (WORD)pbCompressed[ibCompressed] | ((WORD)pbCompressed[ibCompressed + 1] << 8);
+                bDecompressed = (BYTE)((wCompressed >> ibitCompressed) & 0x7F);
+            }
+            pbData[ibData] = bDecompressed;
+            ibitCompressed += 7;
+            if (ibitCompressed >= 8)         {
+                ibitCompressed = (ibitCompressed % 8);
+                ++ibCompressed;
+            }
+        }
+    }
+HandleError:
+    #pragma prefast(suppress : 26030, "In case of JET_wrnBufferTruncated, we return what the buffer size should be.")
+    return err;
+}
+
+ERR CDataCompressor::ErrDecompress7BitUnicode_(
+    const DATA& dataCompressed,
+    _Out_writes_bytes_to_opt_( cbDataMax, *pcbDataActual ) BYTE * const pbData,
+    const INT cbDataMax,
+    _Out_ INT * const pcbDataActual )
+{
+    ERR err = JET_errSuccess;
+
+    const BYTE * const pbCompressed = (BYTE *)dataCompressed.Pv();
+    const BYTE bHeader = *(BYTE *)dataCompressed.Pv();
+    const BYTE bIdentifier = bHeader >> 3;
+    Assert( bIdentifier == COMPRESS_7BITUNICODE );
+    const INT cbitFinal = (bHeader & 0x7)+1;
+    Assert( cbitFinal > 0 );
+    Assert( cbitFinal <= 8 );
+
+    const INT cbitTotal = ( ( dataCompressed.Cb() - 2 ) * 8 ) + cbitFinal;
+    Assert( 0 == cbitTotal % 7 );
+    const INT cwTotal = cbitTotal / 7;
+
+    *pcbDataActual = cwTotal * sizeof(WORD);
+    if( *pcbDataActual > cbDataMax )
+    {
+        err = ErrERRCheck( JET_wrnBufferTruncated );
+    }
+
+    if( 0 == cbDataMax || NULL == pbData )
+    {
+        goto HandleError;
+    }
+
+    {
+        const INT ibDataMax = min(*pcbDataActual, cbDataMax);
+
+        INT ibCompressed = 1;
+        INT ibitCompressed = 0;
+        for (INT ibData = 0; ibData < ibDataMax; )     {
+            Assert(ibCompressed < dataCompressed.Cb());
+            BYTE bDecompressed;
+            if (ibitCompressed <= 1)         {
+                const BYTE bCompressed = pbCompressed[ibCompressed];
+                bDecompressed = (BYTE)((bCompressed >> ibitCompressed) & 0x7F);
+            }
+            else         {
+                Assert(ibCompressed < dataCompressed.Cb() - 1);
+                const WORD wCompressed = (WORD)pbCompressed[ibCompressed] | ((WORD)pbCompressed[ibCompressed + 1] << 8);
+                bDecompressed = (BYTE)((wCompressed >> ibitCompressed) & 0x7F);
+            }
+
+            pbData[ibData++] = bDecompressed;
+            if (ibData >= ibDataMax)         {
+                break;
+            }
+            pbData[ibData++] = 0x0;
+            if (ibData >= ibDataMax)         {
+                break;
+            }
+
+            ibitCompressed += 7;
+            if (ibitCompressed >= 8)         {
+                ibitCompressed = (ibitCompressed % 8);
+                ++ibCompressed;
+            }
+        }
+    }
+
+HandleError:
+    #pragma prefast(suppress : 26030, "In case of JET_wrnBufferTruncated, we return what the buffer size should be.")
+    return err;
+}
+
+ERR CDataCompressor::ErrDecompressXpress_(
+    const DATA& dataCompressed,
+    _Out_writes_bytes_to_opt_( cbDataMax, *pcbDataActual ) BYTE * const pbData,
+    const INT cbDataMax,
+    _Out_ INT * const pcbDataActual)
+{
+    ERR err = JET_errSuccess;
+    PERFOptDeclare( const HRT hrtStart = HrtHRTCount() );
+
+    XpressDecodeStream decode = 0;
+
+    const BYTE * const  pbCompressed    = (BYTE *)dataCompressed.Pv();
+    const UnalignedLittleEndian<WORD> * const pwSize    = (UnalignedLittleEndian<WORD> *)(pbCompressed + 1);
+    const INT cbUncompressed            = *pwSize;
+
+    const BYTE bHeader      = *(BYTE *)dataCompressed.Pv();
+    OnDebug( const BYTE bIdentifier     = bHeader >> 3 );
+    Assert( bIdentifier == COMPRESS_XPRESS );
+
+    *pcbDataActual = cbUncompressed;
+
+    const INT cbHeader              = sizeof(BYTE) + sizeof(WORD);
+    const BYTE * pbCompressedData   = (BYTE *)dataCompressed.Pv() + cbHeader;
+    const INT cbCompressedData      = dataCompressed.Cb() - cbHeader;
+    const INT cbWanted              = min( *pcbDataActual, cbDataMax );
+
+    if ( NULL == pbData || 0 == cbDataMax )
+    {
+        err = ErrERRCheck( JET_wrnBufferTruncated );
+        goto HandleError;
+    }
+
+    Assert( cbWanted <= cbUncompressed );
+
+    Call( ErrXpressDecodeOpen_( &decode ) );
+
+    {
+        const INT cbDecoded = XpressDecode(
+            decode,
+            pbData,
+            cbUncompressed,
+            cbWanted,
+            pbCompressedData,
+            cbCompressedData);
+        if (-1 == cbDecoded)     {
+            Call(ErrERRCheck(JET_errDecompressionFailed));
+        }
+        Assert(cbDecoded == cbWanted);
+
+        if (cbUncompressed > cbDataMax)     {
+            err = ErrERRCheck(JET_wrnBufferTruncated);
+        }
+    }
+HandleError:
+    XpressDecodeClose_( decode );
+
+    if ( err >= JET_errSuccess )
+    {
+        PERFOpt( pstats->AddDecompressionBytes( cbWanted ) );
+        PERFOpt( pstats->IncDecompressionCalls() );
+        PERFOpt( pstats->AddDecompressionDhrts( HrtHRTCount() - hrtStart ) );
+    }
+
+    #pragma prefast(suppress : 26030, "In case of JET_wrnBufferTruncated, we return what the buffer size should be.")
+    return err;
+}
+
+ERR CDataCompressor::ErrDecompressScrub_(
+    const DATA& data )
+{
+    #ifdef DEBUG
+    const BYTE * const pbData = (BYTE *)data.Pv();
+    const INT cbData = data.Cb();
+    Assert( cbData >= 1 );
+    const BYTE bHeader = pbData[0];
+    const BYTE bIdentifier = bHeader >> 3;
+
+    Assert( bIdentifier == COMPRESS_SCRUB );
+    Expected( ( bHeader & 0x07 ) == 0 );
+
+    if ( cbData > 1 )
+    {
+        const CHAR chKnownPattern = pbData[1];
+
+        Expected( chKnownPattern == chSCRUBLegacyLVChunkFill || chKnownPattern == chSCRUBDBMaintLVChunkFill );
+
+        const INT cbKnownPattern = cbData - 1;
+        BYTE* pbKnownPattern = new BYTE[cbKnownPattern];
+        if ( pbKnownPattern != NULL )
+        {
+            memset( pbKnownPattern, chKnownPattern, cbKnownPattern );
+            Assert( memcmp( pbKnownPattern, pbData + 1, cbKnownPattern ) == 0 );
+        }
+        delete [] pbKnownPattern;
+    }
+    #endif
+    return 0; //ErrERRCheck( wrnRECCompressionScrubDetected );
+}
+
+ERR CDataCompressor::ErrXpressDecodeOpen_( _Out_ XpressDecodeStream * const pdecode )
+{
+    C_ASSERT( sizeof(void*) == sizeof(XpressDecodeStream) );
+
+    *pdecode = 0;
+
+    XpressDecodeStream decode = GetCachedPtr<XpressDecodeStream>( m_rgdecodeXpress, m_cdecodeCachedMax );
+    if( 0 != decode )
+    {
+        *pdecode = decode;
+        return JET_errSuccess;
+    }
+
+    decode = XpressDecodeCreate(
+        0,
+        PvXpressAlloc_ );
+    if (NULL == decode)
+    {
+        return ErrERRCheck( JET_errOutOfMemory );
+    }
+    *pdecode = decode;
+    return JET_errSuccess;
+}
+
+void CDataCompressor::XpressDecodeClose_( XpressDecodeStream decode )
+{
+    if ( decode )
+    {
+        if( FCachePtr<XpressDecodeStream>( decode, m_rgdecodeXpress, m_cdecodeCachedMax ) )
+        {
+            return;
+        }
+
+        XpressDecodeRelease_( decode );
+    }
+}
+
+void * XPRESS_CALL CDataCompressor::PvXpressAlloc_( _In_opt_ void * pvContext, INT cbAlloc )
+{
+    return new BYTE[cbAlloc];
+}
+
+void XPRESS_CALL CDataCompressor::XpressFree_( _In_opt_ void * pvContext, _Post_ptr_invalid_ void * pvAlloc )
+{
+    delete [] pvAlloc;
+}
+
+
+void CDataCompressor::XpressDecodeRelease_( XpressDecodeStream decode )
+{
+    if ( decode )
+    {
+        XpressDecodeClose( decode, 0, XpressFree_ );
+    }
 }
 
 

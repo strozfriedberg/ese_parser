@@ -5,6 +5,8 @@
 
 #include "_common.hxx"
 
+#define rand_s( x )     throw __FUNCTION__
+
 class CBlockCacheHeaderHelpers
 {
     public:

@@ -5154,30 +5154,28 @@ InvasiveRedBlackTree<KEY, CObject, OffsetOfILE>::ErrInsert_( const KEY& key, Nod
         goto HandleError;
     }
 
-    Node* pnodeRoot = *ppnodeRoot;
-
-    if( key == pnodeRoot->Key() )
     {
-        err = ERR::errDuplicateEntry;
-    }
-    else if( key < pnodeRoot->Key() )
-    {
-        Node * pnodeT = pnodeRoot->PnodeLeft();
-        err = ErrInsert_( key, pnodeNew, &pnodeT );
-        pnodeRoot->SetLeft( pnodeT );
-    }
-    else
-    {
-        COLLAssert( key > pnodeRoot->Key() );
-        Node * pnodeT = pnodeRoot->PnodeRight();
-        err = ErrInsert_( key, pnodeNew, &pnodeT );
-        pnodeRoot->SetRight( pnodeT );
-    }
+        Node* pnodeRoot = *ppnodeRoot;
 
-    pnodeRoot = Fixup_( pnodeRoot );
-    pnodeRoot->AssertValid();
-    *ppnodeRoot = pnodeRoot;
+        if (key == pnodeRoot->Key())     {
+            err = ERR::errDuplicateEntry;
+        }
+        else if (key < pnodeRoot->Key())     {
+            Node* pnodeT = pnodeRoot->PnodeLeft();
+            err = ErrInsert_(key, pnodeNew, &pnodeT);
+            pnodeRoot->SetLeft(pnodeT);
+        }
+        else     {
+            COLLAssert(key > pnodeRoot->Key());
+            Node* pnodeT = pnodeRoot->PnodeRight();
+            err = ErrInsert_(key, pnodeNew, &pnodeT);
+            pnodeRoot->SetRight(pnodeT);
+        }
 
+        pnodeRoot = Fixup_(pnodeRoot);
+        pnodeRoot->AssertValid();
+        *ppnodeRoot = pnodeRoot;
+    }
 HandleError:
     COLLAssert( ERR::errSuccess == err || ERR::errOutOfMemory == err || ERR::errDuplicateEntry == err );
     return err;

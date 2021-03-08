@@ -6,8 +6,6 @@
 
 #include <winioctl.h>
 
-
-
 #ifndef OS_LAYER_VIOLATIONS
 HANDLE HOSLayerTestGetFileHandle( IFileAPI * pfapi )
 {
@@ -1001,7 +999,8 @@ USHORT UsEvenRand( const USHORT usRangeMax )
 {
     Expected( usRangeMax <= 4100 );
     unsigned int uiT;
-    errno_t errnoT = rand_s( &uiT );
+    //errno_t errnoT = 
+        rand_s( &uiT );
     AssertSz( errnoT == 0, "rand_s() returned %d\n", errnoT );
     return (USHORT)( uiT % (ULONG)usRangeMax );
 }
@@ -1289,46 +1288,40 @@ ERR ErrIOWriteContiguous(   IFileAPI* const                         pfapi,
         fAllocatedFromHeap = fTrue;
     }
 
-
-    QWORD ibOffsetCurrent = ibOffset;
-    size_t iData = 0;
-    for ( iData = 0; iData < cData; ++iData )
     {
-        Assert( rgcbData[iData] );
-        TraceContextScope tcScope;
-        *tcScope = rgtc[ iData ];
-        err = pfapi->ErrIOWrite(    *tcScope,
-                                    ibOffsetCurrent,
-                                    rgcbData[iData],
-                                    rgpbData[iData],
-                                    grbitQOS,
-                                    IFileAPI::PfnIOComplete( IOWriteContiguousComplete_ ),
-                                    DWORD_PTR( &rgIoComplete[iData] ) );
-        Assert( err != errDiskTilt );
-        if ( err != JET_errSuccess )
-        {
-            break;
+        QWORD ibOffsetCurrent = ibOffset;
+        size_t iData = 0;
+        for (iData = 0; iData < cData; ++iData)     {
+            Assert(rgcbData[iData]);
+            TraceContextScope tcScope;
+            *tcScope = rgtc[iData];
+            err = pfapi->ErrIOWrite(*tcScope,
+                ibOffsetCurrent,
+                rgcbData[iData],
+                rgpbData[iData],
+                grbitQOS,
+                IFileAPI::PfnIOComplete(IOWriteContiguousComplete_),
+                DWORD_PTR(&rgIoComplete[iData]));
+            Assert(err != errDiskTilt);
+            if (err != JET_errSuccess)         {
+                break;
+            }
+            ibOffsetCurrent += rgcbData[iData];
         }
-        ibOffsetCurrent += rgcbData[iData];
-    }
-    if ( iData > 0 )
-    {
-        CallS( pfapi->ErrIOIssue() );
-    }
-    for ( size_t i = 0; i < iData; ++i )
-    {
-        
-        rgIoComplete[i].Wait();
-    }
-    if ( iData == cData )
-    {
-        for ( size_t j = 0; j < cData; ++j )
-        {
-            Call( rgIoComplete[j].m_err );
+        if (iData > 0)     {
+            CallS(pfapi->ErrIOIssue());
         }
-    }
-    CallSx( err, wrnIOSlow );
+        for (size_t i = 0; i < iData; ++i)     {
 
+            rgIoComplete[i].Wait();
+        }
+        if (iData == cData)     {
+            for (size_t j = 0; j < cData; ++j)         {
+                Call(rgIoComplete[j].m_err);
+            }
+        }
+        CallSx(err, wrnIOSlow);
+    }
 HandleError:
     if ( fAllocatedFromHeap )
     {
@@ -1553,48 +1546,46 @@ ERR COSFile::ErrMMRead( const QWORD     ibOffset,
         }
     }
 
-
-    const QWORD ibOffsetAlign   = ( ibOffset / g_cbMMSize ) * g_cbMMSize;
-    const QWORD ibOffsetBias    = ibOffset - ibOffsetAlign;
-    const QWORD cbViewSize      = min( m_rgcbFileSize[ group ] - ibOffsetAlign, ( ( ibOffsetBias + cbSize + g_cbMMSize - 1 ) / g_cbMMSize ) * g_cbMMSize );
-    void* const pvHint          = (void*)( ( DWORD_PTR( *ppvMap ) / g_cbMMSize ) * g_cbMMSize );
-
-
-    if (    ( pvMap = (BYTE*)MapViewOfFileEx(   m_rghFileMap[ group ],
-                                                FILE_MAP_READ,
-                                                DWORD( ibOffsetAlign >> 32 ),
-                                                DWORD( ibOffsetAlign ),
-                                                size_t( cbViewSize ),
-                                                pvHint ) + ibOffsetBias ) == (void*)DWORD_PTR( ibOffsetBias ) &&
-            ( pvMap = (BYTE*)MapViewOfFileEx(   m_rghFileMap[ group ],
-                                                FILE_MAP_READ,
-                                                DWORD( ibOffsetAlign >> 32 ),
-                                                DWORD( ibOffsetAlign ),
-                                                size_t( cbViewSize ),
-                                                NULL ) + ibOffsetBias ) == (void*)DWORD_PTR( ibOffsetBias ) )
     {
-        Assert( ERROR_IO_PENDING != GetLastError() );
-        Assert( pvMap == NULL );
-        Call( ErrOSFileIGetLastError() );
+        const QWORD ibOffsetAlign = (ibOffset / g_cbMMSize) * g_cbMMSize;
+        const QWORD ibOffsetBias = ibOffset - ibOffsetAlign;
+        const QWORD cbViewSize = min(m_rgcbFileSize[group] - ibOffsetAlign, ((ibOffsetBias + cbSize + g_cbMMSize - 1) / g_cbMMSize) * g_cbMMSize);
+        void* const pvHint = (void*)((DWORD_PTR(*ppvMap) / g_cbMMSize) * g_cbMMSize);
+
+
+        if ((pvMap = (BYTE*)MapViewOfFileEx(m_rghFileMap[group],
+            FILE_MAP_READ,
+            DWORD(ibOffsetAlign >> 32),
+            DWORD(ibOffsetAlign),
+            size_t(cbViewSize),
+            pvHint) + ibOffsetBias) == (void*)DWORD_PTR(ibOffsetBias) &&
+            (pvMap = (BYTE*)MapViewOfFileEx(m_rghFileMap[group],
+                FILE_MAP_READ,
+                DWORD(ibOffsetAlign >> 32),
+                DWORD(ibOffsetAlign),
+                size_t(cbViewSize),
+                NULL) + ibOffsetBias) == (void*)DWORD_PTR(ibOffsetBias))     {
+            Assert(ERROR_IO_PENDING != GetLastError());
+            Assert(pvMap == NULL);
+            Call(ErrOSFileIGetLastError());
+        }
+        Assert((DWORD_PTR(pvMap) / g_cbMMSize) * g_cbMMSize == DWORD_PTR(pvMap) - ibOffsetBias);
+
+
+        Assert(err == JET_errSuccess);
+        if (!RFSAlloc(OSFileRead) || ErrFaultInjection(34060))     {
+            DWORD flOldProtect;
+            (void)VirtualProtect(pvMap, size_t(cbSize), PAGE_NOACCESS, &flOldProtect);
+            err = ErrERRCheck(wrnLossy);
+        }
+
+
+        Assert(FOSMemoryFileMapped(pvMap, size_t(cbSize)));
+        Assert(!FOSMemoryFileMappedCowed(pvMap, size_t(cbSize)));
+
+        *ppvMap = pvMap;
+        pvMap = NULL;
     }
-    Assert( ( DWORD_PTR( pvMap ) / g_cbMMSize ) * g_cbMMSize == DWORD_PTR( pvMap ) - ibOffsetBias );
-
-
-    Assert( err == JET_errSuccess );
-    if ( !RFSAlloc( OSFileRead ) || ErrFaultInjection( 34060 ) )
-    {
-        DWORD flOldProtect;
-        (void)VirtualProtect( pvMap, size_t( cbSize ), PAGE_NOACCESS, &flOldProtect );
-        err = ErrERRCheck( wrnLossy );
-    }
-
-
-    Assert( FOSMemoryFileMapped( pvMap, size_t( cbSize ) ) );
-    Assert( !FOSMemoryFileMappedCowed( pvMap, size_t( cbSize ) ) );
-
-    *ppvMap = pvMap;
-    pvMap = NULL;
-
 HandleError:
 
     if ( err == JET_errFileAccessDenied )
@@ -2584,9 +2575,10 @@ ERR COSFile::ErrIOSetFileSparse(
         sizeof( filesetsparsebuffer ),
         &errorSystem ) );
 
-    const FileModeFlags fmfNew = *(FileModeFlags*)&m_fmf | fmfSparse;
-    m_fmf = fmfNew;
-
+    {
+        const FileModeFlags fmfNew = *(FileModeFlags*)&m_fmf | fmfSparse;
+        m_fmf = fmfNew;
+    }
 HandleError:
     return err;
 }

@@ -1,9 +1,8 @@
 // Copyright (c) Microsoft Corporation.
 // Licensed under the MIT License.
 
-#ifdef _OS_NORM_HXX_INCLUDED
-#error NORM.HXX already included
-#endif
+#ifndef _OS_NORM_HXX_INCLUDED
+//#error NORM.HXX already included
 #define _OS_NORM_HXX_INCLUDED
 
 
@@ -19,15 +18,15 @@ const LANGID LangidFromLcid( const LCID lcid );
 const WORD          countryDefault              = 1;
 extern const LCID   lcidNone;
 extern const LCID   lcidInvariant;
-extern const PWSTR  wszLocaleNameDefault;
-extern const PWSTR  wszLocaleNameNone;
+extern const PCWSTR  wszLocaleNameDefault;
+extern const PCWSTR  wszLocaleNameNone;
 extern const DWORD  dwLCMapFlagsDefaultOBSOLETE;
 extern const DWORD  dwLCMapFlagsDefault;
 
 
-ERR ErrNORMCheckLocaleName( __in INST * const pinst, __in_z const PCWSTR wszLocaleName );
-ERR ErrNORMCheckLCMapFlags( _In_ INST * const pinst, _In_ const DWORD dwLCMapFlags, _In_ const BOOL fUppercaseTextNormalization );
-ERR ErrNORMCheckLCMapFlags( _In_ INST * const pinst, _Inout_ DWORD * const pdwLCMapFlags, _In_ const BOOL fUppercaseTextNormalization );
+#define ErrNORMCheckLocaleName(x, y) 1// ( __in INST * const pinst, __in_z const PCWSTR wszLocaleName );
+#define ErrNORMCheckLCMapFlags(x, y, z) 1//( _In_ INST * const pinst, _In_ const DWORD dwLCMapFlags, _In_ const BOOL fUppercaseTextNormalization );
+#define ErrNORMCheckLCMapFlags(x, y, z) 1//( _In_ INST * const pinst, _Inout_ DWORD * const pdwLCMapFlags, _In_ const BOOL fUppercaseTextNormalization );
 
 BOOL FNORMGetNLSExIsSupported();
 
@@ -120,3 +119,4 @@ INLINE BOOL FNORMSortidIsZeroes(
     return ( 0 == memcmp( psortid, &guidZeroes, sizeof( guidZeroes ) ) );
 }
 
+#endif

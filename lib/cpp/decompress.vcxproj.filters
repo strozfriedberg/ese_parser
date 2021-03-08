@@ -24,5 +24,107 @@
     <ClCompile Include="ms\memory.cxx">
       <Filter>Source Files\ms</Filter>
     </ClCompile>
+    <ClCompile Include="ms\sysinfo.cxx">
+      <Filter>Source Files\ms</Filter>
+    </ClCompile>
+    <ClCompile Include="ms\os.cxx">
+      <Filter>Source Files\ms</Filter>
+    </ClCompile>
+    <ClCompile Include="ms\oseventtrace.cxx">
+      <Filter>Source Files\ms</Filter>
+    </ClCompile>
+    <ClCompile Include="ms\time.cxx">
+      <Filter>Source Files\ms</Filter>
+    </ClCompile>
+    <ClCompile Include="ms\string.cxx">
+      <Filter>Source Files\ms</Filter>
+    </ClCompile>
+    <ClCompile Include="ms\sync.cxx">
+      <Filter>Source Files\ms</Filter>
+    </ClCompile>
+    <ClCompile Include="ms\currproc.cxx">
+      <Filter>Source Files\ms</Filter>
+    </ClCompile>
+    <ClCompile Include="ms\error.cxx">
+      <Filter>Source Files\ms</Filter>
+    </ClCompile>
+    <ClCompile Include="ms\osfs.cxx">
+      <Filter>Source Files\ms</Filter>
+    </ClCompile>
+    <ClCompile Include="ms\osfile.cxx">
+      <Filter>Source Files\ms</Filter>
+    </ClCompile>
+    <ClCompile Include="ms\osdisk.cxx">
+      <Filter>Source Files\ms</Filter>
+    </ClCompile>
+    <ClCompile Include="ms\osdiag.cxx">
+      <Filter>Source Files\ms</Filter>
+    </ClCompile>
+    <ClCompile Include="ms\osblockcache.cxx">
+      <Filter>Source Files\ms</Filter>
+    </ClCompile>
+    <ClCompile Include="ms\reftrace.cxx">
+      <Filter>Source Files\ms</Filter>
+    </ClCompile>
+    <ClCompile Include="ms\task.cxx">
+      <Filter>Source Files\ms</Filter>
+    </ClCompile>
+    <ClCompile Include="ms\thread.cxx">
+      <Filter>Source Files\ms</Filter>
+    </ClCompile>
+    <ClCompile Include="ms\config.cxx">
+      <Filter>Source Files\ms</Filter>
+    </ClCompile>
+    <ClCompile Include="ms\trace.cxx">
+      <Filter>Source Files\ms</Filter>
+    </ClCompile>
+    <ClCompile Include="ms\violated.cxx">
+      <Filter>Source Files\ms</Filter>
+    </ClCompile>
+    <ClCompile Include="ms\cprintf.cxx">
+      <Filter>Source Files\ms</Filter>
+    </ClCompile>
+    <ClCompile Include="ms\checksum.cxx">
+      <Filter>Source Files\ms</Filter>
+    </ClCompile>
+    <ClCompile Include="ms\library.cxx">
+      <Filter>Source Files\ms</Filter>
+    </ClCompile>
+    <ClCompile Include="ms\event.cxx">
+      <Filter>Source Files\ms</Filter>
+    </ClCompile>
+    <ClCompile Include="ms\ostimerqueue.cxx">
+      <Filter>Source Files\ms</Filter>
+    </ClCompile>
+    <ClCompile Include="ms\norm.cxx">
+      <Filter>Source Files\ms</Filter>
+    </ClCompile>
+    <ClCompile Include="ms\perfmon.cxx">
+      <Filter>Source Files\ms</Filter>
+    </ClCompile>
+    <ClCompile Include="ms\encrypt.cxx">
+      <Filter>Source Files\ms</Filter>
+    </ClCompile>
+    <ClCompile Include="ms\edbg.cxx">
+      <Filter>Source Files\ms</Filter>
+    </ClCompile>
+    <ClCompile Include="ms\hapublish.cxx">
+      <Filter>Source Files\ms</Filter>
+    </ClCompile>
+    <ClCompile Include="ms\dllentry.cxx">
+      <Filter>Source Files\ms</Filter>
+    </ClCompile>
+    <ClCompile Include="ms\checksum_amd64.cxx">
+      <Filter>Source Files\ms</Filter>
+    </ClCompile>
+    <ClCompile Include="ms\_xpress\xdecode.c">
+      <Filter>Source Files\ms</Filter>
+    </ClCompile>
+    <ClCompile Include="ms\math.cxx">
+      <Filter>Source Files\ms</Filter>
+    </ClCompile>
+    <ClCompile Include="ms\checksum_avx.cxx">
+      <Filter>Source Files\ms</Filter>
+    </ClCompile>
   </ItemGroup>
 </Project>

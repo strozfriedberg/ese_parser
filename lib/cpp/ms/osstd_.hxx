@@ -211,7 +211,7 @@ VOID UtilReportEvent(
     const WCHAR *       rgpszString[],
     const DWORD         cbRawData = 0,
     void *              pvRawData = NULL,
-    const INST *        pinst = NULL,
+    const void /*INST*/ *        pinst = NULL,
     const LONG          lEventLoggingLevel = 1 );
 
 #ifdef ESENT

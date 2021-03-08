@@ -13,7 +13,7 @@
 #ifdef OS_LAYER_VIOLATIONS
 class INST;
 #else
-typedef unsigned char INST;
+//typedef unsigned char INST;
 #endif
 
 #ifndef ESENT

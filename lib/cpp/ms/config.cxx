@@ -313,7 +313,7 @@ private:
 
     typedef struct _ConfigStoreSubStore
     {
-        WCHAR *                     m_wszSubValuePath;
+        WCHAR const *                     m_wszSubValuePath;
         HKEY                        m_nthkeySubStore;
         ERR                         m_errOpen;
         ConfigStoreReadFlags        m_csrf;
@@ -331,8 +331,8 @@ private:
     {
         typedef struct _RootKeys
         {
-            WCHAR *     wszHkeyLong;
-            WCHAR *     wszHkeyShort;
+            WCHAR const *     wszHkeyLong;
+            WCHAR const *     wszHkeyShort;
             HKEY        hkey;
         }
         RootKeys;
@@ -392,23 +392,22 @@ public:
         {
             Call( ErrERRCheck( JET_errInvalidObject ) );
         }
-        const WCHAR * wszStoreRelPath = wcschr( m_wszStorePath, L'\\' );
-        if ( NULL == wszStoreRelPath || wszStoreRelPath[1] == L'\0' )
         {
-            AssertSz( FNegTest( fInvalidUsage ), "Passed a store with no key name past the root HKLM, HKCU, etc type key." );
-            Call( ErrERRCheck( JET_errInvalidParameter ) );
+            const WCHAR* wszStoreRelPath = wcschr(m_wszStorePath, L'\\');
+            if (NULL == wszStoreRelPath || wszStoreRelPath[1] == L'\0')         {
+                AssertSz(FNegTest(fInvalidUsage), "Passed a store with no key name past the root HKLM, HKCU, etc type key.");
+                Call(ErrERRCheck(JET_errInvalidParameter));
+            }
+            Assert(wszStoreRelPath[0] == L'\\');
+            wszStoreRelPath++;
+            m_errorInit = g_pfnRegOpenKeyExW(nthkeyRoot, wszStoreRelPath, 0, KEY_READ, &(m_rgcsss[csspTop].m_nthkeySubStore));
+
+
+            if (m_errorInit != ERROR_SUCCESS)         {
+                Assert(m_errorInit != ERROR_FILE_NOT_FOUND || ErrOSErrFromWin32Err(m_errorInit) == JET_errFileNotFound);
+                Call(m_rgcsss[csspTop].m_errOpen = ErrOSErrFromWin32Err(m_errorInit));
+            }
         }
-        Assert( wszStoreRelPath[0] == L'\\' );
-        wszStoreRelPath++;
-        m_errorInit = g_pfnRegOpenKeyExW( nthkeyRoot, wszStoreRelPath, 0, KEY_READ, &(m_rgcsss[csspTop].m_nthkeySubStore) );
-
-
-        if ( m_errorInit != ERROR_SUCCESS )
-        {
-            Assert( m_errorInit != ERROR_FILE_NOT_FOUND || ErrOSErrFromWin32Err( m_errorInit ) == JET_errFileNotFound );
-            Call( m_rgcsss[csspTop].m_errOpen = ErrOSErrFromWin32Err( m_errorInit ) );
-        }
-
 HandleError:
 
         return err;
@@ -483,54 +482,49 @@ HandleError:
 
         Assert( m_rgcsss[cssp].m_nthkeySubStore );
 
-
-        DWORD dwType;
-        DWORD cbStored = cbValue;
-        DWORD error = g_pfnRegQueryValueExW(
-                            m_rgcsss[cssp].m_nthkeySubStore,
-                            wszValueName,
-                            0,
-                            &dwType,
-                            (LPBYTE)wszValue,
-                            &cbStored );
-
-
-        if ( error == ERROR_SUCCESS && cbStored == 2 && wszValue[0] == L'\0' )
         {
-            Error( ErrERRCheck( JET_wrnColumnNull ) );
-        }
+            DWORD dwType;
+            DWORD cbStored = cbValue;
+            DWORD error = g_pfnRegQueryValueExW(
+                m_rgcsss[cssp].m_nthkeySubStore,
+                wszValueName,
+                0,
+                &dwType,
+                (LPBYTE)wszValue,
+                &cbStored);
 
-        wszValue[cbValue / sizeof(WCHAR) - 1] = L'\0';
 
-
-        if ( error != ERROR_SUCCESS && error != ERROR_MORE_DATA ||
-                dwType != REG_SZ )
-        {
-
-            if ( error == ERROR_FILE_NOT_FOUND )
-            {
-                Error( ErrERRCheck( JET_wrnColumnNull ) );
+            if (error == ERROR_SUCCESS && cbStored == 2 && wszValue[0] == L'\0')         {
+                Error(ErrERRCheck(JET_wrnColumnNull));
             }
-            err = ErrOSErrFromWin32Err( error );
-            CallS( err );
-            Error( err );
+
+            wszValue[cbValue / sizeof(WCHAR) - 1] = L'\0';
+
+
+            if (error != ERROR_SUCCESS && error != ERROR_MORE_DATA ||
+                dwType != REG_SZ)         {
+
+                if (error == ERROR_FILE_NOT_FOUND)             {
+                    Error(ErrERRCheck(JET_wrnColumnNull));
+                }
+                err = ErrOSErrFromWin32Err(error);
+                CallS(err);
+                Error(err);
+            }
+
+
+            if (error == ERROR_MORE_DATA)         {
+                AssertSz(fFalse, "This means we have malformed registry data as we should always have given a big enough buffer (%d, %d).", cbValue, cbStored);
+                Error(ErrERRCheck(JET_errRecordTooBig));
+            }
+
+            if (cbStored == 0)         {
+                Error(ErrERRCheck(JET_wrnColumnNull));
+            }
+
+
+            Assert(err == JET_errSuccess);
         }
-
-
-        if ( error == ERROR_MORE_DATA )
-        {
-            AssertSz( fFalse, "This means we have malformed registry data as we should always have given a big enough buffer (%d, %d).", cbValue, cbStored );
-            Error( ErrERRCheck( JET_errRecordTooBig ) );
-        }
-
-        if ( cbStored == 0 )
-        {
-            Error( ErrERRCheck( JET_wrnColumnNull ) );
-        }
-
-
-        Assert( err == JET_errSuccess );
-
     HandleError:
 
         if ( ( ( m_rgcsss[csspTop].m_cspf & cspfOnRead ) != 0 ) &&
@@ -660,60 +654,54 @@ ERR ErrOSConfigStoreInit( _In_z_ const WCHAR * const wszPath, _Outptr_ CConfigSt
 
     Call( pcs->ErrConfigStoreOpen() );
 
-
-    QWORD qwT = 0;
-    Call( pcs->ErrConfigStoreIReadValue( csspTop, JET_wszConfigStorePopulateControl, &qwT ) );
-    Assert( ( qwT & 0xffffffff00000000 ) == 0 );
-    CConfigStore::ConfigStorePopulateFlags cspf = (CConfigStore::ConfigStorePopulateFlags)qwT;
-    if ( JET_wrnColumnNull == err || JET_wrnTableEmpty == err )
     {
-        cspf = CConfigStore::cspfNone;
-        err = JET_errSuccess;
-    }
-
-
-    BOOL fWaitedForUserConfigComplete = fFalse;
-    TICK tickStart = TickOSTimeCurrent();
-
-    while( ( JET_errSuccess == ( err = pcs->ErrConfigStoreIReadValue( csspTop, JET_wszConfigStoreReadControl, &qwT ) ) ) &&
-            ( qwT & JET_bitConfigStoreReadControlInhibitRead ) )
-    {
-
-        if ( DtickDelta( tickStart, TickOSTimeCurrent() ) > 1500 )
-        {
-            const WCHAR * rgwszT[] = { JET_wszConfigStoreReadControl };
-            UtilReportEvent(    eventWarning,
-                                GENERAL_CATEGORY,
-                                CONFIG_STORE_READ_INHIBIT_PAUSE_ID,
-                                _countof(rgwszT), rgwszT );
+        QWORD qwT = 0;
+        Call(pcs->ErrConfigStoreIReadValue(csspTop, JET_wszConfigStorePopulateControl, &qwT));
+        Assert((qwT & 0xffffffff00000000) == 0);
+        CConfigStore::ConfigStorePopulateFlags cspf = (CConfigStore::ConfigStorePopulateFlags)qwT;
+        if (JET_wrnColumnNull == err || JET_wrnTableEmpty == err)     {
+            cspf = CConfigStore::cspfNone;
+            err = JET_errSuccess;
         }
-        fWaitedForUserConfigComplete = fTrue;
-        UtilSleep( 50 );
+
+
+        BOOL fWaitedForUserConfigComplete = fFalse;
+        TICK tickStart = TickOSTimeCurrent();
+
+        while ((JET_errSuccess == (err = pcs->ErrConfigStoreIReadValue(csspTop, JET_wszConfigStoreReadControl, &qwT))) &&
+            (qwT & JET_bitConfigStoreReadControlInhibitRead))     {
+
+            if (DtickDelta(tickStart, TickOSTimeCurrent()) > 1500)         {
+                const WCHAR* rgwszT[] = { JET_wszConfigStoreReadControl };
+                UtilReportEvent(eventWarning,
+                    GENERAL_CATEGORY,
+                    CONFIG_STORE_READ_INHIBIT_PAUSE_ID,
+                    _countof(rgwszT), rgwszT);
+            }
+            fWaitedForUserConfigComplete = fTrue;
+            UtilSleep(50);
+        }
+        if (err == JET_wrnColumnNull || err == JET_wrnTableEmpty)     {
+            qwT = JET_bitConfigStoreReadControlDefault;
+            err = JET_errSuccess;
+        }
+        Assert((qwT & 0xffffffff00000000) == 0);
+        const ConfigStoreReadFlags csrf = (ConfigStoreReadFlags)qwT;
+        if (fWaitedForUserConfigComplete)     {
+            err = ErrERRCheck(wrnSlow);
+        }
+
+        pcs->SetDefaultFlags(csrf, cspf);
+
+        if (csrf & JET_bitConfigStoreReadControlDisableAll)     {
+            Call(ErrERRCheck(JET_errDisabledFunctionality));
+        }
+
+        Assert(err == JET_errSuccess || err == wrnSlow);
+
+        *ppcs = pcs;
+        pcs = NULL;
     }
-    if ( err == JET_wrnColumnNull || err == JET_wrnTableEmpty )
-    {
-        qwT = JET_bitConfigStoreReadControlDefault;
-        err = JET_errSuccess;
-    }
-    Assert( ( qwT & 0xffffffff00000000 ) == 0 );
-    const ConfigStoreReadFlags csrf = (ConfigStoreReadFlags)qwT;
-    if ( fWaitedForUserConfigComplete )
-    {
-        err = ErrERRCheck( wrnSlow );
-    }
-
-    pcs->SetDefaultFlags( csrf, cspf );
-
-    if ( csrf & JET_bitConfigStoreReadControlDisableAll )
-    {
-        Call( ErrERRCheck( JET_errDisabledFunctionality ) );
-    }
-
-    Assert( err == JET_errSuccess || err == wrnSlow );
-
-    *ppcs = pcs;
-    pcs = NULL;
-
 HandleError:
 
     if ( NULL != pcs )

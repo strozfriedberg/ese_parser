@@ -35,10 +35,10 @@ BOOL IsDebuggerAttached();
 #endif
 
 #ifndef RTM
-#define TEST_INJECTION
-#define FAULT_INJECTION
-#define CONFIGOVERRIDE_INJECTION
-#define HANG_INJECTION
+//#define TEST_INJECTION
+//#define FAULT_INJECTION
+//#define CONFIGOVERRIDE_INJECTION
+//#define HANG_INJECTION
 #endif
 
 
@@ -227,17 +227,17 @@ void AssertErr( const ERR err, const CHAR* szFilename, const LONG lLine );
                                                     OSTraceResumeGC_();                                                                                         \
                                                 }
 
-#define FireWall( szTag )                       FireWallAt( szTag, __FILE__, __LINE__ )
+#define FireWall( szTag )//                       FireWallAt( szTag, __FILE__, __LINE__ )
 
 
 
-#define AssertTrackAt( exp, szTag, szFilename, lLine )  if ( !( exp ) && !FNegTest( fInvalidUsage ) )                                                                   \
-                                                        {                                                                                                               \
-                                                            OSTraceSuspendGC_();                                                                                        \
-                                                            const CHAR* const szTagT = szTag;                                                                           \
-                                                            AssertFail( OSFormat( "AssertTrackTag%s%s", szTagT ? ":" : "", szTagT ? szTagT : "" ), szFilename, lLine ); \
-                                                            OSTraceResumeGC_();                                                                                         \
-                                                        }
+#define AssertTrackAt( exp, szTag, szFilename, lLine )//  if ( !( exp ) && !FNegTest( fInvalidUsage ) )                                                                   \
+//                                                        {                                                                                                               \
+//                                                            OSTraceSuspendGC_();                                                                                        \
+//                                                            const CHAR* const szTagT = szTag;                                                                           \
+//                                                            AssertFail( OSFormat( "AssertTrackTag%s%s", szTagT ? ":" : "", szTagT ? szTagT : "" ), szFilename, lLine ); \
+//                                                            OSTraceResumeGC_();                                                                                         \
+//                                                        }
 
 #define AssertTrack( exp, szTag )                       AssertTrackAt( exp, szTag, __FILE__, __LINE__ )
 
@@ -299,7 +299,7 @@ extern void (__stdcall *g_pfnEnforceContextFail)( const WCHAR* wszContext, const
 
 
 
-#define C_ASSERT(e) typedef char __C_ASSERT__[(e)?1:-1]
+#define C_ASSERT(e) //typedef char __C_ASSERT__[(e)?1:-1]
 
 #define S_ASSERT(e)                     \
     __pragma(warning(push))             \

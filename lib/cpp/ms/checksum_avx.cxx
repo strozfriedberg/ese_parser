@@ -209,8 +209,8 @@ Start:
     const ULONG mask = ( cb << 19 ) - 1;
 
     const ULONG ecc = p & 0xfc00fc00 & mask | q & 0x03000300 | q_ & 0x00e000e0 | r & 0x001f001f;
-    const ULONG xor = dwAcc;
-    return MakeChecksumFromECCXORAndPgno( ecc, xor, pgno );
+    const ULONG xor_ = dwAcc;
+    return MakeChecksumFromECCXORAndPgno( ecc, xor_, pgno );
 }
     
 #else

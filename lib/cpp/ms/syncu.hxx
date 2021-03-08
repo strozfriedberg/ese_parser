@@ -4,7 +4,9 @@
 #ifndef _OSU_SYNC_HXX_INCLUDED
 #define _OSU_SYNC_HXX_INCLUDED
 
+#ifndef Assert
 #define Assert( x )
+#endif // !Assert
 
 class AGENT
 {

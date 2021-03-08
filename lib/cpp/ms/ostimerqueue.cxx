@@ -208,61 +208,60 @@ void WINAPI COSTimerTaskEntry::OSTimerTaskIThreadpoolTimerCompletion(
     Assert( ptte->m_state == COSTimerTaskEntry::stateScheduled ||
                 ptte->m_state == COSTimerTaskEntry::stateCancelling );
 
-
-    void * const pvTaskRuntimeContext = ptte->m_pvTaskRuntimeContext;
-    ptte->m_pvTaskRuntimeContext = NULL;
-    ptte->m_idRun = ptte->m_idSchedule;
-
-
-    ptte->m_state = COSTimerTaskEntry::stateRunning;
-
-    ptte->m_critSchedule.Leave();
-
-
-    OSTrace( JET_tracetagTimerQueue, OSFormat( "OSTimerTaskIThreadpoolTimerCompletion( %p ) %d ms since last run.\n", ptte->m_pfnTask, DtickDelta( ptte->m_tickExecEndLast, TickOSTimeCurrent() ) ) );
-    ETTimerTaskRun( ptte, ptte->m_pfnTask, ptte->m_pvTaskGroupContext, pvTaskRuntimeContext, ptte->m_cRuns );
-
-    ptte->m_tidExec = GetCurrentThreadId();
-    const TICK tickStart = TickOSTimeCurrent();
-
-
-    ptte->m_pfnTask( ptte->m_pvTaskGroupContext, pvTaskRuntimeContext );
-
-    Assert( ptte->m_state == COSTimerTaskEntry::stateRunning ||
-            ptte->m_state == COSTimerTaskEntry::stateCancelling );
-
-
-    const TICK tickEnd = TickOSTimeCurrent();
-
-
-    ptte->m_tidExecLast         = ptte->m_tidExec;
-    ptte->m_tickExecStartLast   = tickStart;
-    ptte->m_tickExecEndLast     = tickEnd;
-    ptte->m_cRuns++;
-    ptte->m_tickRunAverage      = (TICK) (  WeightedAvePrevRuns( ptte->m_cRuns, ptte->m_tickRunAverage ) +
-                                            WeightedAveNewRun( ptte->m_cRuns, DtickDelta( tickStart, tickEnd ) ) );
-
-
-    ptte->m_critSchedule.Enter();
-
-    if ( ptte->m_state == COSTimerTaskEntry::stateRunning &&
-            ptte->m_idRun == ptte->m_idSchedule )
     {
+        void* const pvTaskRuntimeContext = ptte->m_pvTaskRuntimeContext;
+        ptte->m_pvTaskRuntimeContext = NULL;
+        ptte->m_idRun = ptte->m_idSchedule;
 
-        ptte->m_tickLastQuiesce = TickOSTimeCurrent();
-        ptte->m_state = COSTimerTaskEntry::stateInactive;
+
+        ptte->m_state = COSTimerTaskEntry::stateRunning;
+
+        ptte->m_critSchedule.Leave();
+
+
+        OSTrace(JET_tracetagTimerQueue, OSFormat("OSTimerTaskIThreadpoolTimerCompletion( %p ) %d ms since last run.\n", ptte->m_pfnTask, DtickDelta(ptte->m_tickExecEndLast, TickOSTimeCurrent())));
+        ETTimerTaskRun(ptte, ptte->m_pfnTask, ptte->m_pvTaskGroupContext, pvTaskRuntimeContext, ptte->m_cRuns);
+
+        ptte->m_tidExec = GetCurrentThreadId();
+        const TICK tickStart = TickOSTimeCurrent();
+
+
+        ptte->m_pfnTask(ptte->m_pvTaskGroupContext, pvTaskRuntimeContext);
+
+        Assert(ptte->m_state == COSTimerTaskEntry::stateRunning ||
+            ptte->m_state == COSTimerTaskEntry::stateCancelling);
+
+        {
+            const TICK tickEnd = TickOSTimeCurrent();
+
+
+            ptte->m_tidExecLast = ptte->m_tidExec;
+            ptte->m_tickExecStartLast = tickStart;
+            ptte->m_tickExecEndLast = tickEnd;
+            ptte->m_cRuns++;
+            ptte->m_tickRunAverage = (TICK)(WeightedAvePrevRuns(ptte->m_cRuns, ptte->m_tickRunAverage) +
+                WeightedAveNewRun(ptte->m_cRuns, DtickDelta(tickStart, tickEnd)));
+
+
+            ptte->m_critSchedule.Enter();
+
+            if (ptte->m_state == COSTimerTaskEntry::stateRunning &&
+                ptte->m_idRun == ptte->m_idSchedule) {
+
+                ptte->m_tickLastQuiesce = TickOSTimeCurrent();
+                ptte->m_state = COSTimerTaskEntry::stateInactive;
+            }
+            else if (ptte->m_state == COSTimerTaskEntry::stateRunning &&
+                ptte->m_idRun != ptte->m_idSchedule) {
+                ptte->m_state = COSTimerTaskEntry::stateScheduled;
+            }
+            Assert(ptte->m_state != COSTimerTaskEntry::stateRunning);
+
+            ptte->m_critSchedule.Leave();
+
+            ptte->m_tidExec = DWORD(~0);
+        }
     }
-    else if ( ptte->m_state == COSTimerTaskEntry::stateRunning &&
-            ptte->m_idRun != ptte->m_idSchedule )
-    {
-        ptte->m_state = COSTimerTaskEntry::stateScheduled;
-    }
-    Assert( ptte->m_state != COSTimerTaskEntry::stateRunning );
-
-    ptte->m_critSchedule.Leave();
-
-    ptte->m_tidExec = DWORD( ~0 );
-
 QuitThread:
 
     ptte->m_semExec.Release();

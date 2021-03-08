@@ -17,8 +17,8 @@ const LANGID        langidInvariant             = MAKELANGID( LANG_INVARIANT, SU
 const LCID          lcidNone                    = MAKELCID( langidNone, sortidNone );
 const LCID          lcidInvariant               = MAKELCID( langidInvariant, sortidNone );
 
-const PWSTR         wszLocaleNameDefault        = L"en-US";
-const PWSTR         wszLocaleNameNone           = L"";
+const PCWSTR         wszLocaleNameDefault        = L"en-US";
+const PCWSTR         wszLocaleNameNone           = L"";
 
 const DWORD         dwLCMapFlagsDefaultOBSOLETE = ( LCMAP_SORTKEY | NORM_IGNORECASE | NORM_IGNOREKANATYPE | NORM_IGNOREWIDTH );
 const DWORD         dwLCMapFlagsDefault         = ( LCMAP_SORTKEY | NORM_IGNORECASE | NORM_IGNOREKANATYPE | NORM_IGNOREWIDTH );
@@ -121,7 +121,7 @@ HandleError:
     return err;
 }
 
-LOCAL VOID NORMReportInvalidLcid( INST * const pinst, const LCID lcid, const ERR errReport, const DWORD errSystem )
+LOCAL VOID NORMReportInvalidLcid( void /*INST*/ * const pinst, const LCID lcid, const ERR errReport, const DWORD errSystem )
 {
     WCHAR           szLcid[16];
     WCHAR           szError[64];
@@ -131,7 +131,7 @@ LOCAL VOID NORMReportInvalidLcid( INST * const pinst, const LCID lcid, const ERR
     const ULONG     cszT            = 6;
     const WCHAR*    rgszT[cszT];
     WCHAR *         szSystemErrorDescription    = NULL;
-    WCHAR *         szFallbackLanguage = L"Unknown";
+    WCHAR const *   szFallbackLanguage = L"Unknown";
 
     FormatMessageW( (   FORMAT_MESSAGE_ALLOCATE_BUFFER |
                         FORMAT_MESSAGE_FROM_SYSTEM |
@@ -146,12 +146,12 @@ LOCAL VOID NORMReportInvalidLcid( INST * const pinst, const LCID lcid, const ERR
 
     if ( ErrNORMGetLcidInfo( lcid, LOCALE_SLANGUAGE, &szLanguage ) < JET_errSuccess )
     {
-        szLanguage = szFallbackLanguage;
+        szLanguage = const_cast<WCHAR *> (szFallbackLanguage);
     }
     
     if ( ErrNORMGetLcidInfo( lcid, LOCALE_SENGLANGUAGE, &szEngLanguage ) < JET_errSuccess )
     {
-        szEngLanguage = szFallbackLanguage;
+        szEngLanguage = const_cast<WCHAR *> (szFallbackLanguage);
     }
 
     rgszT[0] = szLcid;
@@ -188,7 +188,7 @@ LOCAL VOID NORMReportInvalidLcid( INST * const pinst, const LCID lcid, const ERR
     LocalFree( szSystemErrorDescription );
 }
 
-LOCAL VOID NORMReportInvalidLocaleName( INST * const pinst, PCWSTR wszLocaleName, const ERR errReport, const DWORD errSystem )
+LOCAL VOID NORMReportInvalidLocaleName( void /*INST*/ * const pinst, PCWSTR wszLocaleName, const ERR errReport, const DWORD errSystem )
 {
     WCHAR           szError[64];
     WCHAR           szSystemError[ 64 ];
@@ -197,7 +197,7 @@ LOCAL VOID NORMReportInvalidLocaleName( INST * const pinst, PCWSTR wszLocaleName
     const ULONG     cszT            = 6;
     const WCHAR*    rgszT[cszT];
     WCHAR *         szSystemErrorDescription    = NULL;
-    WCHAR *         szFallbackLanguage = L"Unknown";
+    WCHAR const *   szFallbackLanguage = L"Unknown";
 
     FormatMessageW( (   FORMAT_MESSAGE_ALLOCATE_BUFFER |
                         FORMAT_MESSAGE_FROM_SYSTEM |
@@ -211,12 +211,12 @@ LOCAL VOID NORMReportInvalidLocaleName( INST * const pinst, PCWSTR wszLocaleName
 
     if ( ErrNORMGetLocaleNameInfo( wszLocaleName, LOCALE_SLANGUAGE, &szLanguage ) < JET_errSuccess )
     {
-        szLanguage = szFallbackLanguage;
+        szLanguage = const_cast<WCHAR *> (szFallbackLanguage);
     }
     
     if ( ErrNORMGetLocaleNameInfo( wszLocaleName, LOCALE_SENGLANGUAGE, &szEngLanguage ) < JET_errSuccess )
     {
-        szEngLanguage = szFallbackLanguage;
+        szEngLanguage = const_cast<WCHAR *> (szFallbackLanguage);
     }
 
     rgszT[0] = wszLocaleName;
@@ -335,6 +335,7 @@ LOCAL_BROKEN BOOL WINAPI GetNLSExNotSupported(
     return fFalse;
 }
 
+/*
 ERR ErrNORMCheckLocaleName( __in INST * const pinst, __in_z PCWSTR const wszLocaleName )
 {
     ERR err = JET_errSuccess;
@@ -388,6 +389,7 @@ HandleError:
 
     return err;
 }
+*/
 
 ERR ErrNORMCheckLocaleVersion(
     _In_ const NORM_LOCALE_VER* pnlv )
@@ -572,7 +574,7 @@ BOOL FNORMNLSVersionEquals( QWORD qwVersionCreated, QWORD qwVersionCurrent )
     return qwVersionCreated == qwVersionCurrent;
 }
 
-LOCAL ERR ErrNORMReportInvalidLCMapFlags( INST * const pinst, const DWORD dwLCMapFlags )
+LOCAL ERR ErrNORMReportInvalidLCMapFlags( void /*INST*/ * const pinst, const DWORD dwLCMapFlags )
 {
     WCHAR           szLCMapFlags[16];
     const ULONG     cszT                = 1;
@@ -596,7 +598,7 @@ LOCAL ERR ErrNORMReportInvalidLCMapFlags( INST * const pinst, const DWORD dwLCMa
 #define SORT_DIGITSASNUMBERS 0x00000008
 #endif
 
-
+/*
 ERR ErrNORMCheckLCMapFlags( _In_ INST * const pinst, _In_ const DWORD dwLCMapFlags, _In_ const BOOL fUppercaseTextNormalization )
 {
     const DWORD     dwValidSortKeyFlags = ( LCMAP_BYTEREV
@@ -623,7 +625,6 @@ ERR ErrNORMCheckLCMapFlags( _In_ INST * const pinst, _In_ const DWORD dwLCMapFla
 }
 
 
-
 ERR ErrNORMCheckLCMapFlags( _In_ INST * const pinst, _Inout_ DWORD * const pdwLCMapFlags, _In_ const BOOL fUppercaseTextNormalization )
 {
     if ( LCMAP_UPPERCASE != *pdwLCMapFlags )
@@ -633,6 +634,7 @@ ERR ErrNORMCheckLCMapFlags( _In_ INST * const pinst, _Inout_ DWORD * const pdwLC
 
     return ErrNORMCheckLCMapFlags( pinst, *pdwLCMapFlags, fUppercaseTextNormalization );
 }
+*/
 
 #ifdef DEBUG_NORM
 VOID NORMPrint( const BYTE * const pb, const INT cb )

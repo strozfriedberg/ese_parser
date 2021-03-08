@@ -3,6 +3,7 @@
 
 #include "osstd.hxx"
 #include "trace.hxx"
+#include "assert.h"
 
 #ifndef ESENT
 #include <NativeWatson.h>
@@ -155,7 +156,7 @@ void UserDebugBreakPoint()
                 Assert( wcslen( szCmd ) < _countof(szCmd) );
 
                 si.cb           = sizeof( si );
-                si.lpDesktop    = L"Winsta0\\Default";
+                si.lpDesktop    = const_cast<LPWSTR>(L"Winsta0\\Default");
 
                 if (    hEvent &&
                         CreateProcessW( NULL,
@@ -697,7 +698,7 @@ void AssertErr( const ERR err, PCSTR szFileName, const LONG lLine )
 
 #else
 
-extern ULONG_PTR UlParam( const INST* const pinst, const ULONG paramid );
+extern ULONG_PTR UlParam( const void /*INST*/* const pinst, const ULONG paramid );
 
 void __stdcall AssertFail( PCSTR szMessage, PCSTR szFilename, LONG lLine, ... )
 {
@@ -875,7 +876,7 @@ LOCAL_BROKEN BOOL ExceptionDialog( const WCHAR wszException[] )
 #ifdef RTM
     WCHAR * wszFmt          = L"%s%d.%d%s%s%s%s%s%d%s%x%s%s%s";
 #else
-    WCHAR * wszFmt          = L"%s%d.%d%s%s%s%s%s%d%s%x%s%s%s%s%s%s%s";
+    WCHAR const * wszFmt          = L"%s%d.%d%s%s%s%s%s%d%s%x%s%s%s%s%s%s%s";
     WCHAR       wszExceptionFilePath[_MAX_PATH];
     _wfullpath( wszExceptionFilePath, wszAssertFile, _countof(wszExceptionFilePath) );
 #endif
@@ -1390,7 +1391,7 @@ QWORD ChitsFaultInj( const ULONG ulID )
 
 ERR ErrEnableTestInjection( const ULONG ulID, const ULONG_PTR pv, const INT type, const ULONG ulProbability, const DWORD grbit )
 {
-    return ErrERRCheck( JET_errTestInjectionNotSupported );
+    return 0;//ErrERRCheck( JET_errTestInjectionNotSupported );
 }
 
 #endif

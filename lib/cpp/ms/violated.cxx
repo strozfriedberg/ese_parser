@@ -13,7 +13,7 @@ void UtilReportEvent(
     const WCHAR *       rgpszString[],
     const DWORD         cbRawData,
     void *              pvRawData,
-    const INST *        pinst,
+    const void /*INST*/ *        pinst,
     const LONG          lEventLoggingLevel )
 {
     return;
@@ -70,7 +70,7 @@ void OSRMPostterm(void)
 
 
 
-ULONG_PTR UlParam( const INST* const, const ULONG )
+ULONG_PTR UlParam( const void /*INST*/* const, const ULONG )
 {
     return 0;
 }

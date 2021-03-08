@@ -11,7 +11,9 @@ class CProfileStorage;
 class CProfileCounter;
 #endif
 
-
+#define ErrRESSetResourceParam( x1, x2, x3, x4)     0
+#define ErrRESGetResourceParam( x1, x2, x3, x4)     0
+/*
 ERR ErrRESSetResourceParam(
         INST * const pinst,
         JET_RESID resid,
@@ -23,6 +25,7 @@ ERR ErrRESGetResourceParam(
         JET_RESID resid,
         JET_RESOPER resoper,
         DWORD_PTR * const pdwParam );
+*/
 
 extern CResource    RESINST;
 extern CResource    RESLOG;
@@ -78,11 +81,11 @@ template < class TData, BOOL fHashPerProc > class PERFInstance;
 class CResource
 {
     CResourceManager    *m_pRM;
-    INST                *m_pinst;
+    void /*INST*/                *m_pinst;
     CQuota              m_quota;
 
 public:
-    INLINE          CResource( INST * pinst = NULL );
+    INLINE          CResource( void /*INST*/ * pinst = NULL );
     INLINE          ~CResource();
             ERR     ErrSetParam( JET_RESOPER resop, DWORD_PTR dwParam );
             ERR     ErrGetParam( JET_RESOPER resop, DWORD_PTR * const pdwParam ) const;
@@ -214,7 +217,7 @@ INLINE VOID CQuota::Release()
 }
 
 
-INLINE CResource::CResource( INST * pinst ) :
+INLINE CResource::CResource( void /*INST*/ * pinst ) :
     m_pRM( NULL ),
     m_pinst( pinst )
     {}

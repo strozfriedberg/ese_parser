@@ -1,17 +1,21 @@
 // Copyright (c) Microsoft Corporation.
 // Licensed under the MIT License.
 
+#pragma warning( disable: 4996)
+
 #include "osstd.hxx"
 
 #ifdef ESENT
-#include <slc.h>
+//#include <slc.h>
+#include <sysinfoapi.h>
 #include <slerror.h>
 #else
 #include "bldver.h"
 #endif
 
 #ifndef RTM
-LOCAL VOID GetSystemVersionOverridesFromRegistry();
+//LOCAL VOID GetSystemVersionOverridesFromRegistry();
+#define GetSystemVersionOverridesFromRegistry()
 #else
 #define GetSystemVersionOverridesFromRegistry()
 #endif
@@ -414,7 +418,7 @@ const WCHAR* WszUtilImagePath()
 
 const WCHAR* WszUtilImageVersionName()
 {
-    return WSZVERSIONNAME;
+    return L"WSZVERSIONNAME";
 }
 
 
@@ -578,6 +582,7 @@ LOCAL OSOVERRIDE g_rgoverrides[] =
         { L"ServicePack", &g_dwSystemServicePackNumber },
 };
 
+/*
 VOID GetSystemVersionOverridesFromRegistry()
 {
     if( g_fSystemVersionOverridesTried )
@@ -620,7 +625,7 @@ VOID GetSystemVersionOverridesFromRegistry()
 
     g_fSystemVersionOverridesTried = fTrue;
 }
-
+*/
 #endif
 
 
@@ -713,6 +718,7 @@ BOOL FOSSysinfoPreinit()
 
     wszWorkingBuffer[ 0 ] = L'\0';
 #ifdef ESENT
+    static WCHAR    WSZVERSIONNAME[]{ L"ese" };
     OSStrCbFormatW( wszWorkingBuffer, sizeof(wszWorkingBuffer),
                         L"%ws[%I32u.%I32u.%I32u.%I32u]",
                         WSZVERSIONNAME,
@@ -845,7 +851,7 @@ HandleError:
 #ifdef ESENT
 
 #include <appmodel.h>
-#include <statemanager.h>
+//#include <statemanager.h>
 
 #else
 WINBASEAPI
@@ -1027,6 +1033,7 @@ UtilSystemBetaConfig    g_rgbetaconfigs [] =
 };
 C_ASSERT( _countof(g_rgbetaconfigs) == EseFeatureMax );
 
+/*
 void UtilReportBetaFeatureInUse( const INST * const pinst, const UtilSystemBetaSiteMode usbsmCurrent, const ULONG featureid, PCWSTR const wszFeatureName )
 {
     if ( fFalse == AtomicCompareExchange( &( g_rgbetaconfigs[featureid].fSuppressInfoEvent ), (LONG)fFalse, (LONG)fLoggedEventAlready ) )
@@ -1040,7 +1047,7 @@ void UtilReportBetaFeatureInUse( const INST * const pinst, const UtilSystemBetaS
         OSTrace( JET_tracetagVersionAndStagingChecks, OSFormat( "Beta Feature %d staging value %d (usbsmCurrent = %d).\n", featureid, fTrue, usbsmCurrent ) );
     }
 }
-
+*/
 
 
 ERR ErrUtilSystemSlConfiguration(
