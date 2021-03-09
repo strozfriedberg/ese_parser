@@ -1,6 +1,6 @@
 //reader.rs
 
-#![allow(unused_assignments)]
+#![allow(unused_assignments, temporary_cstring_as_ptr)]
 
 use std::{fs, io, io::{Seek, Read}, mem, os::raw, path::PathBuf, ptr, slice, convert::TryInto, cell::RefCell};
 use simple_error::SimpleError;
@@ -973,6 +973,7 @@ mod test {
     use std::{str};
     use crate::esent::*;
     use std::ffi::CString;
+    use std::ptr::{null, null_mut};
 
     macro_rules! jetcall {
         ($call:expr) => {
@@ -1005,6 +1006,12 @@ mod test {
         dbid: JET_DBID,
     }
 
+    enum JET_CP {
+        None = 0,
+        Unicode = 1200,
+        ASCII = 1252
+    }
+
     impl EseAPI {
         fn new(pg_size: usize) -> EseAPI {
             EseAPI::set_system_parameter_l(JET_paramDatabasePageSize, pg_size as u64);
@@ -1029,7 +1036,7 @@ mod test {
             jettry!(JetSetSystemParameterA(ptr::null_mut(), 0, paramId, 0, CString::new(szParam).unwrap().as_ptr()));
         }
 
-        fn create_column(name: &str, col_type: JET_COLTYP, grbit: JET_GRBIT) -> JET_COLUMNCREATE_A {
+        fn create_column(name: &str, col_type: JET_COLTYP, cp: JET_CP, grbit: JET_GRBIT) -> JET_COLUMNCREATE_A {
             println!("create_column: {}", name);
 
             JET_COLUMNCREATE_A{
@@ -1038,43 +1045,25 @@ mod test {
                 coltyp: col_type,
                 cbMax: 0,
                 grbit,
-                pvDefault: ptr::null_mut(), cbDefault: 0, cp: 0, columnid: 0, err: 0 }
+                cp: cp as u32,
+                pvDefault: ptr::null_mut(), cbDefault: 0, columnid: 0, err: 0 }
         }
 
-        fn create_index(key: &str, grbit: JET_GRBIT) -> JET_INDEXCREATE_A {
-            let name = key.to_owned() + "_index";
-            let mut key_2zero = Vec::<raw::c_char>::with_capacity(key.len() + 3);
+        fn create_num_column(name: &str, grbit: JET_GRBIT) -> JET_COLUMNCREATE_A {
+            EseAPI::create_column(name, JET_coltypLong, JET_CP::None, grbit)
+        }
 
-            //TODO: idiomatic
-            key_2zero.push('+' as raw::c_char);
-            for c in key.as_bytes() {
-                key_2zero.push(*c as i8);
-            }
+        fn create_text_column(name: &str, cp: JET_CP, grbit: JET_GRBIT) -> JET_COLUMNCREATE_A {
+            EseAPI::create_column(name, JET_coltypLongText, cp, grbit)
+        }
 
-            key_2zero.push(0);
-            key_2zero.push(0);
-
-            println!("create_index: {}, key: {}", name, key);
-            JET_INDEXCREATE_A{
-                cbStruct: size_of::<JET_INDEXCREATE_A>(),
-                szIndexName: CString::new(name).unwrap().into_raw(),
-                szKey: key_2zero.as_mut_ptr(),
-                cbKey: key_2zero.len() as raw::c_ulong,
-                grbit,
-                ulDensity: 0,
-                __bindgen_anon_1: tagJET_INDEXCREATE_A__bindgen_ty_1{lcid: 0},
-                __bindgen_anon_2: tagJET_INDEXCREATE_A__bindgen_ty_2{cbVarSegMac: 0},
-                rgconditionalcolumn: ptr::null_mut(),
-                cConditionalColumn: 0,
-                err: 0,
-                cbKeyMost: 0
-            }
+        fn create_binary_column(name: &str, grbit: JET_GRBIT) -> JET_COLUMNCREATE_A {
+            EseAPI::create_column(name, JET_coltypLongBinary, JET_CP::None, grbit)
         }
 
         fn create_table(self: &mut EseAPI,
                         name: &str,
-                        columns: &mut Vec<JET_COLUMNCREATE_A>,
-                        indexes: &mut Vec<JET_INDEXCREATE_A>) -> JET_TABLEID {
+                        columns: &mut Vec<JET_COLUMNCREATE_A>) -> JET_TABLEID {
 
             let mut table_def =  JET_TABLECREATE_A{
                         cbStruct: size_of::<JET_TABLECREATE_A>(),
@@ -1084,8 +1073,8 @@ mod test {
                         ulDensity: 0,
                         rgcolumncreate: columns.as_mut_ptr(),
                         cColumns: columns.len() as raw::c_ulong,
-                        rgindexcreate: indexes.as_mut_ptr(),
-                        cIndexes: indexes.len() as raw::c_ulong,
+                        rgindexcreate: null_mut(),
+                        cIndexes: 0,
                         grbit: 0,
                         tableid: 0,
                         cCreated: 0
@@ -1120,31 +1109,35 @@ mod test {
         let mut dst_path = PathBuf::from("testdata").canonicalize().unwrap();
         dst_path.push(filename);
 
-        if !dst_path.exists() {
-            println!("creating {}", dst_path.display());
-            let mut db_client = EseAPI::new(pg_size);
+        if dst_path.exists() {
+            let _ = fs::remove_file(&dst_path);
+        }
 
-            let dbpath = CString::new(dst_path.to_str().unwrap()).unwrap();
-            jettry!(JetCreateDatabaseA(db_client.sesid, dbpath.as_ptr(), ptr::null(), &mut db_client.dbid, 0));
+        println!("creating {}", dst_path.display());
+        let mut db_client = EseAPI::new(pg_size);
 
-            let mut columns = Vec::<JET_COLUMNCREATE_A>::with_capacity(2);
-            columns.push(EseAPI::create_column("PK", JET_coltypLong, JET_bitColumnAutoincrement));
-            columns.push(EseAPI::create_column("Value", JET_coltypLongText, JET_bitColumnTagged));
-            
-            let mut indexes = Vec::<JET_INDEXCREATE_A>::with_capacity(2);
-            indexes.push(EseAPI::create_index("PK", JET_bitIndexPrimary));
-            indexes.push(EseAPI::create_index("Value", 0));
+        let dbpath = CString::new(dst_path.to_str().unwrap()).unwrap();
+        jettry!(JetCreateDatabaseA(db_client.sesid, dbpath.as_ptr(), ptr::null(), &mut db_client.dbid, 0));
 
-            let tableid = db_client.create_table("test_table", &mut columns, &mut indexes);
-            let columnid = columns[1].columnid;
+        let mut columns = Vec::<JET_COLUMNCREATE_A>::with_capacity(5);
+        //columns.push(EseAPI::create_num_column("PK",JET_bitColumnAutoincrement));
+        columns.push(EseAPI::create_text_column("Value", JET_CP::None, JET_bitColumnTagged));
+        columns.push(EseAPI::create_text_column("compressed_unicode", JET_CP::Unicode, JET_bitColumnCompressed));
+        columns.push(EseAPI::create_text_column("compressed_ascii", JET_CP::ASCII, JET_bitColumnCompressed));
+        columns.push(EseAPI::create_binary_column("compressed_binary", JET_bitColumnCompressed));
 
-            for i in 0..1000 {
-                let s = format!("Record {:1000}", i);
+        let tableid = db_client.create_table("test_table", &mut columns);
+
+        for i in 0..1000 {
+            let s = format!("Record {:1000}", i);
+
+            for col in &columns {
                 let mut setColumn = JET_SETCOLUMN {
-                    columnid,
+                    columnid: col.columnid,
                     pvData: s.as_ptr() as *const raw::c_void,
                     cbData: s.len() as raw::c_ulong,
-                    grbit: 0, ibLongValue: 0, itagSequence: 0, err: 0 };
+                    grbit: col.grbit,
+                    ibLongValue: 0, itagSequence: 0, err: 0 };
 
                 //println!("'{}' {}", s, s.len());
 
@@ -1157,17 +1150,14 @@ mod test {
                 db_client.commit_transaction();
             }
         }
-        else {
-            println!("use existing {}", dst_path.display());
-        }
 
         dst_path
     }
 
-        #[test]
+    #[test]
     pub fn caching_test() -> Result<(), SimpleError> {
         let cache_size = 10u32;
-        let path = prepare_db("test_caching.edb", 1024 * 8);
+        let path = prepare_db("caching_test.edb", 1024 * 8);
         let mut reader = Reader::new(&path, cache_size as usize)?;
         let page_size = reader.page_size;
         let num_of_pages = std::cmp::min(fs::metadata(&path).unwrap().len() as u32 / page_size, page_size);
@@ -1202,4 +1192,14 @@ mod test {
         }
         Ok(())
     }
+
+    /*
+    #[test]
+    pub fn decompress_test() -> Result<(), SimpleError> {
+        let path = prepare_db("decompress_test.edb", 1024 * 8);
+        let mut reader = Reader::new(&path, cache_size as usize)?;
+
+        Ok(())
+    }
+     */
 }
