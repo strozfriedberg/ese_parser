@@ -171,7 +171,7 @@ pub fn load_page_header(
     reader: &Reader,
     page_number: u32,
 ) -> Result<PageHeader, SimpleError> {
-    let page_offset = ((page_number + 1) * (reader.page_size)) as u64;
+    let page_offset = (page_number + 1) as u64 * (reader.page_size) as u64;
 
     if reader.format_revision < ESEDB_FORMAT_REVISION_NEW_RECORD_FORMAT {
         let header = reader.read_struct::<PageHeaderOld>(page_offset)?;
@@ -973,7 +973,9 @@ mod test {
     use std::{str};
     use crate::esent::*;
     use std::ffi::CString;
-    use std::ptr::{null, null_mut};
+    use std::ptr::null_mut;
+    use crate::ese_parser;
+    use crate::ese_trait::EseDb;
 
     macro_rules! jetcall {
         ($call:expr) => {
@@ -1096,18 +1098,22 @@ mod test {
 
     impl Drop for EseAPI {
         fn drop(&mut self) {
+            println!("Dropping EseAPI");
+            
             if self.sesid != 0 {
                 jettry!(JetEndSession(self.sesid, 0));
             }
             if self.instance != 0 {
-                jettry!(JetTerm(self.instance));
+                jettry!(JetTerm2(self.instance, JET_bitTermComplete));
             }
         }
     }
 
-    fn prepare_db(filename: &str, pg_size: usize) -> PathBuf {
+    fn prepare_db(filename: &str, table: &str, pg_size: usize) -> PathBuf {
         let mut dst_path = PathBuf::from("testdata").canonicalize().unwrap();
         dst_path.push(filename);
+
+//return dst_path;
 
         if dst_path.exists() {
             let _ = fs::remove_file(&dst_path);
@@ -1126,7 +1132,7 @@ mod test {
         columns.push(EseAPI::create_text_column("compressed_ascii", JET_CP::ASCII, JET_bitColumnCompressed));
         columns.push(EseAPI::create_binary_column("compressed_binary", JET_bitColumnCompressed));
 
-        let tableid = db_client.create_table("test_table", &mut columns);
+        let tableid = db_client.create_table(table, &mut columns);
 
         for i in 0..1000 {
             let s = format!("Record {:1000}", i);
@@ -1157,7 +1163,8 @@ mod test {
     #[test]
     pub fn caching_test() -> Result<(), SimpleError> {
         let cache_size = 10u32;
-        let path = prepare_db("caching_test.edb", 1024 * 8);
+        let table = "test_table";
+        let path = prepare_db("caching_test.edb", table, 1024 * 8);
         let mut reader = Reader::new(&path, cache_size as usize)?;
         let page_size = reader.page_size;
         let num_of_pages = std::cmp::min(fs::metadata(&path).unwrap().len() as u32 / page_size, page_size);
@@ -1193,13 +1200,23 @@ mod test {
         Ok(())
     }
 
-    /*
-    #[test]
+     #[test]
     pub fn decompress_test() -> Result<(), SimpleError> {
-        let path = prepare_db("decompress_test.edb", 1024 * 8);
-        let mut reader = Reader::new(&path, cache_size as usize)?;
+         let table = "test_table";
+        let path = prepare_db("decompress_test.edb", table, 1024 * 8);
+        let mut jdb : ese_parser::EseParser = ese_parser::EseParser::init(5);
 
+        match jdb.load(&path.to_str().unwrap()) {
+             Some(e) => panic!("Error: {}", e),
+             None => println!("Loaded {}", path.display())
+        }
+
+        //let table_id = jdb.open_table(&table).unwrap();
+        let columns = jdb.get_columns(&table).unwrap();
+        for col in columns {
+            println!("{}", col.name)
+        }
         Ok(())
     }
-     */
+
 }
