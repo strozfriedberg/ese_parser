@@ -206,10 +206,11 @@ pub fn load_page_tags(
     db_page: &jet::DbPage,
 ) -> Result<Vec<PageTag>, SimpleError> {
     let page_offset = ((db_page.page_number + 1) * reader.page_size) as u64;
+    let tags_cnt = db_page.get_available_page_tag();
     let mut tags_offset = (page_offset + reader.page_size as u64) as u64;
-    let mut tags = Vec::<PageTag>::new();
+    let mut tags = Vec::<PageTag>::with_capacity(tags_cnt);
 
-    for _i in 0..db_page.get_available_page_tag() {
+    for _i in 0..tags_cnt {
         tags_offset -= 2;
         let page_tag_offset : u16 = reader.read_struct(tags_offset)?;
         tags_offset -= 2;
@@ -267,7 +268,7 @@ pub fn page_tag_get_branch_child_page_number(
     db_page: &jet::DbPage,
     page_tag: &PageTag,
 ) -> Result<u32, SimpleError> {
-    let page_offset = ((db_page.page_number + 1) * reader.page_size) as u64;
+    let page_offset = (db_page.page_number + 1) as u64 * reader.page_size as u64;
     let mut offset = page_offset + db_page.size() as u64 + page_tag.offset as u64;
 
     if page_tag.flags().intersects(jet::PageTagFlags::FLAG_HAS_COMMON_KEY_SIZE) {
@@ -279,7 +280,6 @@ pub fn page_tag_get_branch_child_page_number(
     offset += local_page_key_size as u64;
 
     let child_page_number : u32 = reader.read_struct(offset)?;
-    offset += 4;
 
     Ok(child_page_number)
 }
@@ -289,11 +289,6 @@ pub fn load_catalog(
 ) -> Result<Vec<jet::TableDefinition>, SimpleError> {
     let db_page = jet::DbPage::new(reader, jet::FixedPageNumber::Catalog as u32)?;
     let pg_tags = &db_page.page_tags;
-
-    if !db_page.flags().contains(jet::PageFlags::IS_PARENT) {
-        return Err(SimpleError::new(format!("pageno {}: IS_PARENT (branch) flag should be present",
-            db_page.page_number)));
-    }
 
     let is_root = db_page.flags().contains(jet::PageFlags::IS_ROOT);
 
@@ -307,7 +302,17 @@ pub fn load_catalog(
         column_catalog_definition_array: vec![], long_value_catalog_definition: None };
 
     let mut prev_page_number = db_page.page_number;
-    let mut page_number = page_tag_get_branch_child_page_number(reader, &db_page, &pg_tags[1])?;
+    let mut page_number =
+        if db_page.flags().contains(jet::PageFlags::IS_LEAF) {
+            prev_page_number
+        } else {
+            if !db_page.flags().contains(jet::PageFlags::IS_PARENT) {
+                return Err(SimpleError::new(format!("pageno {}: IS_PARENT (branch) flag should be present in {:?}",
+                                                    db_page.page_number, db_page.flags())));
+            }
+            page_tag_get_branch_child_page_number(reader, &db_page, &pg_tags[1])?
+        };
+
     while page_number != 0 {
         let db_page = jet::DbPage::new(reader, page_number)?;
         let pg_tags = &db_page.page_tags;
@@ -1113,7 +1118,7 @@ mod test {
         let mut dst_path = PathBuf::from("testdata").canonicalize().unwrap();
         dst_path.push(filename);
 
-//return dst_path;
+return dst_path;
 
         if dst_path.exists() {
             let _ = fs::remove_file(&dst_path);
@@ -1211,10 +1216,15 @@ mod test {
              None => println!("Loaded {}", path.display())
         }
 
-        //let table_id = jdb.open_table(&table).unwrap();
+        let table_id = jdb.open_table(&table).unwrap();
         let columns = jdb.get_columns(&table).unwrap();
         for col in columns {
-            println!("{}", col.name)
+            print!("{}: ", col.name);
+            match jdb.get_column_str(table_id, col.id, 0) {
+                Ok(result) =>
+                    if let Some(value) = result { println!("{}", value) } else { panic!("column '{}' has no value", col.name) },
+                Err(e) => panic!("error: {}", e),
+            }
         }
         Ok(())
     }
