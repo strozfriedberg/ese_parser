@@ -212,8 +212,9 @@ fn get_column<T>(jdb: &Box<dyn EseDb>, table: u64, column: u32) -> Result<Option
                 v.as_ptr(),
                 dst.as_mut_ptr() as *mut u8,
                 size);
+            return Ok(Some(dst.assume_init()));
         }
-        return Ok(Some(dst.assume_init()));
+        return Ok(None);
     }
 }
 
