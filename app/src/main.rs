@@ -426,38 +426,7 @@ fn get_column_val(jdb: &Box<dyn EseDb>, table_id: u64, c: &ColumnInfo) -> Result
     Ok(val)
 }
 
-fn dump_table(jdb: &Box<dyn EseDb>, t: &str) {
-    let table_id = jdb.open_table(&t).unwrap();
-    let cols = jdb.get_columns(&t).unwrap();
-    if !jdb.move_row(table_id, JET_MoveFirst as u32) {
-        // empty table
-        return ;
-    }
-    let mut rows : Vec<Vec<String>> = Vec::new();
-    loop {
-        let mut values : Vec<String> = Vec::new();
-        for c in &cols {
-            let val = get_column_val(jdb, table_id, &c);
-            match val {
-                Err(e) => {
-                    println!("Error: {}", e);
-                },
-                Ok(v) => {
-                    println!("{}", v);
-                    values.push(v);
-                }
-            }
-        }
-        assert_eq!(values.len(), cols.len());
-        rows.push(values);
-        if !jdb.move_row(table_id, JET_MoveNext) {
-            break;
-        }
-    }
-    jdb.close_table(table_id);
-
-    // print table
-
+fn print_table(cols: &Vec<ColumnInfo>, rows: &Vec<Vec<String>>) {
     let mut col_sp : Vec<usize> = Vec::new();
     for i in 0..cols.len() {
         let mut col_max_sz = cols[i].name.len();
@@ -482,6 +451,39 @@ fn dump_table(jdb: &Box<dyn EseDb>, t: &str) {
         }
         println!("{}|", row);
     }
+}
+
+fn dump_table(jdb: &Box<dyn EseDb>, t: &str)
+    -> Result<Option<(/*cols:*/Vec<ColumnInfo>, /*rows:*/Vec<Vec<String>>)>, SimpleError> {
+    let table_id = jdb.open_table(&t)?;
+    let cols = jdb.get_columns(&t)?;
+    if !jdb.move_row(table_id, JET_MoveFirst as u32) {
+        // empty table
+        return Ok(None);
+    }
+    let mut rows : Vec<Vec<String>> = Vec::new();
+    loop {
+        let mut values : Vec<String> = Vec::new();
+        for c in &cols {
+            let val = get_column_val(jdb, table_id, &c);
+            match val {
+                Err(e) => {
+                    println!("Error: {}", e);
+                    values.push("".to_string());
+                },
+                Ok(v) => {
+                    values.push(v);
+                }
+            }
+        }
+        assert_eq!(values.len(), cols.len());
+        rows.push(values);
+        if !jdb.move_row(table_id, JET_MoveNext) {
+            break;
+        }
+    }
+    jdb.close_table(table_id);
+    Ok(Some((cols, rows)))
 }
 
 #[derive(PartialEq, Debug)]
@@ -545,14 +547,23 @@ fn main() {
     }
     println!("loaded {}", dbpath);
 
+    let handle_table = |t: &str| {
+        println!("table {}", &t);
+        match dump_table(&jdb, &t) {
+            Ok(opt) => match opt {
+                Some((cols, rows)) => print_table(&cols, &rows),
+                None => println!("table {} is empty.", &t)
+            },
+            Err(e) => println!("table {}: {}", &t, e)
+        }
+    };
+
     if table.is_empty() {
         let tables = jdb.get_tables().unwrap();
         for t in tables {
-            println!("table {}", &t);
-            dump_table(&jdb, &t);
+            handle_table(&t);
         }
     } else {
-        println!("table {}", &table);
-        dump_table(&jdb, &table);
+        handle_table(&table);
     }
 }
