@@ -219,6 +219,213 @@ fn get_column<T>(jdb: &Box<dyn EseDb>, table: u64, column: u32) -> Result<Option
     }
 }
 
+fn get_column_val(jdb: &Box<dyn EseDb>, table_id: u64, c: &ColumnInfo) -> Result<String, SimpleError> {
+    let mut val = String::new();
+    match c.typ {
+        JET_coltypBit => {
+            assert!(c.cbmax as usize == size_of::<i8>());
+            match get_column::<i8>(jdb, table_id, c.id)? {
+                Some(v) => val = format!("{}", v),
+                None => val = format!(" ")
+            }
+        },
+        JET_coltypUnsignedByte => {
+            assert!(c.cbmax as usize == size_of::<u8>());
+            match get_column::<u8>(jdb, table_id, c.id)? {
+                Some(v) => val = format!("{}", v),
+                None => val = format!(" ")
+            }
+        },
+        JET_coltypShort => {
+            assert!(c.cbmax as usize == size_of::<i16>());
+            match get_column::<i16>(jdb, table_id, c.id)? {
+                Some(v) => val = format!("{}", v),
+                None => val = format!(" ")
+            }
+        },
+        JET_coltypUnsignedShort => {
+            assert!(c.cbmax as usize == size_of::<u16>());
+            match get_column::<u16>(jdb, table_id, c.id)? {
+                Some(v) => val = format!("{}", v),
+                None => val = format!(" ")
+            }
+        },
+        JET_coltypLong => {
+            assert!(c.cbmax as usize == size_of::<i32>());
+            match get_column::<i32>(jdb, table_id, c.id)? {
+                Some(v) => val = format!("{}", v),
+                None => val = format!(" ")
+            }
+        },
+        JET_coltypUnsignedLong => {
+            assert!(c.cbmax as usize == size_of::<u32>());
+            match get_column::<u32>(jdb, table_id, c.id)? {
+                Some(v) => val = format!("{}", v),
+                None => val = format!(" ")
+            }
+        },
+        JET_coltypLongLong => {
+            assert!(c.cbmax as usize == size_of::<i64>());
+            match get_column::<i64>(jdb, table_id, c.id)? {
+                Some(v) => val = format!("{}", v),
+                None => val = format!(" ")
+            }
+        },
+        JET_coltypUnsignedLongLong => {
+            assert!(c.cbmax as usize == size_of::<u64>());
+            match get_column::<u64>(jdb, table_id, c.id)? {
+                Some(v) => val = format!("{}", v),
+                None => val = format!(" ")
+            }
+        },
+        JET_coltypCurrency => {
+            assert!(c.cbmax as usize == size_of::<i64>());
+            match get_column::<i64>(jdb, table_id, c.id)? {
+                Some(v) => val = format!("{}", v),
+                None => val = format!(" ")
+            }
+        },
+        JET_coltypIEEESingle => {
+            assert!(c.cbmax as usize == size_of::<f32>());
+            match get_column::<f32>(jdb, table_id, c.id)? {
+                Some(v) => val = format!("{}", v),
+                None => val = format!(" ")
+            }
+        },
+        JET_coltypIEEEDouble => {
+            assert!(c.cbmax as usize == size_of::<f64>());
+            match get_column::<f64>(jdb, table_id, c.id)? {
+                Some(v) => val = format!("{}", v),
+                None => val = format!(" ")
+            }
+        },
+        JET_coltypBinary => {
+            match jdb.get_column_dyn(table_id, c.id, c.cbmax as usize)? {
+                Some(v) => {
+                    let s = v.iter().map(|c| format!("{:x?} ", c).to_string() ).collect::<String>();
+                    val = format!("{} ", s);
+                },
+                None => {
+                    val = format!(" ");
+                }
+            }
+        },
+        JET_coltypText => {
+            match jdb.get_column_dyn(table_id, c.id, c.cbmax as usize)? {
+                Some(v) => {
+                    if c.cp == 1200 {
+                        let t = v.as_slice();
+                        unsafe {
+                            let (_, v16, _) = t.align_to::<u16>();
+                            let U16Str = U16String::from_ptr(v16.as_ptr(), v16.len());
+                            let ws = U16Str.to_string_lossy();
+                            val = format!("{}", ws);
+                        }
+                    } else {
+                        let s = std::str::from_utf8(&v).unwrap();
+                        val = format!("{}", s);
+                    }
+                },
+                None => {
+                    val = format!(" ");
+                }
+            }
+        },
+        JET_coltypLongText => {
+            let v;
+            if c.cbmax == 0 {
+                v = jdb.get_column_dyn_varlen(table_id, c.id)?;
+            } else {
+                v = jdb.get_column_dyn(table_id, c.id, c.cbmax as usize)?;
+            }
+            match v {
+                Some(v) => {
+                    if c.cp == 1200 {
+                        let t = v.as_slice();
+                        unsafe {
+                            let (_, v16, _) = t.align_to::<u16>();
+                            let U16Str = U16String::from_ptr(v16.as_ptr(), v16.len());
+                            let ws = U16Str.to_string_lossy();
+                            if ws.len() > 32 {
+                                val = format!("{:4} bytes: {}...", ws.len(), truncate(&ws, 32).to_string());
+                            } else {
+                                val = format!("{}", ws);
+                            }
+                        }
+                    } else {
+                        let s = std::str::from_utf8(&v).unwrap();
+                        val = format!("{}", s);
+                    }
+                },
+                None => {
+                    val = format!(" ");
+                }
+            }
+        },
+        JET_coltypLongBinary => {
+            let v;
+            if c.cbmax == 0 {
+                v = jdb.get_column_dyn_varlen(table_id, c.id)?;
+            } else {
+                v = jdb.get_column_dyn(table_id, c.id, c.cbmax as usize)?;
+            }
+            match v {
+                Some(mut v) => {
+                    let orig_size = v.len();
+                    v.truncate(16);
+                    let s = v.iter().map(|c| format!("{:02x} ", c).to_string() ).collect::<String>();
+                    val = format!("{:4} bytes: {}...", orig_size, s);
+                },
+                None => {
+                    val = format!(" ");
+                }
+            }
+        },
+        JET_coltypGUID => {
+            match jdb.get_column_dyn(table_id, c.id, c.cbmax as usize)? {
+                Some(v) => {
+                    unsafe {
+                        let mut guid_str : Vec<u16> = Vec::new();
+                        // 39 - is len of {12345678-1234-1234-1234-123456789abc}\0
+                        guid_str.resize(39, 0);
+                        let r = StringFromGUID2(v.as_ptr() as *const std::os::raw::c_void,
+                            guid_str.as_mut_ptr() as *const u16, guid_str.len() as i32);
+                        if r > 0 {
+                            let s = OsString::from_wide(&guid_str).into_string().unwrap();
+                            val = format!("{} ", s);
+                        }
+                    }
+                },
+                None => {
+                    val = format!(" ");
+                }
+            }
+        },
+        JET_coltypDateTime => {
+            assert!(c.cbmax as usize == size_of::<f64>());
+            match get_column::<f64>(jdb, table_id, c.id)? {
+                Some(v) => {
+                    let mut st = MaybeUninit::<SYSTEMTIME>::zeroed();
+                    unsafe {
+                        let r = VariantTimeToSystemTime(v, st.as_mut_ptr());
+                        if r == 1 {
+                            let s = st.assume_init();
+                            val = format!("{}.{}.{} {}:{}:{}", s.wDay, s.wMonth, s.wYear, s.wHour, s.wMinute, s.wSecond);
+                        } else {
+                            return Err(SimpleError::new(format!("VariantTimeToSystemTime failed")));
+                        }
+                    }
+                },
+                None => val = format!(" ")
+            }
+        },
+        _ => {
+            return Err(SimpleError::new(format!("Incorrect column type: {}, max is 19", c.typ)));
+        }
+    }
+    Ok(val)
+}
+
 fn dump_table(jdb: &Box<dyn EseDb>, t: &str) {
     let table_id = jdb.open_table(&t).unwrap();
     let cols = jdb.get_columns(&t).unwrap();
@@ -230,246 +437,16 @@ fn dump_table(jdb: &Box<dyn EseDb>, t: &str) {
     loop {
         let mut values : Vec<String> = Vec::new();
         for c in &cols {
-            let mut val = String::new();
-            match c.typ {
-                JET_coltypBit => {
-                    assert!(c.cbmax as usize == size_of::<i8>());
-                    match get_column::<i8>(jdb, table_id, c.id).unwrap() {
-                        Some(v) => val = format!("{}", v),
-                        None => val = format!(" ")
-                    }
+            let val = get_column_val(jdb, table_id, &c);
+            match val {
+                Err(e) => {
+                    println!("Error: {}", e);
                 },
-                JET_coltypUnsignedByte => {
-                    assert!(c.cbmax as usize == size_of::<u8>());
-                    match get_column::<u8>(jdb, table_id, c.id).unwrap() {
-                        Some(v) => val = format!("{}", v),
-                        None => val = format!(" ")
-                    }
-                },
-                JET_coltypShort => {
-                    assert!(c.cbmax as usize == size_of::<i16>());
-                    match get_column::<i16>(jdb, table_id, c.id).unwrap() {
-                        Some(v) => val = format!("{}", v),
-                        None => val = format!(" ")
-                    }
-                },
-                JET_coltypUnsignedShort => {
-                    assert!(c.cbmax as usize == size_of::<u16>());
-                    match get_column::<u16>(jdb, table_id, c.id).unwrap() {
-                        Some(v) => val = format!("{}", v),
-                        None => val = format!(" ")
-                    }
-                },
-                JET_coltypLong => {
-                    assert!(c.cbmax as usize == size_of::<i32>());
-                    match get_column::<i32>(jdb, table_id, c.id).unwrap() {
-                        Some(v) => val = format!("{}", v),
-                        None => val = format!(" ")
-                    }
-                },
-                JET_coltypUnsignedLong => {
-                    assert!(c.cbmax as usize == size_of::<u32>());
-                    match get_column::<u32>(jdb, table_id, c.id).unwrap() {
-                        Some(v) => val = format!("{}", v),
-                        None => val = format!(" ")
-                    }
-                },
-                JET_coltypLongLong => {
-                    assert!(c.cbmax as usize == size_of::<i64>());
-                    match get_column::<i64>(jdb, table_id, c.id).unwrap() {
-                        Some(v) => val = format!("{}", v),
-                        None => val = format!(" ")
-                    }
-                },
-                JET_coltypUnsignedLongLong => {
-                    assert!(c.cbmax as usize == size_of::<u64>());
-                    match get_column::<u64>(jdb, table_id, c.id).unwrap() {
-                        Some(v) => val = format!("{}", v),
-                        None => val = format!(" ")
-                    }
-                },
-                JET_coltypCurrency => {
-                    assert!(c.cbmax as usize == size_of::<i64>());
-                    match get_column::<i64>(jdb, table_id, c.id).unwrap() {
-                        Some(v) => val = format!("{}", v),
-                        None => val = format!(" ")
-                    }
-                },
-                JET_coltypIEEESingle => {
-                    assert!(c.cbmax as usize == size_of::<f32>());
-                    match get_column::<f32>(jdb, table_id, c.id).unwrap() {
-                        Some(v) => val = format!("{}", v),
-                        None => val = format!(" ")
-                    }
-                },
-                JET_coltypIEEEDouble => {
-                    assert!(c.cbmax as usize == size_of::<f64>());
-                    match get_column::<f64>(jdb, table_id, c.id).unwrap() {
-                        Some(v) => val = format!("{}", v),
-                        None => val = format!(" ")
-                    }
-                },
-                JET_coltypBinary => {
-                    match jdb.get_column_dyn(table_id, c.id, c.cbmax as usize) {
-                        Ok(ov) => {
-                            match ov {
-                                Some(v) => {
-                                    let s = v.iter().map(|c| format!("{:x?} ", c).to_string() ).collect::<String>();
-                                    val = format!("{} ", s);
-                                },
-                                None => {
-                                    val = format!(" ");
-                                }
-                            }
-                        },
-                        Err(e) => {
-                            println!("get_column_dyn failed with error {}", e);
-                        }
-                    }
-                },
-                JET_coltypText => {
-                    match jdb.get_column_dyn(table_id, c.id, c.cbmax as usize) {
-                        Ok(ov) => {
-                            match ov {
-                                Some(v) => {
-                                    if c.cp == 1200 {
-                                        let t = v.as_slice();
-                                        unsafe {
-                                            let (_, v16, _) = t.align_to::<u16>();
-                                            let U16Str = U16String::from_ptr(v16.as_ptr(), v16.len());
-                                            let ws = U16Str.to_string_lossy();
-                                            val = format!("{}", ws);
-                                        }
-                                    } else {
-                                        let s = std::str::from_utf8(&v).unwrap();
-                                        val = format!("{}", s);
-                                    }
-                                },
-                                None => {
-                                    val = format!(" ");
-                                }
-                            }
-                        },
-                        Err(e) => {
-                            println!("get_column_dyn failed with error {}", e);
-                        }
-                    }
-                },
-                JET_coltypLongText => {
-                    let v;
-                    if c.cbmax == 0 {
-                        v = jdb.get_column_dyn_varlen(table_id, c.id);
-                    } else {
-                        v = jdb.get_column_dyn(table_id, c.id, c.cbmax as usize);
-                    }
-                    match v {
-                        Ok(ov) => {
-                            match ov {
-                                Some(v) => {
-                                    if c.cp == 1200 {
-                                        let t = v.as_slice();
-                                        unsafe {
-                                            let (_, v16, _) = t.align_to::<u16>();
-                                            let U16Str = U16String::from_ptr(v16.as_ptr(), v16.len());
-                                            let ws = U16Str.to_string_lossy();
-                                            if ws.len() > 32 {
-                                                val = format!("{:4} bytes: {}...", ws.len(), truncate(&ws, 32).to_string());
-                                            } else {
-                                                val = format!("{}", ws);
-                                            }
-                                        }
-                                    } else {
-                                        let s = std::str::from_utf8(&v).unwrap();
-                                        val = format!("{}", s);
-                                    }
-                                },
-                                None => {
-                                    val = format!(" ");
-                                }
-                            }
-                        },
-                        Err(e) => {
-                            println!("get_column_dyn failed with error {}", e);
-                        }
-                    }
-                },
-                JET_coltypLongBinary => {
-                    let v;
-                    if c.cbmax == 0 {
-                        v = jdb.get_column_dyn_varlen(table_id, c.id);
-                    } else {
-                        v = jdb.get_column_dyn(table_id, c.id, c.cbmax as usize);
-                    }
-                    match v {
-                        Ok(ov) => {
-                            match ov {
-                                Some(mut v) => {
-                                    let orig_size = v.len();
-                                    v.truncate(16);
-                                    let s = v.iter().map(|c| format!("{:02x} ", c).to_string() ).collect::<String>();
-                                    val = format!("{:4} bytes: {}...", orig_size, s);
-                                },
-                                None => {
-                                    val = format!(" ");
-                                }
-                            }
-                        },
-                        Err(e) => {
-                            println!("get_column_dyn failed with error {}", e);
-                        }
-                    }
-                },
-                JET_coltypGUID => {
-                    match jdb.get_column_dyn(table_id, c.id, c.cbmax as usize) {
-                        Ok(ov) => {
-                            match ov {
-                                Some(v) => {
-                                    unsafe {
-                                        let mut guid_str : Vec<u16> = Vec::new();
-                                        // 39 - is len of {12345678-1234-1234-1234-123456789abc}\0
-                                        guid_str.resize(39, 0);
-                                        let r = StringFromGUID2(v.as_ptr() as *const std::os::raw::c_void,
-                                            guid_str.as_mut_ptr() as *const u16, guid_str.len() as i32);
-                                        if r > 0 {
-                                            let s = OsString::from_wide(&guid_str).into_string().unwrap();
-                                            val = format!("{} ", s);
-                                        }
-                                    }
-                                },
-                                None => {
-                                    val = format!(" ");
-                                }
-                            }
-                        },
-                        Err(e) => {
-                            println!("get_column_dyn failed with error {}", e);
-                        }
-                    }
-                },
-                JET_coltypDateTime => {
-                    assert!(c.cbmax as usize == size_of::<f64>());
-                    match get_column::<f64>(jdb, table_id, c.id).unwrap() {
-                        Some(v) => {
-                            let mut st = MaybeUninit::<SYSTEMTIME>::zeroed();
-                            unsafe {
-                                let r = VariantTimeToSystemTime(v, st.as_mut_ptr());
-                                if r == 1 {
-                                    let s = st.assume_init();
-                                    val = format!("{}.{}.{} {}:{}:{}", s.wDay, s.wMonth, s.wYear, s.wHour, s.wMinute, s.wSecond);
-                                } else {
-                                    println!("VariantTimeToSystemTime failed");
-                                }
-                            }
-                        },
-                        None => val = format!(" ")
-                    }
-                },
-                _ => {
-                    println!("Incorrect column type: {}, max is 19", c.typ);
+                Ok(v) => {
+                    println!("{}", v);
+                    values.push(v);
                 }
             }
-            //println!("{}", val);
-            values.push(val);
         }
         assert_eq!(values.len(), cols.len());
         rows.push(values);
