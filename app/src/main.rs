@@ -11,6 +11,7 @@ use std::ffi::OsString;
 use std::os::windows::prelude::*;
 
 use simple_error::SimpleError;
+use widestring::U16String;
 
 const CACHE_SIZE_ENTRIES : usize = 10;
 
@@ -335,9 +336,9 @@ fn dump_table(jdb: &Box<dyn EseDb>, t: &str) {
                                         let t = v.as_slice();
                                         unsafe {
                                             let (_, v16, _) = t.align_to::<u16>();
-                                            let ws = OsString::from_wide(&v16);
-                                            let wss = ws.into_string().unwrap();
-                                            val = format!("{}", wss);
+                                            let U16Str = U16String::from_ptr(v16.as_ptr(), v16.len());
+                                            let ws = U16Str.to_string_lossy();
+                                            val = format!("{}", ws);
                                         }
                                     } else {
                                         let s = std::str::from_utf8(&v).unwrap();
@@ -369,12 +370,12 @@ fn dump_table(jdb: &Box<dyn EseDb>, t: &str) {
                                         let t = v.as_slice();
                                         unsafe {
                                             let (_, v16, _) = t.align_to::<u16>();
-                                            let ws = OsString::from_wide(&v16);
-                                            let wss = ws.into_string().unwrap();
-                                            if wss.len() > 20 {
-                                                val = format!("{:4} bytes: {}...", wss.len(), truncate(&wss, 32).to_string());
+                                            let U16Str = U16String::from_ptr(v16.as_ptr(), v16.len());
+                                            let ws = U16Str.to_string_lossy();
+                                            if ws.len() > 32 {
+                                                val = format!("{:4} bytes: {}...", ws.len(), truncate(&ws, 32).to_string());
                                             } else {
-                                                val = format!("{}", wss);
+                                                val = format!("{}", ws);
                                             }
                                         }
                                     } else {
