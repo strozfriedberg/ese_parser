@@ -425,12 +425,13 @@ fn dump_table(jdb: &Box<dyn EseDb>, t: &str) {
                             match ov {
                                 Some(v) => {
                                     unsafe {
-                                        let mut vstr : Vec<u16> = Vec::new();
-                                        vstr.resize(39, 0);
+                                        let mut guid_str : Vec<u16> = Vec::new();
+                                        // 39 - is len of {12345678-1234-1234-1234-123456789abc}\0
+                                        guid_str.resize(39, 0);
                                         let r = StringFromGUID2(v.as_ptr() as *const std::os::raw::c_void,
-                                            vstr.as_mut_ptr() as *const u16, vstr.len() as i32);
+                                            guid_str.as_mut_ptr() as *const u16, guid_str.len() as i32);
                                         if r > 0 {
-                                            let s = OsString::from_wide(&vstr).into_string().unwrap();
+                                            let s = OsString::from_wide(&guid_str).into_string().unwrap();
                                             val = format!("{} ", s);
                                         }
                                     }
