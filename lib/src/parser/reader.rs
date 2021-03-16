@@ -12,10 +12,10 @@ use crate::parser::jet;
 
 pub struct Reader {
     file: RefCell<fs::File>,
-    cache: RefCell<Cache<u32, Vec<u8>>>,
+    cache: RefCell<Cache<usize, Vec<u8>>>,
     format_version: jet::FormatVersion,
     format_revision: jet::FormatRevision,
-    page_size: u32,
+    page_size: u64,
     last_page_number: u32,
 }
 
@@ -94,7 +94,7 @@ impl Reader {
         let db_fh = reader.load_db_file_header()?;
         reader.format_version = db_fh.format_version;
         reader.format_revision = db_fh.format_revision;
-        reader.page_size = db_fh.page_size;
+        reader.page_size = db_fh.page_size as u64;
         reader.last_page_number = (db_fh.page_size * 2) / db_fh.page_size;
 
         reader.cache.get_mut().clear();
@@ -103,7 +103,7 @@ impl Reader {
     }
 
     fn read(&self, offset: u64, buf: &mut [u8]) -> Result<(), SimpleError> {
-        let pg_no = (offset / self.page_size as u64) as u32;
+        let pg_no = (offset / self.page_size as u64) as usize;
         let mut c = self.cache.borrow_mut();
         if !c.contains_key(&pg_no) {
             let mut page_buf = vec![0u8; self.page_size as usize];
@@ -205,7 +205,7 @@ pub fn load_page_tags(
     reader: &Reader,
     db_page: &jet::DbPage,
 ) -> Result<Vec<PageTag>, SimpleError> {
-    let page_offset = ((db_page.page_number + 1) * reader.page_size) as u64;
+    let page_offset = (db_page.page_number + 1) as u64 * reader.page_size;
     let tags_cnt = db_page.get_available_page_tag();
     let mut tags_offset = (page_offset + reader.page_size as u64) as u64;
     let mut tags = Vec::<PageTag>::with_capacity(tags_cnt);
@@ -247,7 +247,7 @@ pub fn load_root_page_header(
     db_page: &jet::DbPage,
     page_tag: &PageTag,
 ) -> Result<RootPageHeader, SimpleError> {
-    let page_offset = ((db_page.page_number + 1) * reader.page_size) as u64;
+    let page_offset = (db_page.page_number + 1) as u64 * reader.page_size;
     let root_page_offset = page_offset + db_page.size() as u64 + page_tag.offset as u64;
 
     // TODO Seen in format version 0x620 revision 0x14
@@ -301,17 +301,18 @@ pub fn load_catalog(
     let mut table_def : jet::TableDefinition = jet::TableDefinition { table_catalog_definition: None,
         column_catalog_definition_array: vec![], long_value_catalog_definition: None };
 
-    let mut prev_page_number = db_page.page_number;
     let mut page_number =
-        if db_page.flags().contains(jet::PageFlags::IS_LEAF) {
-            prev_page_number
+        if db_page.flags().contains(jet::PageFlags::IS_PARENT) {
+            page_tag_get_branch_child_page_number(reader, &db_page, &pg_tags[1])?
         } else {
-            if !db_page.flags().contains(jet::PageFlags::IS_PARENT) {
+            if db_page.flags().contains(jet::PageFlags::IS_LEAF) {
+                db_page.page_number
+            } else {
                 return Err(SimpleError::new(format!("pageno {}: IS_PARENT (branch) flag should be present in {:?}",
                                                     db_page.page_number, db_page.flags())));
             }
-            page_tag_get_branch_child_page_number(reader, &db_page, &pg_tags[1])?
         };
+    let mut prev_page_number = db_page.page_number;
 
     while page_number != 0 {
         let db_page = jet::DbPage::new(reader, page_number)?;
@@ -369,7 +370,7 @@ pub fn load_catalog_item(
     db_page: &jet::DbPage,
     page_tag: &PageTag,
 ) -> Result<jet::CatalogDefinition, SimpleError> {
-    let page_offset = ((db_page.page_number + 1) * reader.page_size) as u64;
+    let page_offset = (db_page.page_number + 1) as u64 * reader.page_size;
     let mut offset = page_offset + db_page.size() as u64 + page_tag.offset as u64;
 
     let mut first_word_readed = false;
@@ -520,7 +521,7 @@ pub fn load_data(
     }
 
     let page_tag = &pg_tags[page_tag_index];
-    let page_offset = ((db_page.page_number + 1) * reader.page_size) as u64;
+    let page_offset = (db_page.page_number + 1) as u64 * reader.page_size;
     let mut offset = page_offset + db_page.size() as u64 + page_tag.offset as u64;
     let offset_start = offset;
 
@@ -774,7 +775,7 @@ pub fn load_lv_tag(
     page_tag: &PageTag,
     page_tag_0: &PageTag
 ) -> Result<Option<LV_tags>, SimpleError> {
-    let page_offset = ((db_page.page_number + 1) * reader.page_size) as u64;
+    let page_offset = (db_page.page_number + 1) as u64 * reader.page_size;
     let mut offset = page_offset + db_page.size() as u64 + page_tag.offset as u64;
     let page_tag_offset : u64 = offset;
 
@@ -975,12 +976,11 @@ pub fn load_lv_data(
 #[allow(dead_code)]
 mod test {
     use super::*;
-    use std::{str};
+    use std::{str, ffi::CString, ptr::null_mut, convert::TryFrom};
     use crate::esent::*;
-    use std::ffi::CString;
-    use std::ptr::null_mut;
     use crate::ese_parser;
     use crate::ese_trait::EseDb;
+    use encoding::{all::{ASCII, UTF_16LE, UTF_8}, Encoding, EncoderTrap};
 
     macro_rules! jetcall {
         ($call:expr) => {
@@ -1019,6 +1019,18 @@ mod test {
         ASCII = 1252
     }
 
+    impl TryFrom<u32> for JET_CP {
+        type Error = ();
+
+        fn try_from(v: u32) -> Result<Self, Self::Error> {
+            match v {
+                x if x == JET_CP::None as u32 => Ok(JET_CP::None),
+                x if x == JET_CP::ASCII as u32 => Ok(JET_CP::ASCII),
+                x if x == JET_CP::Unicode as u32 => Ok(JET_CP::Unicode),
+                _ => Err(()),
+            }
+        }
+    }
     impl EseAPI {
         fn new(pg_size: usize) -> EseAPI {
             EseAPI::set_system_parameter_l(JET_paramDatabasePageSize, pg_size as u64);
@@ -1114,11 +1126,11 @@ mod test {
         }
     }
 
-    fn prepare_db(filename: &str, table: &str, pg_size: usize) -> PathBuf {
+    fn prepare_db(filename: &str, table: &str, pg_size: usize, record_size: usize, records_cnt: usize) -> PathBuf {
         let mut dst_path = PathBuf::from("testdata").canonicalize().unwrap();
         dst_path.push(filename);
 
-return dst_path;
+//return dst_path;
 
         if dst_path.exists() {
             let _ = fs::remove_file(&dst_path);
@@ -1132,34 +1144,50 @@ return dst_path;
 
         let mut columns = Vec::<JET_COLUMNCREATE_A>::with_capacity(5);
         //columns.push(EseAPI::create_num_column("PK",JET_bitColumnAutoincrement));
-        columns.push(EseAPI::create_text_column("Value", JET_CP::None, JET_bitColumnTagged));
         columns.push(EseAPI::create_text_column("compressed_unicode", JET_CP::Unicode, JET_bitColumnCompressed));
         columns.push(EseAPI::create_text_column("compressed_ascii", JET_CP::ASCII, JET_bitColumnCompressed));
         columns.push(EseAPI::create_binary_column("compressed_binary", JET_bitColumnCompressed));
+        columns.push(EseAPI::create_text_column("usual_text", JET_CP::None, JET_bitColumnTagged));
 
         let tableid = db_client.create_table(table, &mut columns);
 
-        for i in 0..1000 {
-            let s = format!("Record {:1000}", i);
+        for i in 0..records_cnt {
+            let s = format!("Record {number:>width$}", number=i, width=record_size);
 
+            db_client.begin_transaction();
+
+            jettry!(JetPrepareUpdate(db_client.sesid, tableid, JET_prepInsert));
             for col in &columns {
+                let data = match col.cp.try_into() {
+                    Ok(JET_CP::Unicode) => match UTF_16LE.encode(&s, EncoderTrap::Strict) {
+                        Ok(data) => data,
+                        Err(e) => panic!("{}", e),
+                    },
+                    Ok(JET_CP::ASCII) => match ASCII.encode(&s, EncoderTrap::Strict) {
+                        Ok(data) => data,
+                        Err(e) => panic!("{}", e),
+                    },
+                    Ok(JET_CP::None) => match UTF_8.encode(&s, EncoderTrap::Strict) {
+                        Ok(data) => data,
+                        Err(e) => panic!("{}", e),
+                    },
+                    Err(e) => panic!("{:?}", e),
+                };
+
                 let mut setColumn = JET_SETCOLUMN {
                     columnid: col.columnid,
-                    pvData: s.as_ptr() as *const raw::c_void,
-                    cbData: s.len() as raw::c_ulong,
+                    pvData: data.as_ptr() as *const raw::c_void,
+                    cbData: data.len() as raw::c_ulong,
                     grbit: col.grbit,
                     ibLongValue: 0, itagSequence: 0, err: 0 };
 
                 //println!("'{}' {}", s, s.len());
 
-                db_client.begin_transaction();
-
-                jettry!(JetPrepareUpdate(db_client.sesid, tableid, JET_prepInsert));
                 jettry!(JetSetColumns(db_client.sesid, tableid, &mut setColumn, 1));
-                jettry!(JetUpdate(db_client.sesid, tableid, ptr::null_mut(), 0, ptr::null_mut()));
-
-                db_client.commit_transaction();
             }
+
+            jettry!(JetUpdate(db_client.sesid, tableid, ptr::null_mut(), 0, ptr::null_mut()));
+            db_client.commit_transaction();
         }
 
         dst_path
@@ -1167,29 +1195,29 @@ return dst_path;
 
     #[test]
     pub fn caching_test() -> Result<(), SimpleError> {
-        let cache_size = 10u32;
+        let cache_size: usize = 10;
         let table = "test_table";
-        let path = prepare_db("caching_test.edb", table, 1024 * 8);
+        let path = prepare_db("caching_test.edb", table, 1024 * 8, 1024, 4000);
         let mut reader = Reader::new(&path, cache_size as usize)?;
         let page_size = reader.page_size;
-        let num_of_pages = std::cmp::min(fs::metadata(&path).unwrap().len() as u32 / page_size, page_size);
+        let num_of_pages = std::cmp::min(fs::metadata(&path).unwrap().len() / page_size, page_size) as usize;
         let full_cache_size = 6 * cache_size;
         let stride = num_of_pages / full_cache_size;
-        let chunk_size = page_size / num_of_pages;
+        let chunk_size = page_size as usize / num_of_pages;
         let mut chunks = Vec::<Vec<u8>>::with_capacity(stride as usize);
 
         println!("cache_size: {}, page_size: {}, num_of_pages: {}, stride: {}, chunk_size: {}",
             cache_size, page_size, num_of_pages, stride, chunk_size);
 
         for pass in 1..3 {
-            for pg_no in 1..12 {
-                let offset: u64 = (pg_no * (page_size + chunk_size)) as u64;
+            for pg_no in 1_usize..12_usize {
+                let offset: u64 = (pg_no * (page_size as usize + chunk_size)) as u64;
 
                 println!("pass {}, pg_no {}, offset {:x} ", pass, pg_no, offset);
 
                 if pass == 1 {
                     let mut chunk = Vec::<u8>::with_capacity(stride as usize);
-                    assert!(!reader.cache.get_mut().contains_key(&pg_no));
+                    assert!(!reader.cache.get_mut().contains_key(&pg_no as &usize));
                     reader.read(offset, &mut chunk)?;
                     chunks.push(chunk);
                 } else {
@@ -1207,8 +1235,8 @@ return dst_path;
 
      #[test]
     pub fn decompress_test() -> Result<(), SimpleError> {
-         let table = "test_table";
-        let path = prepare_db("decompress_test.edb", table, 1024 * 8);
+        let table = "test_table";
+        let path = prepare_db("decompress_test.edb", table, 1024 * 8, 10, 10);
         let mut jdb : ese_parser::EseParser = ese_parser::EseParser::init(5);
 
         match jdb.load(&path.to_str().unwrap()) {
@@ -1216,16 +1244,26 @@ return dst_path;
              None => println!("Loaded {}", path.display())
         }
 
+        let mut all_records_ok = true;
         let table_id = jdb.open_table(&table).unwrap();
         let columns = jdb.get_columns(&table).unwrap();
         for col in columns {
             print!("{}: ", col.name);
             match jdb.get_column_str(table_id, col.id, 0) {
                 Ok(result) =>
-                    if let Some(value) = result { println!("{}", value) } else { panic!("column '{}' has no value", col.name) },
+                    if let Some(value) = result {
+                        println!("{}", value);
+                    }
+                    else {
+                        println!("column '{}' has no value", col.name);
+                        all_records_ok = false;
+                    },
                 Err(e) => panic!("error: {}", e),
             }
         }
+
+        assert!(all_records_ok);
+
         Ok(())
     }
 
