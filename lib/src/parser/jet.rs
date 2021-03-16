@@ -342,7 +342,7 @@ impl PageTag {
     }
 }
 
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 #[repr(C)]
 pub struct CatalogDefinition {
     pub father_data_page_object_identifier: uint32_t,
