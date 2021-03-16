@@ -7,8 +7,9 @@
 #include <windows.h>
 #include <tchar.h>
 #include <strsafe.h>
+#include <stdlib.h>
 
-#include <iostream>
+#include <cstdint>
 
 #include <Esent.h>
 
@@ -127,6 +128,26 @@ struct CDataCompressor {
         _In_opt_ void *             pvContext,
         _Post_ptr_invalid_ void *   pvAlloc );
 };
+
+extern "C" {
+    uint32_t decompress(uint8_t const *data,
+                        uint32_t data_size,
+                        uint8_t * const out_buffer,
+                        uint32_t out_buffer_size,
+                        uint32_t * decompressed) {
+        static CDataCompressor  worker;
+        DATA    dataCompressed;
+
+        dataCompressed.SetPv((void *)data);
+        dataCompressed.SetCb(data_size);
+
+        INT     actual = 0;
+        ERR     res = worker.ErrDecompress(dataCompressed, out_buffer, out_buffer_size, &actual);
+        *decompressed = actual;
+
+        return res;
+    }
+}
 
 ERR CDataCompressor::ErrDecompress(
     const DATA& dataCompressed,
@@ -472,9 +493,9 @@ void CDataCompressor::XpressDecodeRelease_( XpressDecodeStream decode )
     }
 }
 
-
+/*
 int main()
 {
     std::cout << "Hello World!\n";
 }
-
+*/
