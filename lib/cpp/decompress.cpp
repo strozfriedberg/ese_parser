@@ -493,9 +493,30 @@ void CDataCompressor::XpressDecodeRelease_( XpressDecodeStream decode )
     }
 }
 
-/*
+#ifndef RUST_LIBRARY
+//======================================================
+#include <iostream>
+#include <vector>
+#include <string>
+
 int main()
 {
-    std::cout << "Hello World!\n";
+    uint8_t     data[] {"\x16���-'�@ \x10\b\x4\x2�@0"};
+    uint32_t    decompressed = 0;
+    uint32_t    res = decompress(data, sizeof(data), nullptr, 0, &decompressed);
+
+    if (res == JET_wrnBufferTruncated) {
+        std::vector<uint8_t>    buf(decompressed);
+
+        if ((res = decompress(data, sizeof(data), buf.data(), buf.size(), &decompressed)) == JET_errSuccess) {
+            std::string         str((char*)buf.data(), buf.size());
+
+            std::cout << "decompressed = " << decompressed << ": '" << str << "'\n";
+        }
+        else
+            std::cerr << "ERROR: " << res;
+    }
+    else
+        std::cerr << "ERROR: res (" << res << ") != JET_wrnBufferTruncated!";
 }
-*/
+#endif //RUST_LIBRARY
