@@ -199,35 +199,35 @@ INLINE const CHAR * const SzNewFile();
 INLINE ULONG UlNewLine();
 #endif
 
-_Ret_maybenull_ _Post_writable_byte_size_(cbSize)
-INLINE void* __cdecl operator new( const size_t cbSize )
-{
-#ifdef MEM_CHECK
-    return g_fMemCheck?
-            PvOSMemoryHeapAlloc_( cbSize, SzNewFile(), UlNewLine() ):
-            PvOSMemoryHeapAlloc__( cbSize );
-#else
-    return PvOSMemoryHeapAlloc( cbSize );
-#endif
-}
-
-#ifdef MEM_CHECK
-BOOL FOSMemoryNewMemCheck_( __in_z const CHAR* const szFileName, const ULONG ulLine );
-
-#define new     ( g_fMemCheck && !FOSMemoryNewMemCheck_( __FILE__, __LINE__ ) ) ? NULL : new
-#endif
-
-INLINE void __cdecl operator delete( void* const pv )
-{
-    OSMemoryHeapFree( pv );
-}
-
-#pragma push_macro("new")
-#undef new
-_Ret_maybenull_ _Post_writable_byte_size_(size)
-inline void* __cdecl operator new[](size_t size) { return operator new(size); }
-inline void __cdecl operator delete[](void* p) { operator delete(p); }
-#pragma pop_macro("new")
+//_Ret_maybenull_ _Post_writable_byte_size_(cbSize)
+//INLINE void* __cdecl operator new( const size_t cbSize )
+//{
+//#ifdef MEM_CHECK
+//    return g_fMemCheck?
+//            PvOSMemoryHeapAlloc_( cbSize, SzNewFile(), UlNewLine() ):
+//            PvOSMemoryHeapAlloc__( cbSize );
+//#else
+//    return PvOSMemoryHeapAlloc( cbSize );
+//#endif
+//}
+//
+//#ifdef MEM_CHECK
+//BOOL FOSMemoryNewMemCheck_( __in_z const CHAR* const szFileName, const ULONG ulLine );
+//
+//#define new     ( g_fMemCheck && !FOSMemoryNewMemCheck_( __FILE__, __LINE__ ) ) ? NULL : new
+//#endif
+//
+//INLINE void __cdecl operator delete( void* const pv )
+//{
+//    OSMemoryHeapFree( pv );
+//}
+//
+//#pragma push_macro("new")
+//#undef new
+//_Ret_maybenull_ _Post_writable_byte_size_(size)
+//inline void* __cdecl operator new[](size_t size) { return operator new(size); }
+//inline void __cdecl operator delete[](void* p) { operator delete(p); }
+//#pragma pop_macro("new")
 
 
 
