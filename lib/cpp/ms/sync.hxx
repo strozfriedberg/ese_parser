@@ -769,8 +769,8 @@ class CEnhancedStateContainer
                 {
                 }
 
-                void* operator new( size_t cb ) { return ESMemoryNew( cb ); }
-                void operator delete( void* pv ) { ESMemoryDelete( pv ); }
+                //void* operator new( size_t cb ) { return ESMemoryNew( cb ); }
+                //void operator delete( void* pv ) { ESMemoryDelete( pv ); }
         };
 
 
