@@ -10,6 +10,14 @@ use crate::parser::ese_db;
 use crate::parser::ese_db::*;
 use crate::parser::jet;
 
+extern "C" {
+    fn decompress(  data: *const u8,
+                    data_size: u32,
+                    out_buffer: *mut u8,
+                    out_buffer_size: u32,
+                    decompressed: *mut u32) -> u32;
+}
+
 pub struct Reader {
     file: RefCell<fs::File>,
     cache: RefCell<Cache<usize, Vec<u8>>>,
@@ -746,7 +754,20 @@ pub fn load_data(
                                 return Ok(Some(v));
                             }
                         } else if dtf.intersects(jet::TaggedDataTypeFlag::COMPRESSED) {
-                            println!("{} unsupported data type flags: {:?}", col.name, dtf);
+                            const JET_wrnBufferTruncated: u32 = 1006;
+                            const JET_errSuccess: u32 = 0;
+                            let mut decompressed: u32 = 0;
+                            let v = reader.read_bytes(offset, tagged_data_type_size as usize)?;
+                            let mut res = unsafe { decompress(v.as_ptr(), v.len() as u32, ptr::null_mut(), 0, &mut decompressed) };
+
+                            assert_eq!(res, JET_wrnBufferTruncated);
+
+                            let mut  buf = Vec::<u8>::with_capacity(decompressed as usize);
+                            unsafe { buf.set_len(buf.capacity()); }
+                            res = unsafe { decompress(v.as_ptr(), v.len() as u32, buf.as_mut_ptr(), buf.len() as u32, &mut decompressed) };
+                            assert_eq!(res, JET_errSuccess);
+
+                            return Ok(Some(buf));
                         } else {
                             let v = reader.read_bytes(offset, tagged_data_type_size as usize)?;
                             return Ok(Some(v));
@@ -1130,7 +1151,7 @@ mod test {
         let mut dst_path = PathBuf::from("testdata").canonicalize().unwrap();
         dst_path.push(filename);
 
-//return dst_path;
+return dst_path;
 
         if dst_path.exists() {
             let _ = fs::remove_file(&dst_path);
