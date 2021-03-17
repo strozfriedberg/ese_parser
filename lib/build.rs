@@ -45,6 +45,8 @@ fn main() {
         ])
         .define("ESENT", None)
         .define("SORTPP_PASS", None)
+        .define("DISABLE_ERR_CHECK", None)
+        .define("RUST_LIBRARY", None)
         .compile("decompress");
 
     println!(r"cargo:rustc-link-lib=esent");
