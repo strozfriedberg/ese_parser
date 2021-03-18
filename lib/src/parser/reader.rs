@@ -680,55 +680,10 @@ pub fn load_data(
                             let v = load_lv_data(reader, &lv_tags, key)?;
                             return Ok(Some(v));
                         } else if dtf.intersects(TaggedDataTypeFlag::MULTI_VALUE | TaggedDataTypeFlag::MULTI_VALUE_OFFSET) {
-                            let mut mv_indexes : Vec<(u16/*shift*/, (bool/*lv*/, u16/*size*/))> = Vec::new();
-                            if dtf.intersects(jet::TaggedDataTypeFlag::MULTI_VALUE_OFFSET) {
-                                // The first byte contain the offset
-                                // [13, ...]
-                                let offset_mv_list = offset;
-                                let value : u16 = reader.read_struct::<u8>(offset_mv_list)? as u16;
-
-                                mv_indexes.push((1, (false, value)));
-                                mv_indexes.push((value+1, (false, tagged_data_type_size - value - 1)));
-                            } else if dtf.intersects(jet::TaggedDataTypeFlag::MULTI_VALUE) {
-                                // The first 2 bytes contain the offset to the first value
-                                // there is an offset for every value
-                                // therefore first offset / 2 = the number of value entries
-                                // [8, 0, 7, 130, 11, 2, 10, 131, ...]
-                                let mut offset_mv_list = offset;
-                                let mut value = reader.read_struct::<u16>(offset_mv_list)?;
-                                offset_mv_list += 2;
-
-                                let mut value_entry_size : u16;
-                                let mut value_entry_offset = value & 0x7fff;
-                                let mut entry_lvbit : bool = (value & 0x8000) > 0;
-                                let number_of_value_entries = value_entry_offset / 2;
-
-                                for _ in 1..number_of_value_entries {
-                                    value = reader.read_struct::<u16>(offset_mv_list)?;
-                                    offset_mv_list += 2;
-                                    value_entry_size = (value & 0x7fff) - value_entry_offset;
-                                    mv_indexes.push((value_entry_offset, (entry_lvbit, value_entry_size)));
-                                    entry_lvbit = (value & 0x8000) > 0;
-                                    value_entry_offset = value & 0x7fff;
-                                }
-                                value_entry_size = tagged_data_type_size - value_entry_offset;
-                                mv_indexes.push((value_entry_offset, (entry_lvbit, value_entry_size)));
-                            }
-                            let mut mv_index = 0;
-                            if multi_value_index > 0 && multi_value_index - 1 < mv_indexes.len() {
-                                mv_index = multi_value_index - 1;
-                            }
-
-                            if mv_index < mv_indexes.len() {
-                                let (shift, (lv, size)) = mv_indexes[mv_index];
-                                let v;
-                                if lv {
-                                    let key = reader.read_struct::<u32>(offset + shift as u64)?;
-                                    v = load_lv_data(reader, &lv_tags, key)?;
-                                } else {
-                                    v = reader.read_bytes(offset + shift as u64, size as usize)?;
-                                }
-                                return Ok(Some(v));
+                            let mv = read_multi_value(
+                                &reader, offset, tagged_data_type_size, &dtf, multi_value_index, &lv_tags)?;
+                            if let Some(mv_data) = mv {
+                                return Ok(Some(mv_data));
                             }
                         } else if dtf.intersects(jet::TaggedDataTypeFlag::COMPRESSED) {
                             println!("{} unsupported data type flags: {:?}", col.name, dtf);
@@ -752,6 +707,69 @@ pub fn load_data(
     }
 
     Err(SimpleError::new(format!("column {} not found", column_id)))
+}
+
+fn read_multi_value(
+    reader: &Reader,
+    offset: u64,
+    tagged_data_type_size: u16,
+    dtf: &jet::TaggedDataTypeFlag,
+    multi_value_index: usize,
+    lv_tags: &Vec<LV_tags>
+) -> Result<Option<Vec<u8>>, SimpleError> {
+    let mut mv_indexes : Vec<(u16/*shift*/, (bool/*lv*/, u16/*size*/))> = Vec::new();
+    if dtf.intersects(jet::TaggedDataTypeFlag::MULTI_VALUE_OFFSET) {
+        // The first byte contain the offset
+        // [13, ...]
+        let offset_mv_list = offset;
+        let value : u16 = reader.read_struct::<u8>(offset_mv_list)? as u16;
+
+        mv_indexes.push((1, (false, value)));
+        mv_indexes.push((value+1, (false, tagged_data_type_size - value - 1)));
+    } else if dtf.intersects(jet::TaggedDataTypeFlag::MULTI_VALUE) {
+        // The first 2 bytes contain the offset to the first value
+        // there is an offset for every value
+        // therefore first offset / 2 = the number of value entries
+        // [8, 0, 7, 130, 11, 2, 10, 131, ...]
+        let mut offset_mv_list = offset;
+        let mut value = reader.read_struct::<u16>(offset_mv_list)?;
+        offset_mv_list += 2;
+
+        let mut value_entry_size : u16;
+        let mut value_entry_offset = value & 0x7fff;
+        let mut entry_lvbit : bool = (value & 0x8000) > 0;
+        let number_of_value_entries = value_entry_offset / 2;
+
+        for _ in 1..number_of_value_entries {
+            value = reader.read_struct::<u16>(offset_mv_list)?;
+            offset_mv_list += 2;
+            value_entry_size = (value & 0x7fff) - value_entry_offset;
+            mv_indexes.push((value_entry_offset, (entry_lvbit, value_entry_size)));
+            entry_lvbit = (value & 0x8000) > 0;
+            value_entry_offset = value & 0x7fff;
+        }
+        value_entry_size = tagged_data_type_size - value_entry_offset;
+        mv_indexes.push((value_entry_offset, (entry_lvbit, value_entry_size)));
+    } else {
+        return Err(SimpleError::new(format!("Unknown TaggedDataTypeFlag: {}", dtf.bits())));
+    }
+    let mut mv_index = 0;
+    if multi_value_index > 0 && multi_value_index - 1 < mv_indexes.len() {
+        mv_index = multi_value_index - 1;
+    }
+
+    if mv_index < mv_indexes.len() {
+        let (shift, (lv, size)) = mv_indexes[mv_index];
+        let v;
+        if lv {
+            let key = reader.read_struct::<u32>(offset + shift as u64)?;
+            v = load_lv_data(reader, &lv_tags, key)?;
+        } else {
+            v = reader.read_bytes(offset + shift as u64, size as usize)?;
+        }
+        return Ok(Some(v));
+    }
+    Ok(None)
 }
 
 pub fn load_lv_tag(
