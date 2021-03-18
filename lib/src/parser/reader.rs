@@ -1,7 +1,4 @@
 //reader.rs
-
-#![allow(unused_assignments)]
-
 use std::{fs, io, io::{Seek, Read}, mem, path::PathBuf, slice, convert::TryInto, cell::RefCell};
 use simple_error::SimpleError;
 use cache_2q::Cache;
@@ -20,9 +17,9 @@ pub struct Reader {
 }
 
 #[allow(clippy::mut_from_ref)]
-unsafe fn _any_as_slice<'a, U: Sized, T: Sized>(p: &'a &mut T) -> &'a mut [U] {
-    slice::from_raw_parts_mut(
-        (*p as *const T) as *mut U,
+unsafe fn _any_as_slice<'a, U: Sized, T: Sized>(p: &'a &T) -> &'a [U] {
+    slice::from_raw_parts(
+        (*p as *const T) as *const U,
         mem::size_of::<T>() / mem::size_of::<U>(),
     )
 }
@@ -38,8 +35,8 @@ impl Reader {
             return Err(SimpleError::new("bad file_header.signature"));
         }
 
-        fn calc_crc32(file_header: &&mut ese_db::FileHeader) -> u32 {
-            let vec32: &[u32] = unsafe { _any_as_slice::<u32, _>(&file_header) };
+        fn calc_crc32(file_header: &ese_db::FileHeader) -> u32 {
+            let vec32: &[u32] = unsafe { _any_as_slice::<u32, ese_db::FileHeader>(&file_header) };
             vec32.iter().skip(1).fold(0x89abcdef, |crc, &val| crc ^ val)
         }
 
@@ -215,9 +212,9 @@ pub fn load_page_tags(
         tags_offset -= 2;
         let page_tag_size : u16 = reader.read_struct(tags_offset)?;
 
-        let mut flags : u8 = 0;
-		let mut offset : u16 = 0;
-        let mut size : u16 = 0;
+        let flags : u8;
+		let offset : u16;
+        let size : u16;
 
         if reader.format_revision >= ESEDB_FORMAT_REVISION_EXTENDED_PAGE_HEADER && reader.page_size >= 16384 {
 			offset = page_tag_offset & 0x7fff;
@@ -271,7 +268,6 @@ pub fn page_tag_get_branch_child_page_number(
     let mut offset = page_offset + db_page.size() as u64 + page_tag.offset as u64;
 
     if page_tag.flags().intersects(jet::PageTagFlags::FLAG_HAS_COMMON_KEY_SIZE) {
-        //let common_page_key_size : u16 = reader.read_struct(offset)?;
         offset += 2;
     }
     let local_page_key_size : u16 = reader.read_struct(offset)?;
@@ -279,8 +275,6 @@ pub fn page_tag_get_branch_child_page_number(
     offset += local_page_key_size as u64;
 
     let child_page_number : u32 = reader.read_struct(offset)?;
-    offset += 4;
-
     Ok(child_page_number)
 }
 
@@ -299,7 +293,6 @@ pub fn load_catalog(
 
     if is_root {
         let _root_page_header = load_root_page_header(reader, &db_page, &pg_tags[0])?;
-        //println!("root_page {:?}", root_page_header);
     }
 
     let mut res : Vec<jet::TableDefinition> = vec![];
@@ -367,16 +360,14 @@ pub fn load_catalog_item(
     let page_offset = ((db_page.page_number + 1) * reader.page_size) as u64;
     let mut offset = page_offset + db_page.size() as u64 + page_tag.offset as u64;
 
-    let mut first_word_readed = false;
+    let mut first_word_read = false;
     if page_tag.flags().intersects(jet::PageTagFlags::FLAG_HAS_COMMON_KEY_SIZE) {
-        //let common_page_key_size : u16 = clean_pgtag_flag(reader, db_page, reader.read_struct::<u16>(offset)?);
-        first_word_readed = true;
+        first_word_read = true;
         offset += 2;
     }
     let mut local_page_key_size : u16 = reader.read_struct(offset)?;
-    if !first_word_readed {
+    if !first_word_read {
         local_page_key_size = clean_pgtag_flag(reader, db_page, local_page_key_size);
-        first_word_readed = true;
     }
     offset += 2;
     offset += local_page_key_size as u64;
@@ -385,9 +376,11 @@ pub fn load_catalog_item(
     let ddh = reader.read_struct::<ese_db::DataDefinitionHeader>(offset_ddh)?;
     offset += mem::size_of::<ese_db::DataDefinitionHeader>() as u64;
 
-    let mut number_of_variable_size_data_types : u32 = 0;
+    let number_of_variable_size_data_types : u32;
     if ddh.last_variable_size_data_type > 127 {
         number_of_variable_size_data_types = ddh.last_variable_size_data_type as u32 - 127;
+    } else {
+        number_of_variable_size_data_types = 0;
     }
 
     let cat_def_zero = std::mem::MaybeUninit::<jet::CatalogDefinition>::zeroed();
@@ -403,7 +396,7 @@ pub fn load_catalog_item(
         cat_def.father_data_page_number = unsafe { data_def.coltyp_or_fdp.father_data_page_number };
     }
     cat_def.size = data_def.space_usage;
-    // data_def.flags?
+    // TODO handle data_def.flags?
     if cat_def.cat_type == jet::CatalogType::Column as u16 {
         cat_def.codepage = unsafe { data_def.pages_or_locale.codepage };
     }
@@ -421,7 +414,7 @@ pub fn load_catalog_item(
             let variable_size_data_type_size : u16 = reader.read_struct(offset_ddh + variable_size_data_types_offset as u64)?;
             variable_size_data_types_offset += 2;
 
-            let mut data_type_size : u16 = 0;
+            let data_type_size : u16;
             if variable_size_data_type_size & 0x8000 != 0 {
                 data_type_size = 0;
             } else {
@@ -432,7 +425,6 @@ pub fn load_catalog_item(
                     128 => {
                         let offset_dtn = offset_ddh + variable_size_data_type_value_data_offset as u64 + previous_variable_size_data_type_size as u64;
                         cat_def.name = reader.read_string(offset_dtn, data_type_size as usize)?;
-                        //println!("cat_def.name: {}", cat_def.name);
                     },
                     130 => {
                         // TODO template_name
@@ -448,7 +440,7 @@ pub fn load_catalog_item(
                     135 | // TupleLimits
                     136   // Version
                         => {
-                        // not usefull fields
+                        // not useful fields
                     },
                     _ => {
                         if data_type_size > 0 {
@@ -521,14 +513,12 @@ pub fn load_data(
 
     let mut first_word_readed = false;
     if page_tag.flags().intersects(jet::PageTagFlags::FLAG_HAS_COMMON_KEY_SIZE) {
-        //let common_page_key_size : u16 = clean_pgtag_flag(reader, &db_page, reader.read_struct::<u16>(offset)?);
         first_word_readed = true;
         offset += 2;
     }
     let mut local_page_key_size : u16 = reader.read_struct(offset)?;
     if !first_word_readed {
         local_page_key_size = clean_pgtag_flag(reader, &db_page, local_page_key_size);
-        first_word_readed = true;
     }
     offset += 2;
     offset += local_page_key_size as u64;
@@ -544,11 +534,6 @@ pub fn load_data(
         tagged_data_types_format = jet::TaggedDataTypesFormats::Linear;
     }
 
-    let mut tagged_data_type_offset_bitmask : u16 = 0x3fff;
-    if reader.format_revision >= ESEDB_FORMAT_REVISION_EXTENDED_PAGE_HEADER && reader.page_size >= 16384 {
-        tagged_data_type_offset_bitmask = 0x7fff;
-    }
-
     // read fixed data bits mask, located at the end of fixed columns
     let fixed_data_bits_mask_size = (ddh.last_fixed_size_data_type as usize + 7) / 8;
     let mut fixed_data_bits_mask : Vec<u8>= Vec::new();
@@ -562,13 +547,14 @@ pub fn load_data(
     let mut tagged_data_types_offset : u16 = 0;
     let mut tagged_data_type_offset : u16 = 0;
     let mut tagged_data_type_offset_data_size : u16 = 0;
-    let mut previous_tagged_data_type_offset : u16 = 0;
     let mut remaining_definition_data_size : u16 = 0;
     let mut previous_variable_size_data_type_size : u16 = 0;
 
-    let mut number_of_variable_size_data_types : u16 = 0;
+    let number_of_variable_size_data_types : u16;
     if ddh.last_variable_size_data_type > 127 {
         number_of_variable_size_data_types = ddh.last_variable_size_data_type as u16 - 127;
+    } else {
+        number_of_variable_size_data_types = 0;
     }
 
     let mut current_variable_size_data_type : u32 = 127;
@@ -644,7 +630,7 @@ pub fn load_data(
                     }
                 }
                 if remaining_definition_data_size > 0 && col.identifier == tagged_data_type_identifier as u32 {
-                    previous_tagged_data_type_offset = tagged_data_type_offset;
+                    let previous_tagged_data_type_offset = tagged_data_type_offset;
                     if tagged_data_type_offset_data_size > 0 {
                         tagged_data_type_identifier = reader.read_struct::<u16>(offset)?;
                         offset += 2;
@@ -656,11 +642,17 @@ pub fn load_data(
                         remaining_definition_data_size    -= 4;
                     }
 
+                    let tagged_data_type_offset_bitmask : u16;
+                    if reader.format_revision >= ESEDB_FORMAT_REVISION_EXTENDED_PAGE_HEADER && reader.page_size >= 16384 {
+                        tagged_data_type_offset_bitmask = 0x7fff;
+                    } else {
+                        tagged_data_type_offset_bitmask = 0x3fff;
+                    }
                     let masked_previous_tagged_data_type_offset : u16 =
                         previous_tagged_data_type_offset & tagged_data_type_offset_bitmask;
                     let masked_tagged_data_type_offset = tagged_data_type_offset & tagged_data_type_offset_bitmask;
 
-                    let mut tagged_data_type_size = 0;
+                    let mut tagged_data_type_size;
                     if masked_tagged_data_type_offset > masked_previous_tagged_data_type_offset {
                         tagged_data_type_size = masked_tagged_data_type_offset - masked_previous_tagged_data_type_offset;
                     } else {
@@ -692,9 +684,8 @@ pub fn load_data(
                             if dtf.intersects(jet::TaggedDataTypeFlag::MULTI_VALUE_OFFSET) {
                                 // The first byte contain the offset
                                 // [13, ...]
-                                let mut offset_mv_list = offset;
+                                let offset_mv_list = offset;
                                 let value : u16 = reader.read_struct::<u8>(offset_mv_list)? as u16;
-                                offset_mv_list += 1;
 
                                 mv_indexes.push((1, (false, value)));
                                 mv_indexes.push((value+1, (false, tagged_data_type_size - value - 1)));
@@ -707,7 +698,7 @@ pub fn load_data(
                                 let mut value = reader.read_struct::<u16>(offset_mv_list)?;
                                 offset_mv_list += 2;
 
-                                let mut value_entry_size : u16 = 0;
+                                let mut value_entry_size : u16;
                                 let mut value_entry_offset = value & 0x7fff;
                                 let mut entry_lvbit : bool = (value & 0x8000) > 0;
                                 let number_of_value_entries = value_entry_offset / 2;
@@ -792,7 +783,6 @@ pub fn load_lv_tag(
     let mut local_page_key_size : u16 = reader.read_struct(offset)?;
     if !first_word_readed {
         local_page_key_size = clean_pgtag_flag(reader, db_page, local_page_key_size);
-        first_word_readed = true;
     }
     offset += 2;
     if local_page_key_size > 0 {
@@ -808,7 +798,6 @@ pub fn load_lv_tag(
         res.key = skey;
 
         let _total_size : u32 = reader.read_struct(offset)?;
-        offset += 4;
 
         // TODO: handle? page_tags with skey & total_size only
         return Ok(None);
