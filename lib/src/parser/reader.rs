@@ -997,11 +997,11 @@ pub fn load_lv_data(
 #[allow(dead_code)]
 mod test {
     use super::*;
-    use std::{str, ffi::CString, ptr::null_mut, convert::TryFrom};
+    use std::{str, ffi::CString, ptr::null_mut, convert::TryFrom, collections::HashSet};
     use crate::esent::*;
     use crate::ese_parser;
     use crate::ese_trait::EseDb;
-    use encoding::{all::{ASCII, UTF_16LE, UTF_8}, Encoding, EncoderTrap};
+    use encoding::{all::{ASCII, UTF_16LE, UTF_8}, Encoding, EncoderTrap, DecoderTrap};
 
     macro_rules! jetcall {
         ($call:expr) => {
@@ -1052,6 +1052,7 @@ mod test {
             }
         }
     }
+
     impl EseAPI {
         fn new(pg_size: usize) -> EseAPI {
             EseAPI::set_system_parameter_l(JET_paramDatabasePageSize, pg_size as u64);
@@ -1150,8 +1151,6 @@ mod test {
     fn prepare_db(filename: &str, table: &str, pg_size: usize, record_size: usize, records_cnt: usize) -> PathBuf {
         let mut dst_path = PathBuf::from("testdata").canonicalize().unwrap();
         dst_path.push(filename);
-
-return dst_path;
 
         if dst_path.exists() {
             let _ = fs::remove_file(&dst_path);
@@ -1265,25 +1264,37 @@ return dst_path;
              None => println!("Loaded {}", path.display())
         }
 
-        let mut all_records_ok = true;
-        let table_id = jdb.open_table(&table).unwrap();
-        let columns = jdb.get_columns(&table).unwrap();
+        let table_id = jdb.open_table(&table)?;
+        let columns = jdb.get_columns(&table)?;
+        let mut values = HashSet::<String>::new();
+
         for col in columns {
             print!("{}: ", col.name);
             match jdb.get_column_str(table_id, col.id, 0) {
                 Ok(result) =>
-                    if let Some(value) = result {
+                    if let Some(mut value) = result {
+                        if col.cp == JET_CP::Unicode as u16 {
+                            unsafe {
+                                let buffer = slice::from_raw_parts(value.as_bytes() as *const _ as *const u16, value.len() / 2);
+                                value = String::from_utf16(&buffer).unwrap();
+                            }
+                        }
+                        if let Ok(s) = UTF_8.decode(&value.as_bytes(), DecoderTrap::Strict) {
+                            value = s;
+                        }
                         println!("{}", value);
+                        values.insert(value);
                     }
                     else {
                         println!("column '{}' has no value", col.name);
-                        all_records_ok = false;
+                        values.insert("".to_string());
                     },
                 Err(e) => panic!("error: {}", e),
             }
         }
 
-        assert!(all_records_ok);
+        println!("values: {:?}", values);
+        assert_eq!(values.len(), 1);
 
         Ok(())
     }
