@@ -368,8 +368,6 @@ pub struct TableDefinition {
     pub table_catalog_definition: Option<CatalogDefinition>,
     pub column_catalog_definition_array: Vec<CatalogDefinition>,
     pub long_value_catalog_definition: Option<CatalogDefinition>,
-    //pub callback_catalog_definition: Option<CatalogDefinition>,
-    //pub index_catalog_definition_array: Vec<Option<CatalogDefinition>>,
 }
 
 pub struct PageTree {
