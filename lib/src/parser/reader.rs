@@ -495,7 +495,6 @@ pub fn load_data(
     let is_root = db_page.flags().contains(jet::PageFlags::IS_ROOT);
     if is_root {
         let _root_page_header = load_root_page_header(reader, &db_page, &pg_tags[0])?;
-        //println!("root_page {:?}", _root_page_header);
     }
 
     if !db_page.flags().contains(jet::PageFlags::IS_LEAF) {
