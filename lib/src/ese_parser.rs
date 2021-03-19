@@ -185,8 +185,8 @@ impl EseDb for EseParser {
         None
     }
 
-    fn error_to_string(&self, _err: i32) -> String {
-        "TODO".to_string()
+    fn error_to_string(&self, err: i32) -> String {
+        format!("EseParser: error {}", err)
     }
 
     fn get_tables(&self) -> Result<Vec<String>, SimpleError> {
