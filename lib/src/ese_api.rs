@@ -248,7 +248,8 @@ impl EseDb for EseAPI {
                     cbStruct: size_of::<JET_RETINFO>() as c_ulong,
                     ibLongValue: vres.len() as c_ulong,
                     itagSequence : 1,
-                    columnidNextTagged: 0 };
+                    columnidNextTagged: 0
+                };
                 let err = JetRetrieveColumn(self.sesid, table, column, v.as_mut_slice().as_mut_ptr() as *mut c_void, size as u32,
                     &mut bytes, 0, &mut retinfo);
                 if err != 0 && err != JET_wrnBufferTruncated as i32 {
@@ -284,7 +285,8 @@ impl EseDb for EseAPI {
                         cbStruct: size_of::<JET_RETINFO>() as c_ulong,
                         ibLongValue: vres.len() as c_ulong,
                         itagSequence : multi_value_index,
-                        columnidNextTagged: 0 };
+                        columnidNextTagged: 0
+                    };
                     let err = JetRetrieveColumn(self.sesid, table, column, v.as_mut_slice().as_mut_ptr() as *mut c_void, size as u32,
                         &mut bytes, 0, &mut retinfo);
                     if err != 0 && err != JET_wrnBufferTruncated as i32 {
@@ -297,7 +299,10 @@ impl EseDb for EseAPI {
 
                     v.truncate(bytes as usize);
                     vres.append(v.as_mut());
-                    if err != JET_wrnBufferTruncated as i32 {
+
+                    if err == JET_wrnBufferTruncated as i32 {
+                        continue;
+                    } else {
                         break;
                     }
                 }

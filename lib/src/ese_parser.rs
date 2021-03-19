@@ -7,7 +7,7 @@ use crate::esent;
 use simple_error::SimpleError;
 use std::cell::{RefCell, RefMut};
 
-struct Internal {
+struct Table {
     cat: Box<jet::TableDefinition>,
     lv_tags: Vec<LV_tags>,
     current_page: Option<jet::DbPage>,
@@ -17,17 +17,17 @@ struct Internal {
 pub struct EseParser {
     cache_size: usize,
     reader: Option<Reader>,
-    tables: Vec<RefCell<Internal>>,
+    tables: Vec<RefCell<Table>>,
 }
 
-impl Internal {
+impl Table {
     fn page(&self) -> &jet::DbPage {
         self.current_page.as_ref().unwrap()
     }
 }
 
 impl EseParser {
-    fn get_table(&self, table: &str, index: &mut usize) -> Result<RefMut<Internal>, SimpleError> {
+    fn get_table_by_name(&self, table: &str, index: &mut usize) -> Result<RefMut<Table>, SimpleError> {
         for i in 0..self.tables.len() {
             let n = self.tables[i].borrow_mut();
             if n.cat.table_catalog_definition.as_ref().unwrap().name == table {
@@ -45,98 +45,108 @@ impl EseParser {
         }
     }
 
-    fn get_internal(&self, table: u64) -> Result<RefMut<Internal>, SimpleError> {
-        let i = table as usize;
+    fn get_table_by_id(&self, table_id: u64) -> Result<RefMut<Table>, SimpleError> {
+        let i = table_id as usize;
         if i < self.tables.len() {
             return Ok(self.tables[i].borrow_mut());
         }
-        Err(SimpleError::new(format!("out of range index {}", table)))
+        Err(SimpleError::new(format!("out of range index {}", table_id)))
     }
 
-    fn get_column_dyn_helper(&self, table: u64, column: u32, mv_index: u32) -> Result<Option<Vec<u8>>, SimpleError> {
-        let itrnl = self.get_internal(table)?;
+    fn get_column_dyn_helper(&self, table_id: u64, column: u32, mv_index: u32) -> Result<Option<Vec<u8>>, SimpleError> {
+        let table = self.get_table_by_id(table_id)?;
         let reader = self.get_reader()?;
-        if itrnl.current_page.is_none() {
+        if table.current_page.is_none() {
             return Err(SimpleError::new("no current page, use open_table API before this"));
         }
-        load_data(reader, &itrnl.cat, &itrnl.lv_tags, &itrnl.page(), itrnl.page_tag_index, column, mv_index as usize)
+        load_data(reader, &table.cat, &table.lv_tags, &table.page(), table.page_tag_index, column, mv_index as usize)
     }
 
-    fn move_row_helper(&self, table: u64, crow: u32) -> Result<bool, SimpleError> {
+    fn move_next_row(&self, table_id: u64, crow: u32) -> Result<bool, SimpleError> {
         let reader = self.get_reader()?;
-        let mut t = self.get_internal(table)?;
+        let mut t = self.get_table_by_id(table_id)?;
 
-        if crow == esent::JET_MoveFirst as u32 || crow == esent::JET_MoveNext as u32 {
-            let mut i = t.page_tag_index + 1;
-            if crow == esent::JET_MoveFirst as u32 {
-                let first_leaf_page = find_first_leaf_page(&reader,
-                    t.cat.table_catalog_definition.as_ref().unwrap().father_data_page_number)?;
-                if t.current_page.is_none() || t.page().page_number != first_leaf_page {
-                    let page = jet::DbPage::new(&reader, first_leaf_page)?;
-                    t.current_page = Some(page);
-                }
-                if t.page().page_tags.len() < 2 {
-                    // empty table
-                    return Ok(false);
-                }
-                i = 1;
+        let mut i = t.page_tag_index + 1;
+        if crow == esent::JET_MoveFirst as u32 {
+            let first_leaf_page = find_first_leaf_page(reader,
+                t.cat.table_catalog_definition.as_ref().unwrap().father_data_page_number)?;
+            if t.current_page.is_none() || t.page().page_number != first_leaf_page {
+                let page = jet::DbPage::new(reader, first_leaf_page)?;
+                t.current_page = Some(page);
             }
-            loop {
-                while i < t.page().page_tags.len() &&
-                    t.page().page_tags[i].flags().intersects(jet::PageTagFlags::FLAG_IS_DEFUNCT) {
-                    i += 1;
-                }
-                if i < t.page().page_tags.len() {
-                    // found non-free data tag
-                    (*t).page_tag_index = i;
-                    return Ok(true);
-                } else {
-                    if t.page().common().next_page != 0 {
-                        let page = jet::DbPage::new(&self.get_reader().unwrap(), t.page().common().next_page)?;
-                        t.current_page = Some(page);
-                        i = 1;
-                    } else {
-                        // no more leaf pages
-                        return Ok(false);
-                    }
-                }
+            if t.page().page_tags.len() < 2 {
+                // empty table
+                return Ok(false);
             }
-        } else if crow == esent::JET_MoveLast as u32 || crow == esent::JET_MovePrevious as u32 {
-            let mut i = t.page_tag_index - 1;
-            if crow == esent::JET_MoveLast as u32 {
-                while t.page().common().next_page != 0 {
-                    let page = jet::DbPage::new(&mut self.reader.as_ref().unwrap(), t.page().common().next_page)?;
-                    t.current_page = Some(page);
-                }
-                if t.page().page_tags.len() < 2 {
-                    // empty table
-                    return Ok(false);
-                }
-                i = t.page().page_tags.len()-1;
-            }
-            loop {
-                while i > 0 && t.page().page_tags[i].flags().intersects(jet::PageTagFlags::FLAG_IS_DEFUNCT) {
-                    i -= 1;
-                }
-                if i > 0 {
-                    // found non-free data tag
-                    t.page_tag_index = i;
-                    return Ok(true);
-                } else {
-                    if t.page().common().previous_page != 0 {
-                        let page = jet::DbPage::new(&mut self.reader.as_ref().unwrap(), t.page().common().previous_page)?;
-                        t.current_page = Some(page);
-                        i = t.page().page_tags.len()-1;
-                    } else {
-                        // no more leaf pages
-                        return Ok(false);
-                    }
-                }
-            }
-        } else {
-            // movo to crow
+            i = 1;
         }
+        loop {
+            while i < t.page().page_tags.len() &&
+                t.page().page_tags[i].flags().intersects(jet::PageTagFlags::FLAG_IS_DEFUNCT) {
+                i += 1;
+            }
+            if i < t.page().page_tags.len() {
+                // found non-free data tag
+                (*t).page_tag_index = i;
+                return Ok(true);
+            } else {
+                if t.page().common().next_page != 0 {
+                    let page = jet::DbPage::new(&mut self.get_reader().unwrap(), t.page().common().next_page)?;
+                    t.current_page = Some(page);
+                    i = 1;
+                } else {
+                    // no more leaf pages
+                    return Ok(false);
+                }
+            }
+        }
+    }
 
+    fn move_previous_row(&self, table_id: u64, crow: u32) -> Result<bool, SimpleError> {
+        let reader = self.get_reader()?;
+        let mut t = self.get_table_by_id(table_id)?;
+
+        let mut i = t.page_tag_index - 1;
+        if crow == esent::JET_MoveLast as u32 {
+            while t.page().common().next_page != 0 {
+                let page = jet::DbPage::new(reader, t.page().common().next_page)?;
+                t.current_page = Some(page);
+            }
+            if t.page().page_tags.len() < 2 {
+                // empty table
+                return Ok(false);
+            }
+            i = t.page().page_tags.len()-1;
+        }
+        loop {
+            while i > 0 && t.page().page_tags[i].flags().intersects(jet::PageTagFlags::FLAG_IS_DEFUNCT) {
+                i -= 1;
+            }
+            if i > 0 {
+                // found non-free data tag
+                t.page_tag_index = i;
+                return Ok(true);
+            } else {
+                if t.page().common().previous_page != 0 {
+                    let page = jet::DbPage::new(reader, t.page().common().previous_page)?;
+                    t.current_page = Some(page);
+                    i = t.page().page_tags.len()-1;
+                } else {
+                    // no more leaf pages
+                    return Ok(false);
+                }
+            }
+        }
+    }
+
+    fn move_row_helper(&self, table_id: u64, crow: u32) -> Result<bool, SimpleError> {
+        if crow == esent::JET_MoveFirst as u32 || crow == esent::JET_MoveNext as u32 {
+            return self.move_next_row(table_id, crow);
+        } else if crow == esent::JET_MoveLast as u32 || crow == esent::JET_MovePrevious as u32 {
+            return self.move_previous_row(table_id, crow);
+        } else {
+            // TODO: movo to crow
+        }
         Err(SimpleError::new(format!("move_row: TODO: implement me, crow {}", crow)))
     }
 
@@ -178,15 +188,15 @@ impl EseDb for EseParser {
         self.reader = Some(reader);
         for i in cat.drain(0..) {
             if i.table_catalog_definition.is_some() {
-                let itrnl = Internal { cat: Box::new(i), lv_tags: vec![], current_page: None, page_tag_index: 0 };
+                let itrnl = Table { cat: Box::new(i), lv_tags: vec![], current_page: None, page_tag_index: 0 };
                 self.tables.push(RefCell::new(itrnl));
             }
         }
         None
     }
 
-    fn error_to_string(&self, _err: i32) -> String {
-        "TODO".to_string()
+    fn error_to_string(&self, err: i32) -> String {
+        format!("EseParser: error {}", err)
     }
 
     fn get_tables(&self) -> Result<Vec<String>, SimpleError> {
@@ -201,7 +211,7 @@ impl EseDb for EseParser {
     fn open_table(&self, table: &str) -> Result<u64, SimpleError> {
         let mut index : usize = 0;
         { // used to drop borrow mut
-            let mut t = self.get_table(table, &mut index)?;
+            let mut t = self.get_table_by_name(table, &mut index)?;
             let reader = self.get_reader()?;
             if t.cat.long_value_catalog_definition.is_some() {
                 t.lv_tags = load_lv_metadata(&reader,
@@ -226,7 +236,7 @@ impl EseDb for EseParser {
 
     fn get_columns(&self, table: &str) -> Result<Vec<ColumnInfo>, SimpleError> {
         let mut index : usize = 0;
-        let t = self.get_table(table, &mut index)?;
+        let t = self.get_table_by_name(table, &mut index)?;
         let mut columns : Vec<ColumnInfo> = vec![];
         for i in &t.cat.column_catalog_definition_array {
             let col_info = ColumnInfo {
