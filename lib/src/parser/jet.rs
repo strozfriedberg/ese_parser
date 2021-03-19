@@ -241,6 +241,7 @@ pub struct DbFile {
 #[derive(Debug)]
 pub struct DbPage {
     pub page_number: uint32_t,
+    pub page_size: uint32_t,
     pub page_header: ese_db::PageHeader,
     pub page_tags: Vec<ese_db::PageTag>,
 }
@@ -250,6 +251,7 @@ impl DbPage {
         let page_header = reader::load_page_header(reader, page_number)?;
         let mut db_page = DbPage {
             page_number,
+            page_size: reader.page_size(),
             page_header,
             page_tags: vec![],
         };
@@ -297,6 +299,10 @@ impl DbPage {
     pub fn prev_page(&self) -> u32 {
         self.common().previous_page
     }
+
+    pub fn offset(&self) -> u64 {
+        ((self.page_number + 1) * self.page_size) as u64
+    }
 }
 
 impl RootPageHeader {
@@ -339,6 +345,10 @@ impl RootPageHeader {
 impl PageTag {
     pub fn flags(&self) -> PageTagFlags {
         PageTagFlags::from_bits_truncate(self.flags)
+    }
+
+    pub fn offset(&self, db_page: &DbPage) -> u64 {
+        db_page.offset() + db_page.size() as u64 + self.offset as u64
     }
 }
 

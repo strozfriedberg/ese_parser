@@ -162,6 +162,10 @@ impl Reader {
     pub fn load_db(path: &std::path::PathBuf, cache_size: usize) -> Result<Reader, SimpleError> {
         Reader::new(path, cache_size)
     }
+
+    pub fn page_size(&self) -> u32 {
+        self.page_size
+    }
 }
 
 pub fn load_page_header(
@@ -202,7 +206,7 @@ pub fn load_page_tags(
     reader: &Reader,
     db_page: &jet::DbPage,
 ) -> Result<Vec<PageTag>, SimpleError> {
-    let page_offset = ((db_page.page_number + 1) * reader.page_size) as u64;
+    let page_offset = db_page.offset();
     let mut tags_offset = (page_offset + reader.page_size as u64) as u64;
     let mut tags = Vec::<PageTag>::new();
 
@@ -243,8 +247,7 @@ pub fn load_root_page_header(
     db_page: &jet::DbPage,
     page_tag: &PageTag,
 ) -> Result<RootPageHeader, SimpleError> {
-    let page_offset = ((db_page.page_number + 1) * reader.page_size) as u64;
-    let root_page_offset = page_offset + db_page.size() as u64 + page_tag.offset as u64;
+    let root_page_offset = page_tag.offset(db_page);
 
     // TODO Seen in format version 0x620 revision 0x14
     // check format and revision
@@ -264,8 +267,7 @@ pub fn page_tag_get_branch_child_page_number(
     db_page: &jet::DbPage,
     page_tag: &PageTag,
 ) -> Result<u32, SimpleError> {
-    let page_offset = ((db_page.page_number + 1) * reader.page_size) as u64;
-    let mut offset = page_offset + db_page.size() as u64 + page_tag.offset as u64;
+    let mut offset = page_tag.offset(db_page);
 
     if page_tag.flags().intersects(jet::PageTagFlags::FLAG_HAS_COMMON_KEY_SIZE) {
         offset += 2;
@@ -357,8 +359,7 @@ pub fn load_catalog_item(
     db_page: &jet::DbPage,
     page_tag: &PageTag,
 ) -> Result<jet::CatalogDefinition, SimpleError> {
-    let page_offset = ((db_page.page_number + 1) * reader.page_size) as u64;
-    let mut offset = page_offset + db_page.size() as u64 + page_tag.offset as u64;
+    let mut offset = page_tag.offset(db_page);
 
     let mut first_word_read = false;
     if page_tag.flags().intersects(jet::PageTagFlags::FLAG_HAS_COMMON_KEY_SIZE) {
@@ -507,17 +508,16 @@ pub fn load_data(
     }
 
     let page_tag = &pg_tags[page_tag_index];
-    let page_offset = ((db_page.page_number + 1) * reader.page_size) as u64;
-    let mut offset = page_offset + db_page.size() as u64 + page_tag.offset as u64;
+    let mut offset = page_tag.offset(db_page);
     let offset_start = offset;
 
-    let mut first_word_readed = false;
+    let mut first_word_read = false;
     if page_tag.flags().intersects(jet::PageTagFlags::FLAG_HAS_COMMON_KEY_SIZE) {
-        first_word_readed = true;
+        first_word_read = true;
         offset += 2;
     }
     let mut local_page_key_size : u16 = reader.read_struct(offset)?;
-    if !first_word_readed {
+    if !first_word_read {
         local_page_key_size = clean_pgtag_flag(reader, &db_page, local_page_key_size);
     }
     offset += 2;
@@ -778,28 +778,27 @@ pub fn load_lv_tag(
     page_tag: &PageTag,
     page_tag_0: &PageTag
 ) -> Result<Option<LV_tags>, SimpleError> {
-    let page_offset = ((db_page.page_number + 1) * reader.page_size) as u64;
-    let mut offset = page_offset + db_page.size() as u64 + page_tag.offset as u64;
+    let mut offset = page_tag.offset(db_page);
     let page_tag_offset : u64 = offset;
 
     let mut res = LV_tags { common_page_key: vec![], local_page_key: vec![], key: 0, offset: 0, size: 0, seg_offset: 0 };
 
-    let mut first_word_readed = false;
+    let mut first_word_read = false;
     let mut common_page_key_size : u16 = 0;
     if page_tag.flags().intersects(jet::PageTagFlags::FLAG_HAS_COMMON_KEY_SIZE) {
         common_page_key_size = clean_pgtag_flag(reader, db_page, reader.read_struct::<u16>(offset)?);
-        first_word_readed = true;
+        first_word_read = true;
         offset += 2;
 
         if common_page_key_size > 0 {
-            let offset0 = page_offset + db_page.size() as u64 + page_tag_0.offset as u64;
+            let offset0 = page_tag_0.offset(db_page);
             let mut common_page_key = reader.read_bytes(offset0, common_page_key_size as usize)?;
             res.common_page_key.append(&mut common_page_key);
         }
     }
 
     let mut local_page_key_size : u16 = reader.read_struct(offset)?;
-    if !first_word_readed {
+    if !first_word_read {
         local_page_key_size = clean_pgtag_flag(reader, db_page, local_page_key_size);
     }
     offset += 2;
@@ -888,7 +887,6 @@ pub fn load_lv_metadata(
     let is_root = db_page.flags().contains(jet::PageFlags::IS_ROOT);
     if is_root {
         let _root_page_header = load_root_page_header(reader, &db_page, &pg_tags[0])?;
-        //println!("root_page {:?}", _root_page_header);
     }
 
     let mut res : Vec<LV_tags> = vec![];
