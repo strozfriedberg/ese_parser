@@ -100,7 +100,6 @@ fn test_edb_table_all_values() {
             let r = VariantTimeToSystemTime(dt, st.as_mut_ptr());
             assert_eq!(r, 1);
             let s = st.assume_init();
-            println!("{:?}", s);
             assert_eq!(s.wDayOfWeek, 2);
             assert_eq!(s.wDay, 2);
             assert_eq!(s.wMonth, 3);
