@@ -62,81 +62,91 @@ impl EseParser {
         load_data(reader, &table.cat, &table.lv_tags, &table.page(), table.page_tag_index, column, mv_index as usize)
     }
 
-    fn move_row_helper(&self, table_id: u64, crow: u32) -> Result<bool, SimpleError> {
+    fn move_next_row(&self, table_id: u64, crow: u32) -> Result<bool, SimpleError> {
         let reader = self.get_reader()?;
         let mut t = self.get_table_by_id(table_id)?;
 
-        if crow == esent::JET_MoveFirst as u32 || crow == esent::JET_MoveNext as u32 {
-            let mut i = t.page_tag_index + 1;
-            if crow == esent::JET_MoveFirst as u32 {
-                let first_leaf_page = find_first_leaf_page(&reader,
-                    t.cat.table_catalog_definition.as_ref().unwrap().father_data_page_number)?;
-                if t.current_page.is_none() || t.page().page_number != first_leaf_page {
-                    let page = jet::DbPage::new(&reader, first_leaf_page)?;
-                    t.current_page = Some(page);
-                }
-                if t.page().page_tags.len() < 2 {
-                    // empty table
-                    return Ok(false);
-                }
-                i = 1;
+        let mut i = t.page_tag_index + 1;
+        if crow == esent::JET_MoveFirst as u32 {
+            let first_leaf_page = find_first_leaf_page(reader,
+                t.cat.table_catalog_definition.as_ref().unwrap().father_data_page_number)?;
+            if t.current_page.is_none() || t.page().page_number != first_leaf_page {
+                let page = jet::DbPage::new(reader, first_leaf_page)?;
+                t.current_page = Some(page);
             }
-            loop {
-                while i < t.page().page_tags.len() &&
-                    t.page().page_tags[i].flags().intersects(jet::PageTagFlags::FLAG_IS_DEFUNCT) {
-                    i += 1;
-                }
-                if i < t.page().page_tags.len() {
-                    // found non-free data tag
-                    (*t).page_tag_index = i;
-                    return Ok(true);
-                } else {
-                    if t.page().common().next_page != 0 {
-                        let page = jet::DbPage::new(&mut self.get_reader().unwrap(), t.page().common().next_page)?;
-                        t.current_page = Some(page);
-                        i = 1;
-                    } else {
-                        // no more leaf pages
-                        return Ok(false);
-                    }
-                }
+            if t.page().page_tags.len() < 2 {
+                // empty table
+                return Ok(false);
             }
-        } else if crow == esent::JET_MoveLast as u32 || crow == esent::JET_MovePrevious as u32 {
-            let mut i = t.page_tag_index - 1;
-            if crow == esent::JET_MoveLast as u32 {
-                while t.page().common().next_page != 0 {
-                    let page = jet::DbPage::new(&mut self.reader.as_ref().unwrap(), t.page().common().next_page)?;
-                    t.current_page = Some(page);
-                }
-                if t.page().page_tags.len() < 2 {
-                    // empty table
-                    return Ok(false);
-                }
-                i = t.page().page_tags.len()-1;
-            }
-            loop {
-                while i > 0 && t.page().page_tags[i].flags().intersects(jet::PageTagFlags::FLAG_IS_DEFUNCT) {
-                    i -= 1;
-                }
-                if i > 0 {
-                    // found non-free data tag
-                    t.page_tag_index = i;
-                    return Ok(true);
-                } else {
-                    if t.page().common().previous_page != 0 {
-                        let page = jet::DbPage::new(&mut self.reader.as_ref().unwrap(), t.page().common().previous_page)?;
-                        t.current_page = Some(page);
-                        i = t.page().page_tags.len()-1;
-                    } else {
-                        // no more leaf pages
-                        return Ok(false);
-                    }
-                }
-            }
-        } else {
-            // movo to crow
+            i = 1;
         }
+        loop {
+            while i < t.page().page_tags.len() &&
+                t.page().page_tags[i].flags().intersects(jet::PageTagFlags::FLAG_IS_DEFUNCT) {
+                i += 1;
+            }
+            if i < t.page().page_tags.len() {
+                // found non-free data tag
+                (*t).page_tag_index = i;
+                return Ok(true);
+            } else {
+                if t.page().common().next_page != 0 {
+                    let page = jet::DbPage::new(&mut self.get_reader().unwrap(), t.page().common().next_page)?;
+                    t.current_page = Some(page);
+                    i = 1;
+                } else {
+                    // no more leaf pages
+                    return Ok(false);
+                }
+            }
+        }
+    }
 
+    fn move_previous_row(&self, table_id: u64, crow: u32) -> Result<bool, SimpleError> {
+        let reader = self.get_reader()?;
+        let mut t = self.get_table_by_id(table_id)?;
+
+        let mut i = t.page_tag_index - 1;
+        if crow == esent::JET_MoveLast as u32 {
+            while t.page().common().next_page != 0 {
+                let page = jet::DbPage::new(reader, t.page().common().next_page)?;
+                t.current_page = Some(page);
+            }
+            if t.page().page_tags.len() < 2 {
+                // empty table
+                return Ok(false);
+            }
+            i = t.page().page_tags.len()-1;
+        }
+        loop {
+            while i > 0 && t.page().page_tags[i].flags().intersects(jet::PageTagFlags::FLAG_IS_DEFUNCT) {
+                i -= 1;
+            }
+            if i > 0 {
+                // found non-free data tag
+                t.page_tag_index = i;
+                return Ok(true);
+            } else {
+                if t.page().common().previous_page != 0 {
+                    let page = jet::DbPage::new(reader, t.page().common().previous_page)?;
+                    t.current_page = Some(page);
+                    i = t.page().page_tags.len()-1;
+                } else {
+                    // no more leaf pages
+                    return Ok(false);
+                }
+            }
+        }
+    }
+
+    fn move_row_helper(&self, table_id: u64, crow: u32) -> Result<bool, SimpleError> {
+        if crow == esent::JET_MoveFirst as u32 || crow == esent::JET_MoveNext as u32 {
+            return self.move_next_row(table_id, crow);
+        } else if crow == esent::JET_MoveLast as u32 || crow == esent::JET_MovePrevious as u32 {
+            return self.move_previous_row(table_id, crow);
+        } else {
+            // TODO: movo to crow
+        }
         Err(SimpleError::new(format!("move_row: TODO: implement me, crow {}", crow)))
     }
 
