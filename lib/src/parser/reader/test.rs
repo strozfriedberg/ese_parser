@@ -1,8 +1,8 @@
 use super::*;
-use std::{str, ffi::CString, ptr::null_mut, convert::TryFrom, collections::HashSet};
-use crate::esent::*;
-use crate::ese_parser;
-use crate::ese_trait::EseDb;
+use std::{str, ffi::CString, mem::size_of, ptr::null_mut, convert::TryFrom, collections::HashSet};
+use crate::esent::{self, *};
+use crate::ese_parser::EseParser;
+use crate::ese_trait::{EseDb, ColumnInfo};
 use encoding::{all::{ASCII, UTF_16LE, UTF_8}, Encoding, EncoderTrap, DecoderTrap};
 
 macro_rules! jetcall {
@@ -23,10 +23,6 @@ macro_rules! jettry {
             Err(e) => panic!("{} failed: {}", stringify!($func), e),
         }
     }
-}
-
-fn size_of<T> () -> raw::c_ulong{
-    mem::size_of::<T>() as raw::c_ulong
 }
 
 #[derive(Debug)]
@@ -83,17 +79,13 @@ impl EseAPI {
         println!("create_column: {}", name);
 
         JET_COLUMNCREATE_A{
-            cbStruct: size_of::<JET_COLUMNCREATE_A>(),
+            cbStruct: size_of::<JET_COLUMNCREATE_A>() as u32,
             szColumnName: CString::new(name).unwrap().into_raw(),
             coltyp: col_type,
             cbMax: 0,
             grbit,
             cp: cp as u32,
             pvDefault: ptr::null_mut(), cbDefault: 0, columnid: 0, err: 0 }
-    }
-
-    fn create_num_column(name: &str, grbit: JET_GRBIT) -> JET_COLUMNCREATE_A {
-        EseAPI::create_column(name, JET_coltypLong, JET_CP::None, grbit)
     }
 
     fn create_text_column(name: &str, cp: JET_CP, grbit: JET_GRBIT) -> JET_COLUMNCREATE_A {
@@ -109,7 +101,7 @@ impl EseAPI {
                     columns: &mut Vec<JET_COLUMNCREATE_A>) -> JET_TABLEID {
 
         let mut table_def =  JET_TABLECREATE_A{
-                    cbStruct: size_of::<JET_TABLECREATE_A>(),
+                    cbStruct: size_of::<JET_TABLECREATE_A>() as u32,
                     szTableName: CString::new(name).unwrap().into_raw(),
                     szTemplateTableName: ptr::null_mut(),
                     ulPages: 0,
@@ -255,49 +247,62 @@ pub fn caching_test() -> Result<(), SimpleError> {
     Ok(())
 }
 
+fn check_row(jdb: &mut EseParser, table_id: u64, columns: &Vec<ColumnInfo>) -> HashSet<String> {
+    let mut values = HashSet::<String>::new();
+
+    for col in columns {
+        //print!("{}: ", col.name);
+        match jdb.get_column_str(table_id, col.id, 0) {
+            Ok(result) =>
+                if let Some(mut value) = result {
+                    if col.cp == JET_CP::Unicode as u16 {
+                        unsafe {
+                            let buffer = slice::from_raw_parts(value.as_bytes() as *const _ as *const u16, value.len() / 2);
+                            value = String::from_utf16(&buffer).unwrap();
+                        }
+                    }
+                    if let Ok(s) = UTF_8.decode(&value.as_bytes(), DecoderTrap::Strict) {
+                        value = s;
+                    }
+                    //println!("{}", value);
+                    values.insert(value);
+                } else {
+                    println!("column '{}' has no value", col.name);
+                    values.insert("".to_string());
+                },
+            Err(e) => panic!("error: {}", e),
+        }
+    }
+    values
+}
+
 #[test]
 pub fn decompress_test() -> Result<(), SimpleError> {
-   let table = "test_table";
-   let path = prepare_db("decompress_test.edb", table, 1024 * 8, 10, 10);
-   let mut jdb : ese_parser::EseParser = ese_parser::EseParser::init(5);
+    let table = "test_table";
+    let path = prepare_db("decompress_test.edb", table, 1024 * 8, 10, 10);
+    let mut jdb : EseParser = EseParser::init(5);
 
-   match jdb.load(&path.to_str().unwrap()) {
+    match jdb.load(&path.to_str().unwrap()) {
         Some(e) => panic!("Error: {}", e),
         None => println!("Loaded {}", path.display())
-   }
+    }
 
-   let table_id = jdb.open_table(&table)?;
-   let columns = jdb.get_columns(&table)?;
-   let mut values = HashSet::<String>::new();
+    let table_id = jdb.open_table(&table)?;
+    let columns = jdb.get_columns(&table)?;
 
-   for col in columns {
-       print!("{}: ", col.name);
-       match jdb.get_column_str(table_id, col.id, 0) {
-           Ok(result) =>
-               if let Some(mut value) = result {
-                   if col.cp == JET_CP::Unicode as u16 {
-                       unsafe {
-                           let buffer = slice::from_raw_parts(value.as_bytes() as *const _ as *const u16, value.len() / 2);
-                           value = String::from_utf16(&buffer).unwrap();
-                       }
-                   }
-                   if let Ok(s) = UTF_8.decode(&value.as_bytes(), DecoderTrap::Strict) {
-                       value = s;
-                   }
-                   println!("{}", value);
-                   values.insert(value);
-               }
-               else {
-                   println!("column '{}' has no value", col.name);
-                   values.insert("".to_string());
-               },
-           Err(e) => panic!("error: {}", e),
-       }
-   }
+    assert!(jdb.move_row(table_id, esent::JET_MoveFirst));
 
-   println!("values: {:?}", values);
-   assert_eq!(values.len(), 1);
+    for rec_no in 0.. {
+        let values = check_row(&mut jdb, table_id, &columns);
 
-   Ok(())
+        println!("{}: {:?}", rec_no, values);
+        assert_eq!(values.len(), 1);
+
+        if !jdb.move_row(table_id, esent::JET_MoveNext) {
+            break;
+        }
+    }
+
+    Ok(())
 }
 
