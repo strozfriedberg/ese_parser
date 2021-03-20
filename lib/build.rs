@@ -4,7 +4,8 @@ use std::env;
 use std::path::PathBuf;
 
 fn main() {
-    let sources = ["cpp/decompress.cpp",
+    let sources = [
+        "cpp/decompress.cpp",
         "cpp/ms/checksum.cxx",
         "cpp/ms/checksum_amd64.cxx",
         "cpp/ms/checksum_avx.cxx",
@@ -42,13 +43,13 @@ fn main() {
         "cpp/ms/_xpress/xdecode.c",
     ];
 
-    for s in &sources {
+    for s in sources.iter() {
         println!("cargo:rerun-if-changed={}", s);
     }
 
     cc::Build::new()
         .cpp(true)
-        .files(&sources)
+        .files(sources.iter())
         .define("ESENT", None)
         .define("SORTPP_PASS", None)
         .define("DISABLE_ERR_CHECK", None)
