@@ -706,12 +706,16 @@ pub fn load_data(
                             let v = reader.read_bytes(offset, tagged_data_type_size as usize)?;
                             let mut res = unsafe { decompress(v.as_ptr(), v.len() as u32, ptr::null_mut(), 0, &mut decompressed) };
 
-                            assert_eq!(res, JET_wrnBufferTruncated);
+                            if res != JET_wrnBufferTruncated {
+                                return Err(SimpleError::new(format!("Could not get required buffer size. Err {}", res)));
+                            }
 
                             let mut  buf = Vec::<u8>::with_capacity(decompressed as usize);
                             unsafe { buf.set_len(buf.capacity()); }
                             res = unsafe { decompress(v.as_ptr(), v.len() as u32, buf.as_mut_ptr(), buf.len() as u32, &mut decompressed) };
-                            assert_eq!(res, JET_errSuccess);
+                            if res != JET_errSuccess {
+                                return Err(SimpleError::new(format!("Decompress failed. Err {}", res)));
+                            }
 
                             return Ok(Some(buf));
                         } else {
