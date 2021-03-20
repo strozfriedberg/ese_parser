@@ -17,10 +17,10 @@ extern "C" {
 
 pub struct Reader {
     file: RefCell<fs::File>,
-    cache: RefCell<Cache<usize, Vec<u8>>>,
+    cache: RefCell<Cache<u32, Vec<u8>>>,
     format_version: jet::FormatVersion,
     format_revision: jet::FormatRevision,
-    page_size: u64,
+    page_size: u32,
     last_page_number: u32,
 }
 
@@ -99,7 +99,7 @@ impl Reader {
         let db_fh = reader.load_db_file_header()?;
         reader.format_version = db_fh.format_version;
         reader.format_revision = db_fh.format_revision;
-        reader.page_size = db_fh.page_size as u64;
+        reader.page_size = db_fh.page_size;
         reader.last_page_number = (db_fh.page_size * 2) / db_fh.page_size;
 
         reader.cache.get_mut().clear();
@@ -108,7 +108,7 @@ impl Reader {
     }
 
     fn read(&self, offset: u64, buf: &mut [u8]) -> Result<(), SimpleError> {
-        let pg_no = (offset / self.page_size as u64) as usize;
+        let pg_no = (offset / self.page_size as u64) as u32;
         let mut c = self.cache.borrow_mut();
         if !c.contains_key(&pg_no) {
             let mut page_buf = vec![0u8; self.page_size as usize];
@@ -305,17 +305,17 @@ pub fn load_catalog(
     let mut table_def : jet::TableDefinition = jet::TableDefinition { table_catalog_definition: None,
         column_catalog_definition_array: vec![], long_value_catalog_definition: None };
 
-    let mut page_number =
-        if db_page.flags().contains(jet::PageFlags::IS_PARENT) {
-            page_tag_get_branch_child_page_number(reader, &db_page, &pg_tags[1])?
+    let mut page_number;
+    if db_page.flags().contains(jet::PageFlags::IS_PARENT) {
+        page_number = page_tag_get_branch_child_page_number(reader, &db_page, &pg_tags[1])?;
+    } else {
+        if db_page.flags().contains(jet::PageFlags::IS_LEAF) {
+            page_number = db_page.page_number;
         } else {
-            if db_page.flags().contains(jet::PageFlags::IS_LEAF) {
-                db_page.page_number
-            } else {
-                return Err(SimpleError::new(format!("pageno {}: IS_PARENT (branch) flag should be present in {:?}",
-                                                    db_page.page_number, db_page.flags())));
-            }
-        };
+            return Err(SimpleError::new(format!("pageno {}: IS_PARENT (branch) flag should be present in {:?}",
+                                                db_page.page_number, db_page.flags())));
+        }
+    }
     let mut prev_page_number = db_page.page_number;
 
     while page_number != 0 {
@@ -835,7 +835,7 @@ pub fn load_lv_tag(
         offset += local_page_key_size as u64;
     }
 
-    return if (page_tag.size as u64) - (offset - page_tag_offset) == 8 {
+    if (page_tag.size as u64) - (offset - page_tag_offset) == 8 {
         let skey: u32 = reader.read_struct(offset)?;
         offset += 4;
 
@@ -844,7 +844,7 @@ pub fn load_lv_tag(
         let _total_size : u32 = reader.read_struct(offset)?;
 
         // TODO: handle? page_tags with skey & total_size only
-        Ok(None)
+        return Ok(None);
     } else {
         let mut page_key: Vec<u8> = vec![];
         if common_page_key_size + local_page_key_size == 8 {
@@ -876,7 +876,7 @@ pub fn load_lv_tag(
         res.offset = offset;
         res.size = (page_tag.size as u64 - (offset - page_tag_offset)).try_into().unwrap();
 
-        Ok(Some(res))
+        return Ok(Some(res));
     }
 }
 

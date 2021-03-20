@@ -213,7 +213,7 @@ pub fn caching_test() -> Result<(), SimpleError> {
     let table = "test_table";
     let path = prepare_db("caching_test.edb", table, 1024 * 8, 1024, 4000);
     let mut reader = Reader::new(&path, cache_size as usize)?;
-    let page_size = reader.page_size;
+    let page_size = reader.page_size as u64;
     let num_of_pages = std::cmp::min(fs::metadata(&path).unwrap().len() / page_size, page_size) as usize;
     let full_cache_size = 6 * cache_size;
     let stride = num_of_pages / full_cache_size;
@@ -224,14 +224,14 @@ pub fn caching_test() -> Result<(), SimpleError> {
         cache_size, page_size, num_of_pages, stride, chunk_size);
 
     for pass in 1..3 {
-        for pg_no in 1_usize..12_usize {
-            let offset: u64 = (pg_no * (page_size as usize + chunk_size)) as u64;
+        for pg_no in 1_u32..12_u32 {
+            let offset: u64 = (pg_no as u64 * (page_size + chunk_size as u64));
 
             println!("pass {}, pg_no {}, offset {:x} ", pass, pg_no, offset);
 
             if pass == 1 {
                 let mut chunk = Vec::<u8>::with_capacity(stride as usize);
-                assert!(!reader.cache.get_mut().contains_key(&pg_no as &usize));
+                assert!(!reader.cache.get_mut().contains_key(&pg_no));
                 reader.read(offset, &mut chunk)?;
                 chunks.push(chunk);
             } else {
@@ -251,7 +251,6 @@ fn check_row(jdb: &mut EseParser, table_id: u64, columns: &Vec<ColumnInfo>) -> H
     let mut values = HashSet::<String>::new();
 
     for col in columns {
-        //print!("{}: ", col.name);
         match jdb.get_column_str(table_id, col.id, 0) {
             Ok(result) =>
                 if let Some(mut value) = result {
@@ -264,7 +263,6 @@ fn check_row(jdb: &mut EseParser, table_id: u64, columns: &Vec<ColumnInfo>) -> H
                     if let Ok(s) = UTF_8.decode(&value.as_bytes(), DecoderTrap::Strict) {
                         value = s;
                     }
-                    //println!("{}", value);
                     values.insert(value);
                 } else {
                     println!("column '{}' has no value", col.name);
