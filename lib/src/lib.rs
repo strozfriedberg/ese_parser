@@ -37,7 +37,6 @@ fn test_edb_table_all_values() {
     use ese_trait::*;
     use std::os::windows::prelude::*;
 
-    //let mut jdb : ese_trait::EseDb = ese_api::EseApi::init();
     let mut jdb : ese_parser::EseParser = ese_parser::EseParser::init(5);
 
     match jdb.load("testdata\\test.edb") {
@@ -95,7 +94,7 @@ fn test_edb_table_all_values() {
         let date_time = columns.iter().find(|x| x.name == "DateTime" ).unwrap();
         let dt = jdb.get_column::<f64>(table_id, date_time.id).unwrap().unwrap();
 
-        let mut st =  std::mem::MaybeUninit::<SYSTEMTIME>::zeroed();
+        let mut st = std::mem::MaybeUninit::<SYSTEMTIME>::zeroed();
         unsafe {
             let r = VariantTimeToSystemTime(dt, st.as_mut_ptr());
             assert_eq!(r, 1);
