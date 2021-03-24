@@ -126,5 +126,8 @@
     <ClCompile Include="ms\checksum_avx.cxx">
       <Filter>Source Files\ms</Filter>
     </ClCompile>
+    <ClCompile Include="ms\_xpress\xencode.c">
+      <Filter>Source Files\ms</Filter>
+    </ClCompile>
   </ItemGroup>
 </Project>
