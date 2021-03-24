@@ -326,6 +326,10 @@ pub fn load_catalog(
                     res.push(table_def);
                     table_def = jet::TableDefinition { table_catalog_definition: None,
                         column_catalog_definition_array: vec![], long_value_catalog_definition: None };
+                } else if table_def.column_catalog_definition_array.len() > 0 ||
+                    table_def.long_value_catalog_definition.is_some() {
+                    return Err(SimpleError::new(
+                        "corrupted table detected: column/long definition is going before table"));
                 }
                 table_def.table_catalog_definition = Some(cat_item);
             } else if cat_item.cat_type == jet::CatalogType::Column as u16 {
