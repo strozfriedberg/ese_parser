@@ -74,6 +74,52 @@ struct CDataCompressor {
         COMPRESS_MAXIMUM = 0x1f,
     };
 
+    CDataCompressor() {
+        FOSSyncPreinit();
+        ErrInit();
+    }
+    ERR ErrInit(/* const INT cbMin, const INT cbMax */)
+    {
+        ERR err = JET_errSuccess;
+
+        //Assert( cbMin >= 0 );
+        //m_cbMin = cbMin;
+        //Assert( cbMax >= cbMin );
+        //m_cbMax = cbMax;
+
+        //m_cencodeCachedMax = OSSyncGetProcessorCountMax();
+        m_cdecodeCachedMax = OSSyncGetProcessorCountMax();
+
+        //Assert( m_rgencodeXpress == NULL );
+        //Assert( m_rgdecodeXpress == NULL );
+        //Alloc( m_rgencodeXpress = new XpressEncodeStream[ m_cencodeCachedMax ]() );
+        Alloc( m_rgdecodeXpress = new XpressDecodeStream[ m_cdecodeCachedMax ]() );
+
+        #ifdef XPRESS9_COMPRESSION
+        Assert( m_rgencodeXpress9 == NULL );
+        Assert( m_rgdecodeXpress9 == NULL );
+        Alloc( m_rgencodeXpress9 = new XPRESS9_ENCODER[ m_cencodeCachedMax ]() );
+        Alloc( m_rgdecodeXpress9 = new XPRESS9_DECODER[ m_cdecodeCachedMax ]() );
+        #endif
+
+        return err;
+
+    HandleError:
+        //delete[] m_rgencodeXpress;
+        //m_rgencodeXpress = NULL;
+        delete[] m_rgdecodeXpress;
+        m_rgdecodeXpress = NULL;
+        #ifdef XPRESS9_COMPRESSION
+        delete[] m_rgencodeXpress9;
+        m_rgencodeXpress9 = NULL;
+        delete[] m_rgdecodeXpress9;
+        m_rgdecodeXpress9 = NULL;
+        #endif
+
+        return err;
+    }
+
+
     ERR ErrDecompress(
         const DATA& dataCompressed,
         _Out_writes_bytes_to_opt_( cbDataMax, min( cbDataMax, *pcbDataActual ) ) BYTE * const pbData,
@@ -499,24 +545,172 @@ void CDataCompressor::XpressDecodeRelease_( XpressDecodeStream decode )
 #include <vector>
 #include <string>
 
-int main()
+#define errRECCannotCompress                -418  /* column cannot be compressed */
+
+static const INT xpressLegacyCompressionLevel = 2;
+
+INT m_cbMax = 100;  //???
+XpressEncodeStream* m_rgencodeXpress;
+INT m_cencodeCachedMax;
+
+void * XPRESS_CALL /*CDataCompressor::*/PvXpressAlloc_( _In_opt_ void * pvContext, INT cbAlloc )
 {
-    uint8_t     data[] {"\x16���-'�@ \x10\b\x4\x2�@0"};
-    uint32_t    decompressed = 0;
-    uint32_t    res = decompress(data, sizeof(data), nullptr, 0, &decompressed);
+    return new BYTE[cbAlloc];
+}
 
-    if (res == JET_wrnBufferTruncated) {
-        std::vector<uint8_t>    buf(decompressed);
+ERR /*CDataCompressor::*/ErrXpressEncodeOpen_( _Out_ XpressEncodeStream * const pencode )
+{
+    C_ASSERT( sizeof(void*) == sizeof(XpressEncodeStream) );
+    *pencode = 0;
 
-        if ((res = decompress(data, sizeof(data), buf.data(), buf.size(), &decompressed)) == JET_errSuccess) {
-            std::string         str((char*)buf.data(), buf.size());
+    m_cencodeCachedMax = OSSyncGetProcessorCountMax();
+    m_rgencodeXpress =  new XpressEncodeStream[ m_cencodeCachedMax ]();
+
+    XpressEncodeStream encode = GetCachedPtr<XpressEncodeStream>( m_rgencodeXpress, m_cencodeCachedMax );
+    if ( 0 != encode )
+    {
+        *pencode = encode;
+        return JET_errSuccess;
+    }
+
+    encode = XpressEncodeCreate(
+        m_cbMax,
+        0,
+        PvXpressAlloc_,
+        xpressLegacyCompressionLevel );
+    if( NULL == encode )
+    {
+        return ErrERRCheck( JET_errOutOfMemory );
+    }
+    *pencode = encode;
+    return JET_errSuccess;
+}
+
+void XPRESS_CALL /*CDataCompressor::*/XpressFree_( _In_opt_ void * pvContext, _Post_ptr_invalid_ void * pvAlloc )
+{
+    delete [] pvAlloc;
+}
+
+void /*CDataCompressor::*/XpressEncodeRelease_( XpressEncodeStream encode )
+{
+    if ( encode )
+    {
+        XpressEncodeClose( encode, 0, XpressFree_ );
+    }
+}
+
+
+void /*CDataCompressor::*/XpressEncodeClose_( XpressEncodeStream encode )
+{
+    if ( encode )
+    {
+        if( FCachePtr<XpressEncodeStream>( encode, m_rgencodeXpress, m_cencodeCachedMax ) )
+        {
+            return;
+        }
+
+        XpressEncodeRelease_( encode );
+    }
+}
+
+ERR /*CDataCompressor::*/ErrCompressXpress_(
+    const DATA& data,
+    _Out_writes_bytes_to_( cbDataCompressedMax, *pcbDataCompressedActual ) BYTE * const pbDataCompressed,
+    const INT cbDataCompressedMax,
+    _Out_ INT * const pcbDataCompressedActual)
+{
+    PERFOptDeclare( const HRT hrtStart = HrtHRTCount() );
+
+    Assert( data.Cb() >= m_cbMin );
+    Assert( data.Cb() <= wMax );
+    Assert( data.Cb() <= m_cbMax );
+    Assert( pstats );
+
+    ERR err = JET_errSuccess;
+
+    XpressEncodeStream encode = 0;
+    Call( ErrXpressEncodeOpen_( &encode ) );
+
+    {
+        const INT cbReserved = sizeof(BYTE) + sizeof(WORD);
+
+        const INT cbCompressed = XpressEncode(
+            encode,
+            pbDataCompressed + cbReserved,
+            cbDataCompressedMax - cbReserved,
+            data.Pv(),
+            data.Cb(),
+            0,
+            0,
+            0 );
+        Assert( cbCompressed <= data.Cb() );
+
+        if( cbCompressed == 0 || cbCompressed + cbReserved >= data.Cb() )
+        {
+            err = ErrERRCheck( errRECCannotCompress );
+        }
+        else
+        {
+            BYTE * const pbSignature    = pbDataCompressed;
+            UnalignedLittleEndian<WORD> * const pwSize  = (UnalignedLittleEndian<WORD> *)(pbSignature+1);
+
+            *pbSignature    = ( CDataCompressor::COMPRESS_XPRESS << 3 );
+            *pwSize         = (WORD)data.Cb();
+            *pcbDataCompressedActual = cbCompressed + cbReserved;
+        }
+    }
+
+HandleError:
+    XpressEncodeClose_( encode );
+
+    if ( err == JET_errSuccess )
+    {
+        PERFOpt( pstats->AddUncompressedBytes( data.Cb() ) );
+        PERFOpt( pstats->AddCompressedBytes( *pcbDataCompressedActual ) );
+        PERFOpt( pstats->IncCompressionCalls() );
+        PERFOpt( pstats->AddCompressionDhrts( HrtHRTCount() - hrtStart ) );
+    }
+
+    return err;
+}
+
+int main() {
+    using Buffer = std::vector<uint8_t>;
+    DATA            data;
+    INT             res;
+    std::string     src {"===========================test string data to check compression/decompression=================="};
+    Buffer          compressed_data(src.size() + 8);
+    INT             compressed = 0;
+    uint32_t        decompressed = 0;
+    CDataCompressor to_call_init;
+
+    data.SetPv((void *)src.data());
+    data.SetCb(src.size());
+
+    if (JET_errSuccess != (res = ErrCompressXpress_(data, compressed_data.data(), compressed_data.size(), &compressed))) {
+        std::cerr << "ERROR: compress " << res;
+        return 1;
+    }
+
+    if (JET_wrnBufferTruncated == (res = decompress(compressed_data.data(), compressed, nullptr, 0, &decompressed))) {
+        Buffer           decompressed_data(decompressed);
+
+        if (JET_errSuccess == (res = decompress(compressed_data.data(), compressed, 
+                                                decompressed_data.data(), decompressed_data.size(), &decompressed))) {
+            std::string  str((char*)decompressed_data.data(), decompressed_data.size());
 
             std::cout << "decompressed = " << decompressed << ": '" << str << "'\n";
         }
-        else
-            std::cerr << "ERROR: " << res;
+        else {
+            std::cerr << "ERROR: decompress " << res;
+            return 1;
+        }
     }
-    else
-        std::cerr << "ERROR: res (" << res << ") != JET_wrnBufferTruncated!";
+    else {
+        std::cerr << "ERROR: decompressed (" << res << ") != JET_wrnBufferTruncated!";
+        return 1;
+    }
+
+    return 0;
 }
 #endif //RUST_LIBRARY
