@@ -79,13 +79,24 @@ impl EseAPI {
             Ok(bytes as u32)
         }
     }
+
+    pub fn get_column<T>(&self, table: u64, column: u32) -> Result<Option<T>, SimpleError> {
+        let size : c_ulong = size_of::<T>() as u32;
+        let mut v = MaybeUninit::<T>::zeroed();
+
+        unsafe {
+            self.get_column_dyn_helper(table, column,
+                std::slice::from_raw_parts_mut::<u8>(v.as_mut_ptr() as *mut u8, size as usize), size as usize)?;
+            Ok(Some(v.assume_init()))
+        }
+    }
+
+    pub fn init() -> EseAPI {
+        EseAPI { instance: 0, sesid: 0, dbid: 0 }
+    }
 }
 
 impl EseDb for EseAPI {
-
-    fn init() -> EseAPI {
-        EseAPI { instance: 0, sesid: 0, dbid: 0 }
-    }
 
     fn load(&mut self, dbpath: &str) -> Option<SimpleError> {
         let dbinfo = match EseAPI::get_database_file_info(dbpath) {
@@ -177,7 +188,7 @@ impl EseDb for EseAPI {
     fn close_table(&self, table: u64) -> bool {
         unsafe {
             let err = JetCloseTable(self.sesid, table);
-            err != 0
+            err == 0
         }
     }
 
@@ -202,17 +213,6 @@ impl EseDb for EseAPI {
         match std::str::from_utf8(&v) {
             Ok(s) => Ok(Some(s.to_string())),
             Err(e) => Err(SimpleError::new(format!("std::str::from_utf8 failed: {}", e)))
-        }
-    }
-
-    fn get_column<T>(&self, table: u64, column: u32) -> Result<Option<T>, SimpleError> {
-        let size : c_ulong = size_of::<T>() as u32;
-        let mut v = MaybeUninit::<T>::zeroed();
-
-        unsafe {
-            self.get_column_dyn_helper(table, column,
-                std::slice::from_raw_parts_mut::<u8>(v.as_mut_ptr() as *mut u8, size as usize), size as usize)?;
-            Ok(Some(v.assume_init()))
         }
     }
 
@@ -244,7 +244,12 @@ impl EseDb for EseAPI {
 
             let mut bytes : c_ulong = 0;
             unsafe {
-                let mut retinfo = JET_RETINFO { cbStruct: size_of::<JET_RETINFO>() as c_ulong, ibLongValue: vres.len() as c_ulong, itagSequence : 1, columnidNextTagged: 0 };
+                let mut retinfo = JET_RETINFO {
+                    cbStruct: size_of::<JET_RETINFO>() as c_ulong,
+                    ibLongValue: vres.len() as c_ulong,
+                    itagSequence : 1,
+                    columnidNextTagged: 0
+                };
                 let err = JetRetrieveColumn(self.sesid, table, column, v.as_mut_slice().as_mut_ptr() as *mut c_void, size as u32,
                     &mut bytes, 0, &mut retinfo);
                 if err != 0 && err != JET_wrnBufferTruncated as i32 {
@@ -263,6 +268,46 @@ impl EseDb for EseAPI {
             }
         }
         Ok(Some(vres))
+    }
+
+    fn get_column_dyn_mv(&self, table: u64, column: u32, multi_value_index: u32)
+        -> Result< Option<Vec<u8>>, SimpleError> {
+            let mut vres : Vec<u8> = Vec::new();
+
+            loop {
+                let mut v : Vec<u8> = Vec::new();
+                let size: usize = 4096;
+                v.resize(size, 0);
+
+                let mut bytes : c_ulong = 0;
+                unsafe {
+                    let mut retinfo = JET_RETINFO {
+                        cbStruct: size_of::<JET_RETINFO>() as c_ulong,
+                        ibLongValue: vres.len() as c_ulong,
+                        itagSequence : multi_value_index,
+                        columnidNextTagged: 0
+                    };
+                    let err = JetRetrieveColumn(self.sesid, table, column, v.as_mut_slice().as_mut_ptr() as *mut c_void, size as u32,
+                        &mut bytes, 0, &mut retinfo);
+                    if err != 0 && err != JET_wrnBufferTruncated as i32 {
+                        if err == JET_wrnColumnNull as i32 {
+                            return Ok(None);
+                        }
+                        return Err(SimpleError::new(
+                            format!("JetRetrieveColumn failed with error {}", self.error_to_string(err))));
+                    }
+
+                    v.truncate(bytes as usize);
+                    vres.append(v.as_mut());
+
+                    if err == JET_wrnBufferTruncated as i32 {
+                        continue;
+                    } else {
+                        break;
+                    }
+                }
+            }
+            Ok(Some(vres))
     }
 
     fn move_row(&self, table: u64, crow: u32) -> bool {
@@ -296,8 +341,7 @@ impl EseDb for EseAPI {
         Ok(err)
     }
 
-    fn get_columns(&self, table: &str) -> Result<Vec<ColumnInfo>, SimpleError>
-    {
+    fn get_columns(&self, table: &str) -> Result<Vec<ColumnInfo>, SimpleError> {
         let table_id = self.open_table(table)?;
         let mut cols : Vec<ColumnInfo> = Vec::new();
         let mut col_list = MaybeUninit::<JET_COLUMNLIST>::zeroed();
@@ -332,6 +376,7 @@ impl EseDb for EseAPI {
             }
         }
         self.close_table(table_id);
+        cols.sort_by(|a, b| a.id.cmp(&b.id));
         Ok(cols)
     }
 }

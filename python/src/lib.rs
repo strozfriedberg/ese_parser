@@ -1,16 +1,11 @@
+
 use pyo3::prelude::*;
-use pyo3::wrap_pyfunction;
 use pyo3::exceptions;
-use pyo3::types::*;
 
-use ese_parser_lib::{esent::*, ese_trait::*, ese_api::*};
-
-use simple_error::SimpleError;
+use ese_parser_lib::{esent, ese_trait::*, ese_parser::*};
 
 use std::ffi::OsString;
 use std::os::windows::prelude::*;
-
-use std::mem::MaybeUninit;
 
 extern "C" {
     pub fn StringFromGUID2(
@@ -22,7 +17,7 @@ extern "C" {
 
 #[pyclass]
 pub struct PyEseDb {
-    jdb : EseAPI,
+    jdb : EseParser,
 }
 
 #[pyclass]
@@ -56,7 +51,7 @@ impl PyEseDb {
     #[new]
     fn new() -> Self {
         PyEseDb {
-            jdb : EseDb::init()
+            jdb : EseParser::init(10)
         }
     }
 
@@ -118,6 +113,22 @@ impl PyEseDb {
         self.jdb.move_row(table, crow)
     }
 
+    fn get_row_mv(&self, table: u64, column: &PyColumnInfo, multi_value_index: u32) -> PyResult<Option<PyObject>> {
+        let gil = Python::acquire_gil();
+        let py = gil.python();
+
+        let d = self.jdb.get_column_dyn_mv(table, column.id, multi_value_index);
+        match d {
+            Ok(ov) => {
+                match ov {
+                    Some(n) => return Ok(Some(n.to_object(py))),
+                    None => return Ok(None)
+                }
+            },
+            Err(e) => return Err(PyErr::new::<exceptions::PyTypeError, _>(e.as_str().to_string()))
+        }
+    }
+
     fn get_row(&self, table: u64, column: &PyColumnInfo) -> PyResult<Option<PyObject>> {
         let gil = Python::acquire_gil();
         let py = gil.python();
@@ -135,51 +146,51 @@ impl PyEseDb {
         }
 
         match column.typ {
-            JET_coltypBit => {
+            esent::JET_coltypBit => {
                 let n = get::<i8>(self, table, column)?;
                 Ok(Some(n.to_object(py)))
             },
-            JET_coltypUnsignedByte => {
+            esent::JET_coltypUnsignedByte => {
                 let n = get::<u8>(self, table, column)?;
                 Ok(Some(n.to_object(py)))
             },
-            JET_coltypShort => {
+            esent::JET_coltypShort => {
                 let n = get::<i16>(self, table, column)?;
                 Ok(Some(n.to_object(py)))
             },
-            JET_coltypUnsignedShort => {
+            esent::JET_coltypUnsignedShort => {
                 let n = get::<u16>(self, table, column)?;
                 Ok(Some(n.to_object(py)))
             },
-            JET_coltypLong => {
+            esent::JET_coltypLong => {
                 let n = get::<i32>(self, table, column)?;
                 Ok(Some(n.to_object(py)))
             },
-            JET_coltypUnsignedLong => {
+            esent::JET_coltypUnsignedLong => {
                 let n = get::<u32>(self, table, column)?;
                 Ok(Some(n.to_object(py)))
             },
-            JET_coltypLongLong => {
+            esent::JET_coltypLongLong => {
                 let n = get::<i64>(self, table, column)?;
                 Ok(Some(n.to_object(py)))
             },
-            JET_coltypUnsignedLongLong => {
+            esent::JET_coltypUnsignedLongLong => {
                 let n = get::<u64>(self, table, column)?;
                 Ok(Some(n.to_object(py)))
             },
-            JET_coltypCurrency => { // TODO
+            esent::JET_coltypCurrency => { // TODO
                 let n = get::<i64>(self, table, column)?;
                 Ok(Some(n.to_object(py)))
             },
-            JET_coltypIEEESingle => {
+            esent::JET_coltypIEEESingle => {
                 let n = get::<f32>(self, table, column)?;
                 Ok(Some(n.to_object(py)))
             },
-            JET_coltypIEEEDouble => {
+            esent::JET_coltypIEEEDouble => {
                 let n = get::<f64>(self, table, column)?;
                 Ok(Some(n.to_object(py)))
             },
-            JET_coltypBinary => {
+            esent::JET_coltypBinary => {
                 match self.jdb.get_column_dyn(table, column.id, column.cbmax as usize) {
                     Ok(ov) => {
                         match ov {
@@ -190,7 +201,7 @@ impl PyEseDb {
                     Err(e) => return Err(PyErr::new::<exceptions::PyTypeError, _>(e.as_str().to_string()))
                 }
             },
-            JET_coltypText => {
+            esent::JET_coltypText => {
                 match self.jdb.get_column_dyn(table, column.id, column.cbmax as usize) {
                     Ok(ov) => {
                         match ov {
@@ -203,7 +214,7 @@ impl PyEseDb {
                     Err(e) => return Err(PyErr::new::<exceptions::PyTypeError, _>(e.as_str().to_string()))
                 }
             },
-            JET_coltypLongText => {
+            esent::JET_coltypLongText => {
                 let d;
                 if column.cbmax == 0 {
                     d = self.jdb.get_column_dyn_varlen(table, column.id);
@@ -222,7 +233,7 @@ impl PyEseDb {
                     Err(e) => return Err(PyErr::new::<exceptions::PyTypeError, _>(e.as_str().to_string()))
                 }
             },
-            JET_coltypLongBinary => {
+            esent::JET_coltypLongBinary => {
                 let d;
                 if column.cbmax == 0 {
                     d = self.jdb.get_column_dyn_varlen(table, column.id);
@@ -239,7 +250,7 @@ impl PyEseDb {
                     Err(e) => return Err(PyErr::new::<exceptions::PyTypeError, _>(e.as_str().to_string()))
                 }
             },
-            JET_coltypGUID => {
+            esent::JET_coltypGUID => {
                 match self.jdb.get_column_dyn(table, column.id, column.cbmax as usize) {
                     Ok(ov) => {
                         match ov {
@@ -264,7 +275,7 @@ impl PyEseDb {
                     Err(e) => return Err(PyErr::new::<exceptions::PyTypeError, _>(e.as_str().to_string()))
                 }
             },
-            JET_coltypDateTime => {
+            esent::JET_coltypDateTime => {
                 let ov = get::<f64>(self, table, column)?;
                 match ov {
                     Some(v) => {

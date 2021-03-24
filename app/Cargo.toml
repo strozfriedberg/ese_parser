@@ -6,3 +6,5 @@ edition = "2018"
 
 [dependencies]
 ese_parser_lib = { path = "../lib" }
+simple-error = "*"
+widestring = "*"
