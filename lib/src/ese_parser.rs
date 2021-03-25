@@ -2,7 +2,6 @@
 use crate::parser::*;
 use crate::ese_trait::*;
 use crate::parser::reader::*;
-use crate::esent;
 
 use simple_error::SimpleError;
 use std::cell::{RefCell, RefMut};
@@ -67,7 +66,7 @@ impl EseParser {
         let mut t = self.get_table_by_id(table_id)?;
 
         let mut i = t.page_tag_index + 1;
-        if crow == esent::JET_MoveFirst as u32 {
+        if crow == ESE_MoveFirst as u32 {
             let first_leaf_page = find_first_leaf_page(reader,
                 t.cat.table_catalog_definition.as_ref().unwrap().father_data_page_number)?;
             if t.current_page.is_none() || t.page().page_number != first_leaf_page {
@@ -107,7 +106,7 @@ impl EseParser {
         let mut t = self.get_table_by_id(table_id)?;
 
         let mut i = t.page_tag_index - 1;
-        if crow == esent::JET_MoveLast as u32 {
+        if crow == ESE_MoveLast as u32 {
             while t.page().common().next_page != 0 {
                 let page = jet::DbPage::new(reader, t.page().common().next_page)?;
                 t.current_page = Some(page);
@@ -140,9 +139,9 @@ impl EseParser {
     }
 
     fn move_row_helper(&self, table_id: u64, crow: u32) -> Result<bool, SimpleError> {
-        if crow == esent::JET_MoveFirst as u32 || crow == esent::JET_MoveNext as u32 {
+        if crow == ESE_MoveFirst as u32 || crow == ESE_MoveNext as u32 {
             return self.move_next_row(table_id, crow);
-        } else if crow == esent::JET_MoveLast as u32 || crow == esent::JET_MovePrevious as u32 {
+        } else if crow == ESE_MoveLast as u32 || crow == ESE_MovePrevious as u32 {
             return self.move_previous_row(table_id, crow);
         } else {
             // TODO: movo to crow
@@ -219,7 +218,7 @@ impl EseDb for EseParser {
             }
         }
         // ignore return result
-        self.move_row_helper(index as u64, esent::JET_MoveFirst)?;
+        self.move_row_helper(index as u64, ESE_MoveFirst)?;
 
         Ok(index as u64)
     }

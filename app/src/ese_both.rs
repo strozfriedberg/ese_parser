@@ -1,14 +1,13 @@
-#![cfg(target_os = "windows")] 
+#![cfg(target_os = "windows")]
 #![allow(non_upper_case_globals, non_snake_case, non_camel_case_types, clippy::mut_from_ref, clippy::cast_ptr_alignment)]
 
-use std::env;
-use ese_parser_lib::{esent::*, ese_trait::*, ese_api::*, ese_parser::*};
+use ese_parser_lib::{ese_trait::*, ese_api::*, ese_parser::*};
 use std::cell::RefCell;
 use simple_error::SimpleError;
 
 const CACHE_SIZE_ENTRIES : usize = 10;
 
-struct EseBoth {
+pub struct EseBoth {
     api: EseAPI,
     parser : EseParser,
     opened_tables: RefCell<Vec<(u64, u64)>>,
@@ -154,23 +153,3 @@ impl EseDb for EseBoth {
         Ok(s1)
     }
 }
-
-fn get_column<T>(jdb: &Box<dyn EseDb>, table: u64, column: u32) -> Result<Option<T>, SimpleError> {
-    let size = std::mem::size_of::<T>();
-    let mut dst = std::mem::MaybeUninit::<T>::zeroed();
-
-    let vo = jdb.get_column_dyn(table, column, size)?;
-
-    unsafe {
-        if let Some(v) = vo {
-            std::ptr::copy_nonoverlapping(
-                v.as_ptr(),
-                dst.as_mut_ptr() as *mut u8,
-                size);
-            return Ok(Some(dst.assume_init()));
-        }
-        return Ok(None);
-    }
-}
-
-

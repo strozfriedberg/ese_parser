@@ -6,6 +6,8 @@ pub mod esent;
 pub mod ese_trait;
 pub mod ese_parser;
 
+pub mod ese_api;
+
 #[repr(C)]
 #[derive(Debug, Copy, Clone)]
 pub struct SYSTEMTIME {
@@ -105,11 +107,9 @@ fn test_edb_table_all_values() {
     {
         let guid = columns.iter().find(|x| x.name == "GUID" ).unwrap();
         let v = jdb.get_column_dyn(table_id, guid.id, guid.cbmax as usize).unwrap().unwrap();
-        unsafe {
-            let s = format!("{{{:02X}{:02X}{:02X}{:02X}-{:02X}{:02X}-{:02X}{:02X}-{:02X}{:02X}-{:02X}{:02X}{:02X}{:02X}{:02X}{:02X}}}",
-                v[3], v[2], v[1], v[0], v[5], v[4], v[7], v[6], v[8], v[9], v[10], v[11], v[12], v[13], v[14], v[15]);
-            assert_eq!(s, "{4D36E96E-E325-11CE-BFC1-08002BE10318}");
-        }
+        let s = format!("{{{:02X}{:02X}{:02X}{:02X}-{:02X}{:02X}-{:02X}{:02X}-{:02X}{:02X}-{:02X}{:02X}{:02X}{:02X}{:02X}{:02X}}}",
+            v[3], v[2], v[1], v[0], v[5], v[4], v[7], v[6], v[8], v[9], v[10], v[11], v[12], v[13], v[14], v[15]);
+        assert_eq!(s, "{4D36E96E-E325-11CE-BFC1-08002BE10318}");
     }
 
     // Binary

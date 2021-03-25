@@ -1,7 +1,9 @@
 #![allow(non_upper_case_globals, non_snake_case, non_camel_case_types, clippy::mut_from_ref, clippy::cast_ptr_alignment)]
 
+mod ese_both;
+
 use std::env;
-use ese_parser_lib::{esent::*, ese_trait::*, ese_parser::*};
+use ese_parser_lib::{ese_trait::*, ese_parser::*};
 use std::mem::size_of;
 use simple_error::SimpleError;
 use widestring::U16String;
@@ -50,86 +52,86 @@ fn get_column<T>(jdb: &Box<dyn EseDb>, table: u64, column: u32) -> Result<Option
 }
 
 fn get_column_val(jdb: &Box<dyn EseDb>, table_id: u64, c: &ColumnInfo) -> Result<String, SimpleError> {
-    let mut val = String::new();
+    let val;
     match c.typ {
-        JET_coltypBit => {
+        ESE_coltypBit => {
             assert!(c.cbmax as usize == size_of::<i8>());
             match get_column::<i8>(jdb, table_id, c.id)? {
                 Some(v) => val = format!("{}", v),
                 None => val = format!(" ")
             }
         },
-        JET_coltypUnsignedByte => {
+        ESE_coltypUnsignedByte => {
             assert!(c.cbmax as usize == size_of::<u8>());
             match get_column::<u8>(jdb, table_id, c.id)? {
                 Some(v) => val = format!("{}", v),
                 None => val = format!(" ")
             }
         },
-        JET_coltypShort => {
+        ESE_coltypShort => {
             assert!(c.cbmax as usize == size_of::<i16>());
             match get_column::<i16>(jdb, table_id, c.id)? {
                 Some(v) => val = format!("{}", v),
                 None => val = format!(" ")
             }
         },
-        JET_coltypUnsignedShort => {
+        ESE_coltypUnsignedShort => {
             assert!(c.cbmax as usize == size_of::<u16>());
             match get_column::<u16>(jdb, table_id, c.id)? {
                 Some(v) => val = format!("{}", v),
                 None => val = format!(" ")
             }
         },
-        JET_coltypLong => {
+        ESE_coltypLong => {
             assert!(c.cbmax as usize == size_of::<i32>());
             match get_column::<i32>(jdb, table_id, c.id)? {
                 Some(v) => val = format!("{}", v),
                 None => val = format!(" ")
             }
         },
-        JET_coltypUnsignedLong => {
+        ESE_coltypUnsignedLong => {
             assert!(c.cbmax as usize == size_of::<u32>());
             match get_column::<u32>(jdb, table_id, c.id)? {
                 Some(v) => val = format!("{}", v),
                 None => val = format!(" ")
             }
         },
-        JET_coltypLongLong => {
+        ESE_coltypLongLong => {
             assert!(c.cbmax as usize == size_of::<i64>());
             match get_column::<i64>(jdb, table_id, c.id)? {
                 Some(v) => val = format!("{}", v),
                 None => val = format!(" ")
             }
         },
-        JET_coltypUnsignedLongLong => {
+        ESE_coltypUnsignedLongLong => {
             assert!(c.cbmax as usize == size_of::<u64>());
             match get_column::<u64>(jdb, table_id, c.id)? {
                 Some(v) => val = format!("{}", v),
                 None => val = format!(" ")
             }
         },
-        JET_coltypCurrency => {
+        ESE_coltypCurrency => {
             assert!(c.cbmax as usize == size_of::<i64>());
             match get_column::<i64>(jdb, table_id, c.id)? {
                 Some(v) => val = format!("{}", v),
                 None => val = format!(" ")
             }
         },
-        JET_coltypIEEESingle => {
+        ESE_coltypIEEESingle => {
             assert!(c.cbmax as usize == size_of::<f32>());
             match get_column::<f32>(jdb, table_id, c.id)? {
                 Some(v) => val = format!("{}", v),
                 None => val = format!(" ")
             }
         },
-        JET_coltypIEEEDouble => {
+        ESE_coltypIEEEDouble => {
             assert!(c.cbmax as usize == size_of::<f64>());
             match get_column::<f64>(jdb, table_id, c.id)? {
                 Some(v) => val = format!("{}", v),
                 None => val = format!(" ")
             }
         },
-        JET_coltypBinary => {
+        ESE_coltypBinary => {
             match jdb.get_column_dyn(table_id, c.id, c.cbmax as usize)? {
                 Some(v) => {
                     let s = v.iter().map(|c| format!("{:x?} ", c).to_string() ).collect::<String>();
@@ -140,7 +142,7 @@ fn get_column_val(jdb: &Box<dyn EseDb>, table_id: u64, c: &ColumnInfo) -> Result
                 }
             }
         },
-        JET_coltypText => {
+        ESE_coltypText => {
             match jdb.get_column_dyn(table_id, c.id, c.cbmax as usize)? {
                 Some(v) => {
                     if c.cp == 1200 {
@@ -161,7 +163,7 @@ fn get_column_val(jdb: &Box<dyn EseDb>, table_id: u64, c: &ColumnInfo) -> Result
                 }
             }
         },
-        JET_coltypLongText => {
+        ESE_coltypLongText => {
             let v;
             if c.cbmax == 0 {
                 v = jdb.get_column_dyn_varlen(table_id, c.id)?;
@@ -192,7 +194,7 @@ fn get_column_val(jdb: &Box<dyn EseDb>, table_id: u64, c: &ColumnInfo) -> Result
                 }
             }
         },
-        JET_coltypLongBinary => {
+        ESE_coltypLongBinary => {
             let v;
             if c.cbmax == 0 {
                 v = jdb.get_column_dyn_varlen(table_id, c.id)?;
@@ -211,7 +213,7 @@ fn get_column_val(jdb: &Box<dyn EseDb>, table_id: u64, c: &ColumnInfo) -> Result
                 }
             }
         },
-        JET_coltypGUID => {
+        ESE_coltypGUID => {
             match jdb.get_column_dyn(table_id, c.id, c.cbmax as usize)? {
                 Some(v) => {
                     // {CD2C96BD-DCA8-47CB-B829-8F1AE4E2E686}
@@ -223,7 +225,7 @@ fn get_column_val(jdb: &Box<dyn EseDb>, table_id: u64, c: &ColumnInfo) -> Result
                 }
             }
         },
-        JET_coltypDateTime => {
+        ESE_coltypDateTime => {
             assert!(c.cbmax as usize == size_of::<f64>());
             match get_column::<f64>(jdb, table_id, c.id)? {
                 Some(v) => {
@@ -282,7 +284,7 @@ fn dump_table(jdb: &Box<dyn EseDb>, t: &str)
     -> Result<Option<(/*cols:*/Vec<ColumnInfo>, /*rows:*/Vec<Vec<String>>)>, SimpleError> {
     let table_id = jdb.open_table(&t)?;
     let cols = jdb.get_columns(&t)?;
-    if !jdb.move_row(table_id, JET_MoveFirst as u32) {
+    if !jdb.move_row(table_id, ESE_MoveFirst as u32) {
         // empty table
         return Ok(None);
     }
@@ -303,7 +305,7 @@ fn dump_table(jdb: &Box<dyn EseDb>, t: &str)
         }
         assert_eq!(values.len(), cols.len());
         rows.push(values);
-        if !jdb.move_row(table_id, JET_MoveNext) {
+        if !jdb.move_row(table_id, ESE_MoveNext) {
             break;
         }
     }
@@ -320,12 +322,14 @@ pub enum Mode {
 
 #[cfg(target_os = "windows")]
 fn alloc_jdb(m: &Mode) -> Box<dyn EseDb> {
+    use ese_parser_lib::ese_api::EseAPI;
+
     if *m == Mode::EseApi {
         return Box::new(EseAPI::init());
     } else if *m == Mode::EseParser {
         return Box::new(EseParser::init(CACHE_SIZE_ENTRIES));
     }
-    return Box::new(EseBoth::init());
+    return Box::new(ese_both::EseBoth::init());
 }
 
 #[cfg(any(target_os = "linux", target_os = "macos"))]
