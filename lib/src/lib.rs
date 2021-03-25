@@ -2,7 +2,9 @@
 
 mod parser;
 
+#[cfg(target_os = "windows")]
 pub mod esent;
+
 pub mod ese_trait;
 pub mod ese_parser;
 
