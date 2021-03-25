@@ -12,9 +12,9 @@ fn main() {
         println!(r"cargo:rustc-link-lib=oleaut32");
         println!(r"cargo:rustc-link-search=C:\Program Files (x86)\Windows Kits\10\Lib\10.0.17763.0\um\x64");
 
-        println!("cargo:rerun-if-changed=src/esent.h");
+        println!("cargo:rerun-if-changed=src/esent/esent.h");
         let bindings = bindgen::Builder::default()
-            .header("src/esent.h")
+            .header("src/esent/esent.h")
             .parse_callbacks(Box::new(bindgen::CargoCallbacks))
             // required while cross-build from Linux
             .clang_args(&[

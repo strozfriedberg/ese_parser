@@ -322,7 +322,7 @@ pub enum Mode {
 
 #[cfg(target_os = "windows")]
 fn alloc_jdb(m: &Mode) -> Box<dyn EseDb> {
-    use ese_parser_lib::ese_api::EseAPI;
+    use ese_parser_lib::esent::ese_api::EseAPI;
 
     if *m == Mode::EseApi {
         return Box::new(EseAPI::init());

@@ -6,8 +6,6 @@ pub mod esent;
 pub mod ese_trait;
 pub mod ese_parser;
 
-pub mod ese_api;
-
 #[repr(C)]
 #[derive(Debug, Copy, Clone)]
 pub struct SYSTEMTIME {
@@ -48,7 +46,7 @@ fn test_edb_table_all_values() {
     let columns = jdb.get_columns(&table).unwrap();
 
     let table_id = jdb.open_table(&table).unwrap();
-    assert_eq!(jdb.move_row(table_id, esent::JET_MoveFirst), true);
+    assert_eq!(jdb.move_row(table_id, ESE_MoveFirst), true);
 
     let bit = columns.iter().find(|x| x.name == "Bit" ).unwrap();
     assert_eq!(jdb.get_column::<i8>(table_id, bit.id).unwrap(), Some(0));

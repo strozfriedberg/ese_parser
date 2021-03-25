@@ -1,7 +1,7 @@
 #[cfg(target_os = "windows")]
 
 use crate::ese_trait::*;
-use crate::esent::*;
+use crate::esent::esent::*;
 
 use simple_error::SimpleError;
 
