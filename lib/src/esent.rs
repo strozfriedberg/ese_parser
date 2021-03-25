@@ -2,4 +2,5 @@
 #![allow(non_camel_case_types)]
 #![allow(non_snake_case)]
 
-include!(concat!(env!("OUT_DIR"), "/esent.rs"));
+#[cfg_attr(target_os = "linux", path = "gen/esent.rs")]
+include!("gen/esent.rs");

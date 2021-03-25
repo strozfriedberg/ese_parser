@@ -1,3 +1,5 @@
+#![cfg(target_os = "windows")]
+
 use crate::ese_trait::*;
 use crate::esent::*;
 

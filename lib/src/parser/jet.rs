@@ -1,11 +1,9 @@
 //jet.rs
 #![allow(non_camel_case_types, dead_code)]
 use bitflags::bitflags;
-use chrono::naive::{NaiveDate, NaiveTime};
-use chrono::TimeZone;
+use chrono::naive::NaiveTime;
 use std::{fmt, mem};
 use strum::Display;
-use winapi::um::timezoneapi::GetTimeZoneInformation;
 use simple_error::SimpleError;
 
 use crate::parser::ese_db;
@@ -180,8 +178,12 @@ pub struct DateTime {
     pub os_snapshot: uint8_t,
 }
 
+#[cfg(target_os = "windows")]
 impl fmt::Display for DateTime {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        use chrono::naive::NaiveDate;
+        use chrono::TimeZone;
+        use winapi::um::timezoneapi::GetTimeZoneInformation;
         if self.year > 0 {
             let ndt =
                 NaiveDate::from_ymd(self.year as i32 + 1900, self.month as u32, self.day as u32)
@@ -219,9 +221,9 @@ pub struct Signature {
 #[repr(C, packed)]
 #[derive(Debug, Copy, Default, Clone)]
 pub struct LgPos {
-    pub ib: ::std::os::raw::c_ushort,
-    pub isec: ::std::os::raw::c_ushort,
-    pub l_generation: ::std::os::raw::c_long,
+    pub ib: uint16_t,
+    pub isec: uint16_t,
+    pub l_generation: uint32_t,
 }
 
 #[repr(C, packed)]
@@ -229,8 +231,8 @@ pub struct LgPos {
 pub struct BackupInfo {
     pub lg_pos_mark: LgPos,
     pub bk_logtime_mark: DateTime,
-    pub gen_low: ::std::os::raw::c_ulong,
-    pub gen_high: ::std::os::raw::c_ulong,
+    pub gen_low: uint32_t,
+    pub gen_high: uint32_t,
 }
 
 #[derive(Debug)]
