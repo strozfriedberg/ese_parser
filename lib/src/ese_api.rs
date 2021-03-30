@@ -1,5 +1,3 @@
-#![allow(temporary_cstring_as_ptr)]
-
 use crate::ese_trait::*;
 use crate::esent::*;
 
@@ -260,6 +258,9 @@ impl EseDb for EseAPI {
                     }
                     return Err(SimpleError::new(
                         format!("JetRetrieveColumn failed with error {}", self.error_to_string(err))));
+                }
+                if bytes == 0 {
+                    return Ok(None);
                 }
 
                 v.truncate(bytes as usize);
