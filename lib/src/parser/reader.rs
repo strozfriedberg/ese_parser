@@ -7,6 +7,9 @@ use crate::parser::ese_db;
 use crate::parser::ese_db::*;
 use crate::parser::jet;
 
+const JET_wrnBufferTruncated: u32 = 1006;
+const JET_errSuccess: u32 = 0;
+
 extern "C" {
     fn decompress(  data: *const u8,
                     data_size: u32,
@@ -412,7 +415,7 @@ pub fn load_catalog_item(
         cat_def.father_data_page_number = unsafe { data_def.coltyp_or_fdp.father_data_page_number };
     }
     cat_def.size = data_def.space_usage;
-    // TODO handle data_def.flags?
+    cat_def.flags = data_def.flags;
     if cat_def.cat_type == jet::CatalogType::Column as u16 {
         cat_def.codepage = unsafe { data_def.pages_or_locale.codepage };
     }
@@ -686,40 +689,35 @@ pub fn load_data(
                         }
                     }
                     if tagged_data_type_size > 0 && col.identifier == column_id {
-                        use jet::TaggedDataTypeFlag;
                         offset = offset_ddh + tagged_data_type_value_offset as u64;
+                        let mut v = Vec::new();
+
+                        use jet::ColumnFlags;
+                        use jet::TaggedDataTypeFlag;
+
+                        let col_flag = ColumnFlags::from_bits_truncate(col.flags);
+                        let compressed = col_flag.intersects(ColumnFlags::Compressed);
                         let dtf = TaggedDataTypeFlag::from_bits_truncate(data_type_flags as u16);
                         if dtf.intersects(TaggedDataTypeFlag::LONG_VALUE) {
                             let key = reader.read_struct::<u32>(offset)?;
-                            let v = load_lv_data(reader, &lv_tags, key)?;
-                            return Ok(Some(v));
+                            v = load_lv_data(reader, &lv_tags, key, compressed)?;
                         } else if dtf.intersects(TaggedDataTypeFlag::MULTI_VALUE | TaggedDataTypeFlag::MULTI_VALUE_OFFSET) {
                             let mv = read_multi_value(
-                                &reader, offset, tagged_data_type_size, &dtf, multi_value_index, &lv_tags)?;
+                                &reader, offset, tagged_data_type_size, &dtf, multi_value_index, &lv_tags, compressed)?;
                             if let Some(mv_data) = mv {
-                                return Ok(Some(mv_data));
+                                v = mv_data;
                             }
                         } else if dtf.intersects(jet::TaggedDataTypeFlag::COMPRESSED) {
-                            const JET_wrnBufferTruncated: u32 = 1006;
-                            const JET_errSuccess: u32 = 0;
-                            let mut decompressed: u32 = 0;
-                            let v = reader.read_bytes(offset, tagged_data_type_size as usize)?;
-                            let mut res = unsafe { decompress(v.as_ptr(), v.len() as u32, ptr::null_mut(), 0, &mut decompressed) };
-
-                            if res != JET_wrnBufferTruncated {
-                                return Err(SimpleError::new(format!("Could not get required buffer size. Err {}", res)));
+                            v = reader.read_bytes(offset, tagged_data_type_size as usize)?;
+                            let dsize = decompress_size(&v);
+                            if dsize > 0 {
+                                v = decompress_buf(&v, dsize)?;
                             }
-
-                            let mut  buf = Vec::<u8>::with_capacity(decompressed as usize);
-                            unsafe { buf.set_len(buf.capacity()); }
-                            res = unsafe { decompress(v.as_ptr(), v.len() as u32, buf.as_mut_ptr(), buf.len() as u32, &mut decompressed) };
-                            if res != JET_errSuccess {
-                                return Err(SimpleError::new(format!("Decompress failed. Err {}", res)));
-                            }
-
-                            return Ok(Some(buf));
                         } else {
-                            let v = reader.read_bytes(offset, tagged_data_type_size as usize)?;
+                            v = reader.read_bytes(offset, tagged_data_type_size as usize)?;
+                        }
+
+                        if v.len() > 0 {
                             return Ok(Some(v));
                         }
                     }
@@ -746,7 +744,8 @@ fn read_multi_value(
     tagged_data_type_size: u16,
     dtf: &jet::TaggedDataTypeFlag,
     multi_value_index: usize,
-    lv_tags: &Vec<LV_tags>
+    lv_tags: &Vec<LV_tags>,
+    compressed: bool
 ) -> Result<Option<Vec<u8>>, SimpleError> {
     let mut mv_indexes : Vec<(u16/*shift*/, (bool/*lv*/, u16/*size*/))> = Vec::new();
     if dtf.intersects(jet::TaggedDataTypeFlag::MULTI_VALUE_OFFSET) {
@@ -794,9 +793,16 @@ fn read_multi_value(
         let v;
         if lv {
             let key = reader.read_struct::<u32>(offset + shift as u64)?;
-            v = load_lv_data(reader, &lv_tags, key)?;
+            v = load_lv_data(reader, &lv_tags, key, compressed)?;
         } else {
             v = reader.read_bytes(offset + shift as u64, size as usize)?;
+            if compressed {
+                let dsize = decompress_size(&v);
+                if dsize > 0 {
+                    let dv = decompress_buf(&v, dsize)?;
+                    return Ok(Some(dv));
+                }
+            }
         }
         return Ok(Some(v));
     }
@@ -983,15 +989,24 @@ pub fn load_lv_data(
     reader: &Reader,
     lv_tags: &Vec<LV_tags>,
     long_value_key: u32,
+    compressed: bool
 ) -> Result<Vec<u8>, SimpleError> {
     let mut res : Vec<u8> = vec![];
     let mut i = 0;
     while i < lv_tags.len() {
-        if long_value_key == lv_tags[i].key && res.len() == lv_tags[i].seg_offset as usize {
-            let mut v = reader.read_bytes(lv_tags[i].offset, lv_tags[i].size as usize)?;
-            res.append(&mut v);
-            i = 0; // search next seg_offset (lv_tags could be not sorted)
-            continue;
+        if long_value_key == lv_tags[i].key {
+            if res.len() == lv_tags[i].seg_offset as usize {
+                let mut v = reader.read_bytes(lv_tags[i].offset, lv_tags[i].size as usize)?;
+                if compressed {
+                    let dsize = decompress_size(&v);
+                    if dsize > 0 {
+                        v = decompress_buf(&v, dsize)?;
+                    }
+                }
+                res.append(&mut v);
+                i = 0; // search next seg_offset (lv_tags could be not sorted)
+                continue;
+            }
         }
         i += 1;
     }
@@ -1001,6 +1016,33 @@ pub fn load_lv_data(
     } else {
         Err(SimpleError::new(format!("LV key {} not found", long_value_key)))
     }
+}
+
+pub fn decompress_size(
+    v: &Vec<u8>
+) -> u32 {
+    let mut decompressed: u32 = 0;
+    let mut res = unsafe { decompress(v.as_ptr(), v.len() as u32, ptr::null_mut(), 0, &mut decompressed) };
+
+    if res == JET_wrnBufferTruncated && decompressed as usize > v.len() {
+        return decompressed;
+    }
+    0
+}
+
+pub fn decompress_buf(
+    v: &Vec<u8>,
+    decompressed_size: u32
+) -> Result<Vec<u8>, SimpleError> {
+    let mut buf = Vec::<u8>::with_capacity(decompressed_size as usize);
+    unsafe { buf.set_len(buf.capacity()); }
+    let mut decompressed : u32 = 0;
+    let res = unsafe { decompress(v.as_ptr(), v.len() as u32, buf.as_mut_ptr(), buf.len() as u32, &mut decompressed) };
+    debug_assert!(decompressed_size == decompressed && decompressed as usize == buf.len());
+    if res != JET_errSuccess {
+        return Err(SimpleError::new(format!("Decompress failed. Err {}", res)));
+    }
+    Ok(buf)
 }
 
 mod test;
