@@ -99,13 +99,13 @@ fn test_edb_table_all_values() {
             let r = VariantTimeToSystemTime(dt, st.as_mut_ptr());
             assert_eq!(r, 1);
             let s = st.assume_init();
-            assert_eq!(s.wDayOfWeek, 2);
-            assert_eq!(s.wDay, 2);
+            assert_eq!(s.wDayOfWeek, 1);
+            assert_eq!(s.wDay, 29);
             assert_eq!(s.wMonth, 3);
             assert_eq!(s.wYear, 2021);
             assert_eq!(s.wHour, 11);
-            assert_eq!(s.wMinute, 11);
-            assert_eq!(s.wSecond, 17);
+            assert_eq!(s.wMinute, 49);
+            assert_eq!(s.wSecond, 47);
             assert_eq!(s.wMilliseconds, 0);
         }
     }
