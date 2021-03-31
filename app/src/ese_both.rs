@@ -1,5 +1,5 @@
-#[cfg(target_os = "windows")]
-#[allow(non_upper_case_globals, non_snake_case, non_camel_case_types, clippy::mut_from_ref, clippy::cast_ptr_alignment)]
+#![cfg(target_os = "windows")]
+#![allow(non_upper_case_globals, non_snake_case, non_camel_case_types, clippy::mut_from_ref, clippy::cast_ptr_alignment)]
 
 use ese_parser_lib::{ese_trait::*, esent::ese_api::*, ese_parser::*};
 use std::cell::RefCell;
