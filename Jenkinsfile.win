@@ -6,18 +6,19 @@ pipeline {
         }
     }
     stages {
-        stage('building') {
+        stage('building library and running tests') {
             steps {
                 dir("lib") {
                     bat "cargo test --target x86_64-pc-windows-msvc"
                 }
             }
+		}
+        stage('building app') {
             steps {
                 dir("app") {
                     bat "cargo build --target x86_64-pc-windows-msvc"
                 }
             }
-
         }
     }
     post {
