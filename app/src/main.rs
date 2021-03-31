@@ -3,28 +3,12 @@
 mod ese_both;
 
 use std::env;
-use ese_parser_lib::{ese_trait::*, ese_parser::*};
+use ese_parser_lib::{ese_trait::*, ese_parser::*, vartime::*};
 use std::mem::size_of;
 use simple_error::SimpleError;
 use widestring::U16String;
 
 const CACHE_SIZE_ENTRIES : usize = 10;
-
-#[repr(C)]
-#[derive(Debug, Copy, Clone)]
-pub struct SYSTEMTIME {
-    pub wYear: ::std::os::raw::c_ushort,
-    pub wMonth: ::std::os::raw::c_ushort,
-    pub wDayOfWeek: ::std::os::raw::c_ushort,
-    pub wDay: ::std::os::raw::c_ushort,
-    pub wHour: ::std::os::raw::c_ushort,
-    pub wMinute: ::std::os::raw::c_ushort,
-    pub wSecond: ::std::os::raw::c_ushort,
-    pub wMilliseconds: ::std::os::raw::c_ushort,
-}
-extern "C" {
-    pub fn VariantTimeToSystemTime(vtime: f64, lpSystemTime: *mut SYSTEMTIME) -> ::std::os::raw::c_int;
-}
 
 fn truncate(s: &str, max_chars: usize) -> &str {
     match s.char_indices().nth(max_chars) {
@@ -229,19 +213,12 @@ fn get_column_val(jdb: &Box<dyn EseDb>, table_id: u64, c: &ColumnInfo) -> Result
             assert!(c.cbmax as usize == size_of::<f64>());
             match get_column::<f64>(jdb, table_id, c.id)? {
                 Some(v) => {
-                    return Err(SimpleError::new(format!("VariantTimeToSystemTime failed")));
-                    /*
-                    let mut st = std::mem::MaybeUninit::<SYSTEMTIME>::zeroed();
-                    unsafe {
-                        let r = VariantTimeToSystemTime(v, st.as_mut_ptr());
-                        if r == 1 {
-                            let s = st.assume_init();
-                            val = format!("{}.{}.{} {}:{}:{}", s.wDay, s.wMonth, s.wYear, s.wHour, s.wMinute, s.wSecond);
-                        } else {
-                            return Err(SimpleError::new(format!("VariantTimeToSystemTime failed")));
-                        }
+                    let mut st = unsafe { std::mem::MaybeUninit::<SYSTEMTIME>::zeroed().assume_init() };
+                    if VariantTimeToSystemTime(v, &mut st) {
+                        val = format!("{}.{}.{} {}:{}:{}", st.wDay, st.wMonth, st.wYear, st.wHour, st.wMinute, st.wSecond);
+                    } else {
+                        return Err(SimpleError::new(format!("VariantTimeToSystemTimeX failed")));
                     }
-                    */
                 },
                 None => val = format!(" ")
             }

@@ -7,22 +7,7 @@ pub mod esent;
 
 pub mod ese_trait;
 pub mod ese_parser;
-
-#[repr(C)]
-#[derive(Debug, Copy, Clone)]
-pub struct SYSTEMTIME {
-    pub wYear: ::std::os::raw::c_ushort,
-    pub wMonth: ::std::os::raw::c_ushort,
-    pub wDayOfWeek: ::std::os::raw::c_ushort,
-    pub wDay: ::std::os::raw::c_ushort,
-    pub wHour: ::std::os::raw::c_ushort,
-    pub wMinute: ::std::os::raw::c_ushort,
-    pub wSecond: ::std::os::raw::c_ushort,
-    pub wMilliseconds: ::std::os::raw::c_ushort,
-}
-extern "C" {
-    pub fn VariantTimeToSystemTime(vtime: f64, lpSystemTime: *mut SYSTEMTIME) -> ::std::os::raw::c_int;
-}
+pub mod vartime;
 
 #[test]
 fn test_edb_table_all_values() {
@@ -81,27 +66,22 @@ fn test_edb_table_all_values() {
     assert_eq!(jdb.get_column::<u16>(table_id, unsigned_short.id).unwrap(), Some(65535));
 
     // DateTime
-    /*
     {
         let date_time = columns.iter().find(|x| x.name == "DateTime" ).unwrap();
         let dt = jdb.get_column::<f64>(table_id, date_time.id).unwrap().unwrap();
 
-        let mut st = std::mem::MaybeUninit::<SYSTEMTIME>::zeroed();
-        unsafe {
-            let r = VariantTimeToSystemTime(dt, st.as_mut_ptr());
-            assert_eq!(r, 1);
-            let s = st.assume_init();
-            assert_eq!(s.wDayOfWeek, 2);
-            assert_eq!(s.wDay, 2);
-            assert_eq!(s.wMonth, 3);
-            assert_eq!(s.wYear, 2021);
-            assert_eq!(s.wHour, 11);
-            assert_eq!(s.wMinute, 11);
-            assert_eq!(s.wSecond, 17);
-            assert_eq!(s.wMilliseconds, 0);
-        }
+        let mut st = unsafe { std::mem::MaybeUninit::<vartime::SYSTEMTIME>::zeroed().assume_init() };
+        let r = vartime::VariantTimeToSystemTime(dt, &mut st);
+        assert_eq!(r, true);
+        assert_eq!(st.wDayOfWeek, 2);
+        assert_eq!(st.wDay, 2);
+        assert_eq!(st.wMonth, 3);
+        assert_eq!(st.wYear, 2021);
+        assert_eq!(st.wHour, 11);
+        assert_eq!(st.wMinute, 11);
+        assert_eq!(st.wSecond, 17);
+        assert_eq!(st.wMilliseconds, 0);
     }
-    */
 
     // GUID
     {
