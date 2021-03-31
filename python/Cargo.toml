@@ -13,6 +13,7 @@ crate-type = ["cdylib"]
 [dependencies]
 ese_parser_lib = { path = "../lib" }
 simple-error = "*"
+widestring = "*"
 
 [target.'cfg(windows)'.dependencies]
 winapi = { version = "0.3.9", features = ["oleauto"] }

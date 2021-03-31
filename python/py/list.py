@@ -1,4 +1,5 @@
 import ese_parser
+from datetime import datetime
 
 edb = ese_parser.PyEseDb()
 edb.load("../lib/testdata/test.edb")
@@ -18,6 +19,8 @@ for t in tables:
 		print("|", end='')
 		for c in columns:
 			i = edb.get_row(tbl, c)
+			if c.typ == 8: # datetime
+				i = datetime.utcfromtimestamp(i)
 			print(" {} |".format(i), end='')
 		print("")
 		if not edb.move_row(tbl, 1):

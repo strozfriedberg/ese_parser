@@ -1,4 +1,3 @@
-
 use simple_error::SimpleError;
 
 #[derive(Debug)]
