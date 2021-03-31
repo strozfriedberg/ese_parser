@@ -52,13 +52,13 @@ impl TryFrom<u32> for JET_CP {
 }
 
 impl EseAPI {
-    fn new(pg_size: usize) -> EseAPI {
+    fn new(instance_name: &str, pg_size: usize) -> EseAPI {
         EseAPI::set_system_parameter_l(JET_paramDatabasePageSize, pg_size as u64);
         EseAPI::set_system_parameter_l(JET_paramDisableCallbacks, (true as u64).into());
         EseAPI::set_system_parameter_sz(JET_paramRecovery, "Off");
 
         let mut instance : JET_INSTANCE = 0;
-        jettry!(JetCreateInstanceA(&mut instance, ptr::null()));
+        jettry!(JetCreateInstanceA(&mut instance, instance_name.as_ptr() as *const i8));
         jettry!(JetInit(&mut instance));
 
         let mut sesid : JET_SESID = 0;
@@ -142,7 +142,8 @@ impl Drop for EseAPI {
     }
 }
 
-fn prepare_db(filename: &str, table: &str, pg_size: usize, record_size: usize, records_cnt: usize) -> PathBuf {
+fn prepare_db(filename: &str, table: &str, pg_size: usize, record_size: usize, records_cnt: usize)
+    -> PathBuf {
     let mut dst_path = PathBuf::from("testdata").canonicalize().unwrap();
     dst_path.push(filename);
 
@@ -151,7 +152,7 @@ fn prepare_db(filename: &str, table: &str, pg_size: usize, record_size: usize, r
     }
 
     println!("creating {}", dst_path.display());
-    let mut db_client = EseAPI::new(pg_size);
+    let mut db_client = EseAPI::new(filename, pg_size);
 
     let dbpath = CString::new(dst_path.to_str().unwrap()).unwrap();
     jettry!(JetCreateDatabaseA(db_client.sesid, dbpath.as_ptr(), ptr::null(), &mut db_client.dbid, 0));
@@ -195,8 +196,6 @@ fn prepare_db(filename: &str, table: &str, pg_size: usize, record_size: usize, r
                 grbit: col.grbit,
                 ibLongValue: 0, itagSequence: 0, err: 0 };
 
-            //println!("'{}' {}", s, s.len());
-
             jettry!(JetSetColumns(db_client.sesid, tableid, &mut setColumn, 1));
         }
 
@@ -205,6 +204,11 @@ fn prepare_db(filename: &str, table: &str, pg_size: usize, record_size: usize, r
     }
 
     dst_path
+}
+
+fn clean_db(dst_path: &PathBuf) {
+    fs::remove_file(dst_path.with_extension("jfm")).unwrap();
+    fs::remove_file(dst_path).unwrap();
 }
 
 #[test]
@@ -244,6 +248,7 @@ pub fn caching_test() -> Result<(), SimpleError> {
             }
         }
     }
+    clean_db(&path);
     Ok(())
 }
 
@@ -300,7 +305,7 @@ pub fn decompress_test() -> Result<(), SimpleError> {
             break;
         }
     }
-
+    clean_db(&path);
     Ok(())
 }
 
