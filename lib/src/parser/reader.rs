@@ -870,7 +870,7 @@ pub fn load_lv_tag(
             match page_key[0..4].try_into() {
                 Ok(pk) => std::mem::transmute::<[u8; 4], u32>(pk),
                 Err(e) => return Err(SimpleError::new(format!("can't convert page_key {:?} into slice [0..4], error: {}",
-                                                              page_key, e)))
+                    page_key, e)))
             }
         }.to_be();
 
