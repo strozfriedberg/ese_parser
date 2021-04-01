@@ -10,12 +10,14 @@ doctest = false
 
 [build-dependencies]
 bindgen = "0.56.0"
+cc = { version = "1.0", features = ["parallel"] }
 
 [dependencies]
 libc = "0.2"
 winapi = { version = "0.3", features = ["timezoneapi"] }
 simple-error = "*"
 pretty-hex = "*"
+encoding = "*"
 
 bitflags = "*"
 bitfield = "*"

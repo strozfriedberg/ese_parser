@@ -116,6 +116,29 @@ bitflags! {
     }
 }
 
+bitflags! {
+    // DataDefinition::flags
+    pub struct ColumnFlags : u32 {
+        const NotNull                 = 0x0001;
+        const Version                 = 0x0002;
+        const Autoincrement           = 0x0004;
+        const Multivalued             = 0x0008;
+        const Default                 = 0x0010;
+        const EscrowUpdate            = 0x0020;
+        const Finalize                = 0x0040;
+        const UserDefinedDefault      = 0x0080;
+        const TemplateColumnESE98     = 0x0100;
+        const DeleteOnZero            = 0x0200;
+        const PrimaryIndexPlaceholder = 0x0800;
+        const Compressed              = 0x1000;
+        const Encrypted               = 0x2000;
+        //const PersistedMask         = 0xffff;
+        const Versioned               = 0x10000;
+        const Deleted                 = 0x20000;
+        const VersionedAdd            = 0x40000;
+    }
+}
+
 #[derive(Copy, Clone, Display, Debug)]
 #[repr(u32)]
 pub enum DbState {
@@ -352,7 +375,7 @@ impl PageTag {
     }
 }
 
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 #[repr(C)]
 pub struct CatalogDefinition {
     pub father_data_page_object_identifier: uint32_t,
@@ -365,6 +388,7 @@ pub struct CatalogDefinition {
     pub size: uint32_t,
     pub codepage: uint32_t,
     pub lcmap_flags: uint32_t,
+    pub flags : uint32_t,
 
     pub name: String,
 

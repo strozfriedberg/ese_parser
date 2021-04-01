@@ -1,11 +1,22 @@
 //reader.rs
-use std::{fs, io, io::{Seek, Read}, mem, os::raw, ptr, path::PathBuf, slice, convert::TryInto, cell::RefCell};
+use std::{fs, io, io::{Seek, Read}, mem, os::raw, path::PathBuf, ptr, slice, convert::TryInto, cell::RefCell};
 use simple_error::SimpleError;
 use cache_2q::Cache;
 
 use crate::parser::ese_db;
 use crate::parser::ese_db::*;
 use crate::parser::jet;
+
+const JET_wrnBufferTruncated: u32 = 1006;
+const JET_errSuccess: u32 = 0;
+
+extern "C" {
+    fn decompress(  data: *const u8,
+                    data_size: u32,
+                    out_buffer: *mut u8,
+                    out_buffer_size: u32,
+                    decompressed: *mut u32) -> u32;
+}
 
 pub struct Reader {
     file: RefCell<fs::File>,
@@ -172,7 +183,7 @@ pub fn load_page_header(
     reader: &Reader,
     page_number: u32,
 ) -> Result<PageHeader, SimpleError> {
-    let page_offset = ((page_number + 1) * (reader.page_size)) as u64;
+    let page_offset = (page_number + 1) as u64 * (reader.page_size) as u64;
 
     if reader.format_revision < ESEDB_FORMAT_REVISION_NEW_RECORD_FORMAT {
         let header = reader.read_struct::<PageHeaderOld>(page_offset)?;
@@ -208,9 +219,10 @@ pub fn load_page_tags(
 ) -> Result<Vec<PageTag>, SimpleError> {
     let page_offset = db_page.offset();
     let mut tags_offset = (page_offset + reader.page_size as u64) as u64;
-    let mut tags = Vec::<PageTag>::new();
+    let tags_cnt = db_page.get_available_page_tag();
+    let mut tags = Vec::<PageTag>::with_capacity(tags_cnt);
 
-    for _i in 0..db_page.get_available_page_tag() {
+    for _i in 0..tags_cnt {
         tags_offset -= 2;
         let page_tag_offset : u16 = reader.read_struct(tags_offset)?;
         tags_offset -= 2;
@@ -236,7 +248,7 @@ pub fn load_page_tags(
             offset = page_tag_offset & 0x1fff;
             size   = page_tag_size & 0x1fff;
         }
-        tags.push(PageTag{ flags: flags, offset: offset, size: size} );
+        tags.push(PageTag{ flags, offset, size } );
     }
 
     Ok(tags)
@@ -286,11 +298,6 @@ pub fn load_catalog(
     let db_page = jet::DbPage::new(reader, jet::FixedPageNumber::Catalog as u32)?;
     let pg_tags = &db_page.page_tags;
 
-    if !db_page.flags().contains(jet::PageFlags::IS_PARENT) {
-        return Err(SimpleError::new(format!("pageno {}: IS_PARENT (branch) flag should be present",
-            db_page.page_number)));
-    }
-
     let is_root = db_page.flags().contains(jet::PageFlags::IS_ROOT);
 
     if is_root {
@@ -301,8 +308,19 @@ pub fn load_catalog(
     let mut table_def : jet::TableDefinition = jet::TableDefinition { table_catalog_definition: None,
         column_catalog_definition_array: vec![], long_value_catalog_definition: None };
 
+    let mut page_number;
+    if db_page.flags().contains(jet::PageFlags::IS_PARENT) {
+        page_number = page_tag_get_branch_child_page_number(reader, &db_page, &pg_tags[1])?;
+    } else {
+        if db_page.flags().contains(jet::PageFlags::IS_LEAF) {
+            page_number = db_page.page_number;
+        } else {
+            return Err(SimpleError::new(format!("pageno {}: IS_PARENT (branch) flag should be present in {:?}",
+                                                db_page.page_number, db_page.flags())));
+        }
+    }
     let mut prev_page_number = db_page.page_number;
-    let mut page_number = page_tag_get_branch_child_page_number(reader, &db_page, &pg_tags[1])?;
+
     while page_number != 0 {
         let db_page = jet::DbPage::new(reader, page_number)?;
         let pg_tags = &db_page.page_tags;
@@ -326,6 +344,10 @@ pub fn load_catalog(
                     res.push(table_def);
                     table_def = jet::TableDefinition { table_catalog_definition: None,
                         column_catalog_definition_array: vec![], long_value_catalog_definition: None };
+                } else if table_def.column_catalog_definition_array.len() > 0 ||
+                    table_def.long_value_catalog_definition.is_some() {
+                    return Err(SimpleError::new(
+                        "corrupted table detected: column/long definition is going before table"));
                 }
                 table_def.table_catalog_definition = Some(cat_item);
             } else if cat_item.cat_type == jet::CatalogType::Column as u16 {
@@ -397,7 +419,7 @@ pub fn load_catalog_item(
         cat_def.father_data_page_number = unsafe { data_def.coltyp_or_fdp.father_data_page_number };
     }
     cat_def.size = data_def.space_usage;
-    // TODO handle data_def.flags?
+    cat_def.flags = data_def.flags;
     if cat_def.cat_type == jet::CatalogType::Column as u16 {
         cat_def.codepage = unsafe { data_def.pages_or_locale.codepage };
     }
@@ -671,23 +693,35 @@ pub fn load_data(
                         }
                     }
                     if tagged_data_type_size > 0 && col.identifier == column_id {
-                        use jet::TaggedDataTypeFlag;
                         offset = offset_ddh + tagged_data_type_value_offset as u64;
+                        let mut v = Vec::new();
+
+                        use jet::ColumnFlags;
+                        use jet::TaggedDataTypeFlag;
+
+                        let col_flag = ColumnFlags::from_bits_truncate(col.flags);
+                        let compressed = col_flag.intersects(ColumnFlags::Compressed);
                         let dtf = TaggedDataTypeFlag::from_bits_truncate(data_type_flags as u16);
                         if dtf.intersects(TaggedDataTypeFlag::LONG_VALUE) {
                             let key = reader.read_struct::<u32>(offset)?;
-                            let v = load_lv_data(reader, &lv_tags, key)?;
-                            return Ok(Some(v));
+                            v = load_lv_data(reader, &lv_tags, key, compressed)?;
                         } else if dtf.intersects(TaggedDataTypeFlag::MULTI_VALUE | TaggedDataTypeFlag::MULTI_VALUE_OFFSET) {
                             let mv = read_multi_value(
-                                &reader, offset, tagged_data_type_size, &dtf, multi_value_index, &lv_tags)?;
+                                &reader, offset, tagged_data_type_size, &dtf, multi_value_index, &lv_tags, compressed)?;
                             if let Some(mv_data) = mv {
-                                return Ok(Some(mv_data));
+                                v = mv_data;
                             }
                         } else if dtf.intersects(jet::TaggedDataTypeFlag::COMPRESSED) {
-                            println!("{} unsupported data type flags: {:?}", col.name, dtf);
+                            v = reader.read_bytes(offset, tagged_data_type_size as usize)?;
+                            let dsize = decompress_size(&v);
+                            if dsize > 0 {
+                                v = decompress_buf(&v, dsize)?;
+                            }
                         } else {
-                            let v = reader.read_bytes(offset, tagged_data_type_size as usize)?;
+                            v = reader.read_bytes(offset, tagged_data_type_size as usize)?;
+                        }
+
+                        if v.len() > 0 {
                             return Ok(Some(v));
                         }
                     }
@@ -714,7 +748,8 @@ fn read_multi_value(
     tagged_data_type_size: u16,
     dtf: &jet::TaggedDataTypeFlag,
     multi_value_index: usize,
-    lv_tags: &Vec<LV_tags>
+    lv_tags: &Vec<LV_tags>,
+    compressed: bool
 ) -> Result<Option<Vec<u8>>, SimpleError> {
     let mut mv_indexes : Vec<(u16/*shift*/, (bool/*lv*/, u16/*size*/))> = Vec::new();
     if dtf.intersects(jet::TaggedDataTypeFlag::MULTI_VALUE_OFFSET) {
@@ -762,9 +797,16 @@ fn read_multi_value(
         let v;
         if lv {
             let key = reader.read_struct::<u32>(offset + shift as u64)?;
-            v = load_lv_data(reader, &lv_tags, key)?;
+            v = load_lv_data(reader, &lv_tags, key, compressed)?;
         } else {
             v = reader.read_bytes(offset + shift as u64, size as usize)?;
+            if compressed {
+                let dsize = decompress_size(&v);
+                if dsize > 0 {
+                    let dv = decompress_buf(&v, dsize)?;
+                    return Ok(Some(dv));
+                }
+            }
         }
         return Ok(Some(v));
     }
@@ -808,7 +850,7 @@ pub fn load_lv_tag(
     }
 
     if (page_tag.size as u64) - (offset - page_tag_offset) == 8 {
-        let skey : u32 = reader.read_struct(offset)?;
+        let skey: u32 = reader.read_struct(offset)?;
         offset += 4;
 
         res.key = skey;
@@ -818,8 +860,7 @@ pub fn load_lv_tag(
         // TODO: handle? page_tags with skey & total_size only
         return Ok(None);
     } else {
-
-        let mut page_key : Vec<u8> = vec![];
+        let mut page_key: Vec<u8> = vec![];
         if common_page_key_size + local_page_key_size == 8 {
             page_key.append(&mut res.common_page_key.clone());
             page_key.append(&mut res.local_page_key.clone());
@@ -828,7 +869,7 @@ pub fn load_lv_tag(
         } else if common_page_key_size >= 4 {
             page_key = res.common_page_key.clone();
         }
-        
+
         let skey = unsafe {
             match page_key[0..4].try_into() {
                 Ok(pk) => std::mem::transmute::<[u8; 4], u32>(pk),
@@ -952,15 +993,24 @@ pub fn load_lv_data(
     reader: &Reader,
     lv_tags: &Vec<LV_tags>,
     long_value_key: u32,
+    compressed: bool
 ) -> Result<Vec<u8>, SimpleError> {
     let mut res : Vec<u8> = vec![];
     let mut i = 0;
     while i < lv_tags.len() {
-        if long_value_key == lv_tags[i].key && res.len() == lv_tags[i].seg_offset as usize {
-            let mut v = reader.read_bytes(lv_tags[i].offset, lv_tags[i].size as usize)?;
-            res.append(&mut v);
-            i = 0; // search next seg_offset (lv_tags could be not sorted)
-            continue;
+        if long_value_key == lv_tags[i].key {
+            if res.len() == lv_tags[i].seg_offset as usize {
+                let mut v = reader.read_bytes(lv_tags[i].offset, lv_tags[i].size as usize)?;
+                if compressed {
+                    let dsize = decompress_size(&v);
+                    if dsize > 0 {
+                        v = decompress_buf(&v, dsize)?;
+                    }
+                }
+                res.append(&mut v);
+                i = 0; // search next seg_offset (lv_tags could be not sorted)
+                continue;
+            }
         }
         i += 1;
     }
@@ -972,241 +1022,31 @@ pub fn load_lv_data(
     }
 }
 
-#[allow(dead_code)]
-mod test {
-    use super::*;
-    use std::{str};
-    use crate::esent::*;
-    use std::ffi::CString;
+pub fn decompress_size(
+    v: &Vec<u8>
+) -> u32 {
+    let mut decompressed: u32 = 0;
+    let mut res = unsafe { decompress(v.as_ptr(), v.len() as u32, ptr::null_mut(), 0, &mut decompressed) };
 
-    macro_rules! jetcall {
-        ($call:expr) => {
-            unsafe {
-                match $call {
-                    0 => Ok(()),
-                    err => Err(err),
-                }
-            }
-        }
+    if res == JET_wrnBufferTruncated && decompressed as usize > v.len() {
+        return decompressed;
     }
-
-    macro_rules! jettry {
-        ($func:ident($($args:expr),*)) => {
-            match jetcall!($func($($args),*)) {
-                Ok(x) => x,
-                Err(e) => panic!("{} failed: {}", stringify!($func), e),
-            }
-        }
-    }
-
-    fn size_of<T> () -> raw::c_ulong{
-        mem::size_of::<T>() as raw::c_ulong
-    }
-
-    #[derive(Debug)]
-    pub struct EseAPI {
-        instance: JET_INSTANCE,
-        sesid: JET_SESID,
-        dbid: JET_DBID,
-    }
-
-    impl EseAPI {
-        fn new(pg_size: usize) -> EseAPI {
-            EseAPI::set_system_parameter_l(JET_paramDatabasePageSize, pg_size as u64);
-            EseAPI::set_system_parameter_l(JET_paramDisableCallbacks, (true as u64).into());
-            EseAPI::set_system_parameter_sz(JET_paramRecovery, "Off");
-
-            let mut instance : JET_INSTANCE = 0;
-            jettry!(JetCreateInstanceA(&mut instance, ptr::null()));
-            jettry!(JetInit(&mut instance));
-
-            let mut sesid : JET_SESID = 0;
-            jettry!(JetBeginSessionA(instance, &mut sesid, ptr::null(), ptr::null()));
-
-            EseAPI { instance, sesid, dbid: 0 }
-        }
-
-        fn set_system_parameter_l(paramId : u32, lParam: u64) {
-            jettry!(JetSetSystemParameterA(ptr::null_mut(), 0, paramId, lParam, ptr::null_mut()));
-        }
-
-        fn set_system_parameter_sz(paramId : u32, szParam: &str) {
-            jettry!(JetSetSystemParameterA(ptr::null_mut(), 0, paramId, 0, CString::new(szParam).unwrap().as_ptr()));
-        }
-
-        fn create_column(name: &str, col_type: JET_COLTYP, grbit: JET_GRBIT) -> JET_COLUMNCREATE_A {
-            println!("create_column: {}", name);
-
-            JET_COLUMNCREATE_A{
-                cbStruct: size_of::<JET_COLUMNCREATE_A>(),
-                szColumnName: CString::new(name).unwrap().into_raw(),
-                coltyp: col_type,
-                cbMax: 0,
-                grbit,
-                pvDefault: ptr::null_mut(), cbDefault: 0, cp: 0, columnid: 0, err: 0 }
-        }
-
-        fn create_index(key: &str, grbit: JET_GRBIT) -> JET_INDEXCREATE_A {
-            let name = key.to_owned() + "_index";
-            let mut key_2zero = Vec::<raw::c_char>::with_capacity(key.len() + 3);
-
-            //TODO: idiomatic
-            key_2zero.push('+' as raw::c_char);
-            for c in key.as_bytes() {
-                key_2zero.push(*c as i8);
-            }
-
-            key_2zero.push(0);
-            key_2zero.push(0);
-
-            println!("create_index: {}, key: {}", name, key);
-            JET_INDEXCREATE_A{
-                cbStruct: size_of::<JET_INDEXCREATE_A>(),
-                szIndexName: CString::new(name).unwrap().into_raw(),
-                szKey: key_2zero.as_mut_ptr(),
-                cbKey: key_2zero.len() as raw::c_ulong,
-                grbit,
-                ulDensity: 0,
-                __bindgen_anon_1: tagJET_INDEXCREATE_A__bindgen_ty_1{lcid: 0},
-                __bindgen_anon_2: tagJET_INDEXCREATE_A__bindgen_ty_2{cbVarSegMac: 0},
-                rgconditionalcolumn: ptr::null_mut(),
-                cConditionalColumn: 0,
-                err: 0,
-                cbKeyMost: 0
-            }
-        }
-
-        fn create_table(self: &mut EseAPI,
-                               name: &str,
-                               columns: &mut Vec::<JET_COLUMNCREATE_A>,
-                               indexes: &mut Vec::<JET_INDEXCREATE_A>) -> JET_TABLEID {
-
-            let mut table_def =  JET_TABLECREATE_A{
-                        cbStruct: size_of::<JET_TABLECREATE_A>(),
-                        szTableName: CString::new(name).unwrap().into_raw(),
-                        szTemplateTableName: ptr::null_mut(),
-                        ulPages: 0,
-                        ulDensity: 0,
-                        rgcolumncreate: columns.as_mut_ptr(),
-                        cColumns: columns.len() as raw::c_ulong,
-                        rgindexcreate: indexes.as_mut_ptr(),
-                        cIndexes: indexes.len() as raw::c_ulong,
-                        grbit: 0,
-                        tableid: 0,
-                        cCreated: 0
-                    };
-
-            println!("create_table: {}", name);
-            jettry!(JetCreateTableColumnIndexA(self.sesid, self.dbid, &mut table_def ));
-            table_def.tableid
-        }
-
-        fn begin_transaction(self: &EseAPI) {
-            jettry!(JetBeginTransaction(self.sesid));
-        }
-
-        fn commit_transaction(self: &EseAPI) {
-            jettry!(JetCommitTransaction(self.sesid, 0));
-        }
-    }
-
-    impl Drop for EseAPI {
-        fn drop(&mut self) {
-            if self.sesid != 0 {
-                jettry!(JetEndSession(self.sesid, 0));
-            }
-            if self.instance != 0 {
-                jettry!(JetTerm(self.instance));
-            }
-        }
-    }
-
-    fn prepare_db(filename: &str, pg_size: usize) -> PathBuf {
-        let mut dst_path = PathBuf::from("testdata").canonicalize().unwrap();
-        dst_path.push(filename);
-
-        if !dst_path.exists() {
-            println!("creating {}", dst_path.display());
-            let mut db_client = EseAPI::new(pg_size);
-
-            let dbpath = CString::new(dst_path.to_str().unwrap()).unwrap();
-            jettry!(JetCreateDatabaseA(db_client.sesid, dbpath.as_ptr(), ptr::null(), &mut db_client.dbid, 0));
-
-            let mut columns = Vec::<JET_COLUMNCREATE_A>::with_capacity(2);
-            columns.push(EseAPI::create_column("PK", JET_coltypLong, JET_bitColumnAutoincrement));
-            columns.push(EseAPI::create_column("Value", JET_coltypLongText, JET_bitColumnTagged));
-            
-            let mut indexes = Vec::<JET_INDEXCREATE_A>::with_capacity(2);
-            indexes.push(EseAPI::create_index("PK", JET_bitIndexPrimary));
-            indexes.push(EseAPI::create_index("Value", 0));
-
-            let tableid = db_client.create_table("test_table", &mut columns, &mut indexes);
-            let columnid = columns[1].columnid;
-
-            for i in 0..1000 {
-                let s = format!("Record {:1000}", i);
-                let mut setColumn = JET_SETCOLUMN {
-                    columnid,
-                    pvData: s.as_ptr() as *const raw::c_void,
-                    cbData: s.len() as raw::c_ulong,
-                    grbit: 0, ibLongValue: 0, itagSequence: 0, err: 0 };
-
-                //println!("'{}' {}", s, s.len());
-
-                db_client.begin_transaction();
-
-                jettry!(JetPrepareUpdate(db_client.sesid, tableid, JET_prepInsert));
-                jettry!(JetSetColumns(db_client.sesid, tableid, &mut setColumn, 1));
-                jettry!(JetUpdate(db_client.sesid, tableid, ptr::null_mut(), 0, ptr::null_mut()));
-
-                db_client.commit_transaction();
-            }
-        }
-        else {
-            println!("use existing {}", dst_path.display());
-        }
-
-        dst_path
-    }
-
-        #[test]
-    pub fn caching_test() -> Result<(), SimpleError> {
-        let cache_size = 10u32;
-        let path = prepare_db("test_caching.edb", 1024 * 8);
-        let mut reader = Reader::new(&path, cache_size as usize)?;
-        let page_size = reader.page_size;
-        let num_of_pages = std::cmp::min(fs::metadata(&path).unwrap().len() as u32 / page_size, page_size);
-        let full_cache_size = 6 * cache_size;
-        let stride = num_of_pages / full_cache_size;
-        let chunk_size = page_size / num_of_pages;
-        let mut chunks = Vec::<Vec<u8>>::with_capacity(stride as usize);
-
-        println!("cache_size: {}, page_size: {}, num_of_pages: {}, stride: {}, chunk_size: {}",
-            cache_size, page_size, num_of_pages, stride, chunk_size);
-
-        for pass in 1..3 {
-            for pg_no in 1..12 {
-                let offset: u64 = (pg_no * (page_size + chunk_size)) as u64;
-
-                println!("pass {}, pg_no {}, offset {:x} ", pass, pg_no, offset);
-
-                if pass == 1 {
-                    let mut chunk = Vec::<u8>::with_capacity(stride as usize);
-                    assert!(!reader.cache.get_mut().contains_key(&pg_no));
-                    reader.read(offset, &mut chunk)?;
-                    chunks.push(chunk);
-                } else {
-                    let mut chunk = Vec::<u8>::with_capacity(stride as usize);
-                    // pg_no == 1 was deleted, because cache_size is 10 pages
-                    // and we read 11, so least recently used page (1) was deleted
-                    assert_eq!(reader.cache.get_mut().contains_key(&pg_no), pg_no != 1);
-                    reader.read(offset, &mut chunk)?;
-                    assert_eq!(chunk, chunks[pg_no as usize - 1]);
-                }
-            }
-        }
-        fs::remove_file(path.with_file_name("test_caching.jfm")).unwrap();
-        fs::remove_file(path).unwrap();
-        Ok(())
-    }
+    0
 }
+
+pub fn decompress_buf(
+    v: &Vec<u8>,
+    decompressed_size: u32
+) -> Result<Vec<u8>, SimpleError> {
+    let mut buf = Vec::<u8>::with_capacity(decompressed_size as usize);
+    unsafe { buf.set_len(buf.capacity()); }
+    let mut decompressed : u32 = 0;
+    let res = unsafe { decompress(v.as_ptr(), v.len() as u32, buf.as_mut_ptr(), buf.len() as u32, &mut decompressed) };
+    debug_assert!(decompressed_size == decompressed && decompressed as usize == buf.len());
+    if res != JET_errSuccess {
+        return Err(SimpleError::new(format!("Decompress failed. Err {}", res)));
+    }
+    Ok(buf)
+}
+
+mod test;

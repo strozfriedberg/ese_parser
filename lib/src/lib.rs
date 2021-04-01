@@ -37,7 +37,6 @@ fn test_edb_table_all_values() {
     use ese_trait::*;
     use std::os::windows::prelude::*;
 
-    //let mut jdb : ese_trait::EseDb = ese_api::EseApi::init();
     let mut jdb : ese_parser::EseParser = ese_parser::EseParser::init(5);
 
     match jdb.load("testdata\\test.edb") {
@@ -95,19 +94,18 @@ fn test_edb_table_all_values() {
         let date_time = columns.iter().find(|x| x.name == "DateTime" ).unwrap();
         let dt = jdb.get_column::<f64>(table_id, date_time.id).unwrap().unwrap();
 
-        let mut st =  std::mem::MaybeUninit::<SYSTEMTIME>::zeroed();
+        let mut st = std::mem::MaybeUninit::<SYSTEMTIME>::zeroed();
         unsafe {
             let r = VariantTimeToSystemTime(dt, st.as_mut_ptr());
             assert_eq!(r, 1);
             let s = st.assume_init();
-            println!("{:?}", s);
-            assert_eq!(s.wDayOfWeek, 2);
-            assert_eq!(s.wDay, 2);
+            assert_eq!(s.wDayOfWeek, 1);
+            assert_eq!(s.wDay, 29);
             assert_eq!(s.wMonth, 3);
             assert_eq!(s.wYear, 2021);
             assert_eq!(s.wHour, 11);
-            assert_eq!(s.wMinute, 11);
-            assert_eq!(s.wSecond, 17);
+            assert_eq!(s.wMinute, 49);
+            assert_eq!(s.wSecond, 47);
             assert_eq!(s.wMilliseconds, 0);
         }
     }

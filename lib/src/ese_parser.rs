@@ -87,7 +87,7 @@ impl EseParser {
             }
             if i < t.page().page_tags.len() {
                 // found non-free data tag
-                (*t).page_tag_index = i;
+                t.page_tag_index = i;
                 return Ok(true);
             } else {
                 if t.page().common().next_page != 0 {
