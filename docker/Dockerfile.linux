@@ -10,8 +10,7 @@ RUN apt-get install -y python3 curl && \
 	python3 get-pip.py && \
 	rm get-pip.py
 
-
-RUN pip install maturin
+RUN pip install maturin && pip install virtualenv
 
 RUN addgroup --gid $GROUP_ID builder
 RUN adduser --disabled-password --gecos '' --uid $USER_ID --gid $GROUP_ID builder
