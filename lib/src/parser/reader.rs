@@ -7,6 +7,11 @@ use crate::parser::ese_db;
 use crate::parser::ese_db::*;
 use crate::parser::jet;
 
+#[cfg(target_os = "windows")]
+mod gen_db;
+
+mod test;
+
 const JET_wrnBufferTruncated: u32 = 1006;
 const JET_errSuccess: u32 = 0;
 
@@ -1048,5 +1053,3 @@ pub fn decompress_buf(
     }
     Ok(buf)
 }
-
-mod test;
