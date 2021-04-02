@@ -15,14 +15,6 @@ mod test;
 const JET_wrnBufferTruncated: u32 = 1006;
 const JET_errSuccess: u32 = 0;
 
-extern "C" {
-    fn decompress(  data: *const u8,
-                    data_size: u32,
-                    out_buffer: *mut u8,
-                    out_buffer_size: u32,
-                    decompressed: *mut u32) -> u32;
-}
-
 pub struct Reader {
     file: RefCell<fs::File>,
     cache: RefCell<Cache<u32, Vec<u8>>>,
@@ -1027,6 +1019,13 @@ pub fn load_lv_data(
     }
 }
 
+#[cfg(target_os = "windows")]
+extern "C" {
+    fn decompress(
+        data: *const u8, data_size: u32, out_buffer: *mut u8, out_buffer_size: u32, decompressed: *mut u32) -> u32;
+}
+
+#[cfg(target_os = "windows")]
 pub fn decompress_size(
     v: &Vec<u8>
 ) -> u32 {
@@ -1039,6 +1038,14 @@ pub fn decompress_size(
     0
 }
 
+#[cfg(target_os = "linux")]
+pub fn decompress_size(
+    v: &Vec<u8>
+) -> u32 {
+    0
+}
+
+#[cfg(target_os = "windows")]
 pub fn decompress_buf(
     v: &Vec<u8>,
     decompressed_size: u32
@@ -1052,4 +1059,12 @@ pub fn decompress_buf(
         return Err(SimpleError::new(format!("Decompress failed. Err {}", res)));
     }
     Ok(buf)
+}
+
+#[cfg(target_os = "linux")]
+pub fn decompress_buf(
+    v: &Vec<u8>,
+    decompressed_size: u32
+) -> Result<Vec<u8>, SimpleError> {
+    Err(SimpleError::new("TODO: Decompression is not implemented."))
 }

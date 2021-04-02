@@ -86,6 +86,7 @@ fn check_row(jdb: &mut EseParser, table_id: u64, columns: &Vec<ColumnInfo>) -> H
     values
 }
 
+#[cfg(target_os = "windows")]
 #[test]
 pub fn decompress_test() -> Result<(), SimpleError> {
     let table = "test_table";
