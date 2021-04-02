@@ -1,8 +1,8 @@
 use super::*;
 use std::{str, ffi::CString, mem::size_of, ptr::null_mut, convert::TryFrom, collections::HashSet};
-use crate::esent::{self, *};
+use crate::esent::esent::*;
 use crate::ese_parser::EseParser;
-use crate::ese_trait::{EseDb, ColumnInfo};
+use crate::ese_trait::*;
 use encoding::{all::{ASCII, UTF_16LE, UTF_8}, Encoding, EncoderTrap, DecoderTrap};
 
 macro_rules! jetcall {
@@ -293,7 +293,7 @@ pub fn decompress_test() -> Result<(), SimpleError> {
     let table_id = jdb.open_table(&table)?;
     let columns = jdb.get_columns(&table)?;
 
-    assert!(jdb.move_row(table_id, esent::JET_MoveFirst));
+    assert!(jdb.move_row(table_id, ESE_MoveFirst));
 
     for rec_no in 0.. {
         let values = check_row(&mut jdb, table_id, &columns);
@@ -301,7 +301,7 @@ pub fn decompress_test() -> Result<(), SimpleError> {
         println!("{}: {:?}", rec_no, values);
         assert_eq!(values.len(), 1);
 
-        if !jdb.move_row(table_id, esent::JET_MoveNext) {
+        if !jdb.move_row(table_id, ESE_MoveNext) {
             break;
         }
     }

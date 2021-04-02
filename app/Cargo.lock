@@ -262,6 +262,7 @@ dependencies = [
  "simple-error",
  "strum",
  "strum_macros",
+ "widestring",
  "winapi",
 ]
 

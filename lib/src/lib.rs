@@ -2,44 +2,20 @@
 
 mod parser;
 
+#[cfg(target_os = "windows")]
 pub mod esent;
+
 pub mod ese_trait;
-pub mod ese_api;
 pub mod ese_parser;
-
-extern "C" {
-    pub fn StringFromGUID2(
-        rguid: *const ::std::os::raw::c_void,
-        lpsz: *const ::std::os::raw::c_ushort,
-        cchMax: ::std::os::raw::c_int
-    ) -> ::std::os::raw::c_int;
-}
-
-#[repr(C)]
-#[derive(Debug, Copy, Clone)]
-pub struct SYSTEMTIME {
-    pub wYear: ::std::os::raw::c_ushort,
-    pub wMonth: ::std::os::raw::c_ushort,
-    pub wDayOfWeek: ::std::os::raw::c_ushort,
-    pub wDay: ::std::os::raw::c_ushort,
-    pub wHour: ::std::os::raw::c_ushort,
-    pub wMinute: ::std::os::raw::c_ushort,
-    pub wSecond: ::std::os::raw::c_ushort,
-    pub wMilliseconds: ::std::os::raw::c_ushort,
-}
-extern "C" {
-    pub fn VariantTimeToSystemTime(vtime: f64, lpSystemTime: *mut SYSTEMTIME) -> ::std::os::raw::c_int;
-}
+pub mod vartime;
 
 #[test]
 fn test_edb_table_all_values() {
 
     use ese_trait::*;
-    use std::os::windows::prelude::*;
-
     let mut jdb : ese_parser::EseParser = ese_parser::EseParser::init(5);
 
-    match jdb.load("testdata\\test.edb") {
+    match jdb.load("testdata/test.edb") {
         Some(e) => panic!("Error: {}", e),
         None => println!("Loaded.")
     }
@@ -57,7 +33,7 @@ fn test_edb_table_all_values() {
     let columns = jdb.get_columns(&table).unwrap();
 
     let table_id = jdb.open_table(&table).unwrap();
-    assert_eq!(jdb.move_row(table_id, esent::JET_MoveFirst), true);
+    assert_eq!(jdb.move_row(table_id, ESE_MoveFirst), true);
 
     let bit = columns.iter().find(|x| x.name == "Bit" ).unwrap();
     assert_eq!(jdb.get_column::<i8>(table_id, bit.id).unwrap(), Some(0));
@@ -94,34 +70,26 @@ fn test_edb_table_all_values() {
         let date_time = columns.iter().find(|x| x.name == "DateTime" ).unwrap();
         let dt = jdb.get_column::<f64>(table_id, date_time.id).unwrap().unwrap();
 
-        let mut st = std::mem::MaybeUninit::<SYSTEMTIME>::zeroed();
-        unsafe {
-            let r = VariantTimeToSystemTime(dt, st.as_mut_ptr());
-            assert_eq!(r, 1);
-            let s = st.assume_init();
-            assert_eq!(s.wDayOfWeek, 1);
-            assert_eq!(s.wDay, 29);
-            assert_eq!(s.wMonth, 3);
-            assert_eq!(s.wYear, 2021);
-            assert_eq!(s.wHour, 11);
-            assert_eq!(s.wMinute, 49);
-            assert_eq!(s.wSecond, 47);
-            assert_eq!(s.wMilliseconds, 0);
-        }
+        let mut st = unsafe { std::mem::MaybeUninit::<vartime::SYSTEMTIME>::zeroed().assume_init() };
+        let r = vartime::VariantTimeToSystemTime(dt, &mut st);
+        assert_eq!(r, true);
+        assert_eq!(st.wDayOfWeek, 1);
+        assert_eq!(st.wDay, 29);
+        assert_eq!(st.wMonth, 3);
+        assert_eq!(st.wYear, 2021);
+        assert_eq!(st.wHour, 11);
+        assert_eq!(st.wMinute, 49);
+        assert_eq!(st.wSecond, 47);
+        assert_eq!(st.wMilliseconds, 0);
     }
 
     // GUID
     {
         let guid = columns.iter().find(|x| x.name == "GUID" ).unwrap();
-        let gd = jdb.get_column_dyn(table_id, guid.id, guid.cbmax as usize).unwrap().unwrap();
-        unsafe {
-            let mut vstr : Vec<u16> = Vec::new();
-            vstr.resize(39, 0);
-            let r = StringFromGUID2(gd.as_ptr() as *const ::std::os::raw::c_void, vstr.as_mut_ptr() as *const u16, vstr.len() as i32);
-            assert_ne!(r, 0);
-            let s = std::ffi::OsString::from_wide(&vstr).into_string().unwrap();
-            assert_eq!(s, "{4D36E96E-E325-11CE-BFC1-08002BE10318}\u{0}");
-        }
+        let v = jdb.get_column_dyn(table_id, guid.id, guid.cbmax as usize).unwrap().unwrap();
+        let s = format!("{{{:02X}{:02X}{:02X}{:02X}-{:02X}{:02X}-{:02X}{:02X}-{:02X}{:02X}-{:02X}{:02X}{:02X}{:02X}{:02X}{:02X}}}",
+            v[3], v[2], v[1], v[0], v[5], v[4], v[7], v[6], v[8], v[9], v[10], v[11], v[12], v[13], v[14], v[15]);
+        assert_eq!(s, "{4D36E96E-E325-11CE-BFC1-08002BE10318}");
     }
 
     // Binary
@@ -190,7 +158,7 @@ fn test_edb_table_all_values() {
 
         unsafe {
             let (_, v16, _) = s.align_to::<u16>();
-            let ws = std::ffi::OsString::from_wide(&v16).into_string().unwrap();
+            let ws = widestring::U16String::from_ptr(v16.as_ptr(), v16.len()).to_string_lossy();
             for i in 0..ws.len() {
                 let l = ws.chars().nth(i).unwrap();
                 let r = abc.as_bytes()[i % abc.len()] as char;

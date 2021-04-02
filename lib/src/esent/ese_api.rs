@@ -1,5 +1,7 @@
+#[cfg(target_os = "windows")]
+
 use crate::ese_trait::*;
-use crate::esent::*;
+use crate::esent::esent::*;
 
 use simple_error::SimpleError;
 
@@ -373,7 +375,7 @@ impl EseDb for EseAPI {
                     cp: col_cp
                 });
 
-                if !self.move_row(subtable_id, JET_MoveNext) {
+                if !self.move_row(subtable_id, ESE_MoveNext as u32) {
                     break;
                 }
             }
