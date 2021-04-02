@@ -15,7 +15,6 @@ cc = { version = "1.0", features = ["parallel"] }
 
 [target.'cfg(windows)'.dependencies]
 winapi = { version = "0.3", features = ["timezoneapi"] }
-encoding = "*"
 
 [dependencies]
 libc = "0.2"
@@ -28,5 +27,6 @@ log = "*"
 chrono = "*"
 cache_2q = "*"
 widestring = "*"
+encoding = "*"
 strum = {version = "*", features = ["derive"]}
 strum_macros = "*"
