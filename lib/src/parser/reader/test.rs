@@ -1,5 +1,6 @@
 use super::*;
 use std::collections::HashSet;
+use std::convert::TryFrom;
 use crate::ese_parser::EseParser;
 use crate::ese_trait::*;
 use encoding::{all::UTF_8, Encoding};
@@ -66,7 +67,7 @@ fn check_row(jdb: &mut EseParser, table_id: u64, columns: &Vec<ColumnInfo>) -> H
         match jdb.get_column_str(table_id, col.id, 0) {
             Ok(result) =>
                 if let Some(mut value) = result {
-                    if col.cp == 1200 {
+                    if ESE_CP::try_from(col.cp).unwrap() == ESE_CP::Unicode {
                         unsafe {
                             let buffer = slice::from_raw_parts(value.as_bytes() as *const _ as *const u16, value.len() / 2);
                             value = String::from_utf16(&buffer).unwrap();

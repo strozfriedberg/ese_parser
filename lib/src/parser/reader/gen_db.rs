@@ -1,9 +1,11 @@
 #![cfg(target_os = "windows")]
 
 use super::*;
-use std::{str, ffi::CString, mem::size_of, convert::TryFrom};
+use std::{str, ffi::CString, mem::size_of};
 use crate::esent::esent::*;
 use encoding::{all::{ASCII, UTF_16LE, UTF_8}, Encoding, EncoderTrap};
+use crate::ese_trait::ESE_CP;
+use std::convert::TryFrom;
 
 macro_rules! jetcall {
     ($call:expr) => {
@@ -32,25 +34,6 @@ pub struct EseAPI {
     dbid: JET_DBID,
 }
 
-enum JET_CP {
-    None = 0,
-    Unicode = 1200,
-    ASCII = 1252
-}
-
-impl TryFrom<u32> for JET_CP {
-    type Error = ();
-
-    fn try_from(v: u32) -> Result<Self, Self::Error> {
-        match v {
-            x if x == JET_CP::None as u32 => Ok(JET_CP::None),
-            x if x == JET_CP::ASCII as u32 => Ok(JET_CP::ASCII),
-            x if x == JET_CP::Unicode as u32 => Ok(JET_CP::Unicode),
-            _ => Err(()),
-        }
-    }
-}
-
 impl EseAPI {
     fn new(instance_name: &str, pg_size: usize) -> EseAPI {
         EseAPI::set_system_parameter_l(JET_paramDatabasePageSize, pg_size as u64);
@@ -75,7 +58,7 @@ impl EseAPI {
         jettry!(JetSetSystemParameterA(ptr::null_mut(), 0, paramId, 0, CString::new(szParam).unwrap().as_ptr()));
     }
 
-    fn create_column(name: &str, col_type: JET_COLTYP, cp: JET_CP, grbit: JET_GRBIT) -> JET_COLUMNCREATE_A {
+    fn create_column(name: &str, col_type: JET_COLTYP, cp: ESE_CP, grbit: JET_GRBIT) -> JET_COLUMNCREATE_A {
         println!("create_column: {}", name);
 
         JET_COLUMNCREATE_A{
@@ -88,12 +71,12 @@ impl EseAPI {
             pvDefault: ptr::null_mut(), cbDefault: 0, columnid: 0, err: 0 }
     }
 
-    fn create_text_column(name: &str, cp: JET_CP, grbit: JET_GRBIT) -> JET_COLUMNCREATE_A {
+    fn create_text_column(name: &str, cp: ESE_CP, grbit: JET_GRBIT) -> JET_COLUMNCREATE_A {
         EseAPI::create_column(name, JET_coltypLongText, cp, grbit)
     }
 
     fn create_binary_column(name: &str, grbit: JET_GRBIT) -> JET_COLUMNCREATE_A {
-        EseAPI::create_column(name, JET_coltypLongBinary, JET_CP::None, grbit)
+        EseAPI::create_column(name, JET_coltypLongBinary, ESE_CP::None, grbit)
     }
 
     fn create_table(self: &mut EseAPI,
@@ -159,10 +142,10 @@ pub fn prepare_db(filename: &str, table: &str, pg_size: usize, record_size: usiz
 
     let mut columns = Vec::<JET_COLUMNCREATE_A>::with_capacity(5);
     //columns.push(EseAPI::create_num_column("PK",JET_bitColumnAutoincrement));
-    columns.push(EseAPI::create_text_column("compressed_unicode", JET_CP::Unicode, JET_bitColumnCompressed));
-    columns.push(EseAPI::create_text_column("compressed_ascii", JET_CP::ASCII, JET_bitColumnCompressed));
+    columns.push(EseAPI::create_text_column("compressed_unicode", ESE_CP::Unicode, JET_bitColumnCompressed));
+    columns.push(EseAPI::create_text_column("compressed_ascii", ESE_CP::ASCII, JET_bitColumnCompressed));
     columns.push(EseAPI::create_binary_column("compressed_binary", JET_bitColumnCompressed));
-    columns.push(EseAPI::create_text_column("usual_text", JET_CP::None, JET_bitColumnTagged));
+    columns.push(EseAPI::create_text_column("usual_text", ESE_CP::None, JET_bitColumnTagged));
 
     let tableid = db_client.create_table(table, &mut columns);
 
@@ -173,16 +156,16 @@ pub fn prepare_db(filename: &str, table: &str, pg_size: usize, record_size: usiz
 
         jettry!(JetPrepareUpdate(db_client.sesid, tableid, JET_prepInsert));
         for col in &columns {
-            let data = match col.cp.try_into() {
-                Ok(JET_CP::Unicode) => match UTF_16LE.encode(&s, EncoderTrap::Strict) {
+            let data = match ESE_CP::try_from(col.cp as u16) {
+                Ok(ESE_CP::Unicode) => match UTF_16LE.encode(&s, EncoderTrap::Strict) {
                     Ok(data) => data,
                     Err(e) => panic!("{}", e),
                 },
-                Ok(JET_CP::ASCII) => match ASCII.encode(&s, EncoderTrap::Strict) {
+                Ok(ESE_CP::ASCII) => match ASCII.encode(&s, EncoderTrap::Strict) {
                     Ok(data) => data,
                     Err(e) => panic!("{}", e),
                 },
-                Ok(JET_CP::None) => match UTF_8.encode(&s, EncoderTrap::Strict) {
+                Ok(ESE_CP::None) => match UTF_8.encode(&s, EncoderTrap::Strict) {
                     Ok(data) => data,
                     Err(e) => panic!("{}", e),
                 },
