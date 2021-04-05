@@ -27,7 +27,7 @@ pipeline {
 					bat "python -m venv test"
 					bat "call test/Scripts/activate.bat"
 					bat "pip install --force-reinstall target/wheels/ese_parser-0.1.0-cp36-abi3-win_amd64.whl"
-					bat "python py\test.py"
+					bat "python py/test.py"
 					bat "call test/Scripts/deactivate.bat"
                 }
             }
