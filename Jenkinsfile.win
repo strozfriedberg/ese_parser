@@ -36,7 +36,7 @@ pipeline {
     }
     post {
         always {
-            archiveArtifacts artifacts: 'app/target/x86_64-pc-windows-msvc/debug/ese_parser.exe;app/target/wheels/ese_parser-0.1.0-cp36-abi3-win_amd64.whl', onlyIfSuccessful: true
+            archiveArtifacts artifacts: 'app/target/x86_64-pc-windows-msvc/debug/ese_parser.exe, app/target/wheels/ese_parser-0.1.0-cp36-abi3-win_amd64.whl', onlyIfSuccessful: true
         }
     }
 }
