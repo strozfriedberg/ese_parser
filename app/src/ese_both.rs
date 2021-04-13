@@ -31,7 +31,7 @@ impl EseDb for EseBoth {
     }
 
     fn error_to_string(&self, _err: i32) -> String {
-        "useless".to_string()
+        "unused".to_string()
     }
 
     fn open_table(&self, table: &str) -> Result<u64, SimpleError> {
@@ -61,12 +61,12 @@ impl EseDb for EseBoth {
         let api_tables = self.api.get_tables().map_err(|e| SimpleError::new(format!("EseAPI::get_tables failed: {}", e)))?;
         let parser_tables = self.parser.get_tables().map_err(|e| SimpleError::new(format!("EseParser::get_tables failed: {}", e)))?;
         if api_tables.len() != parser_tables.len() {
-            return Err(SimpleError::new(format!("get_tables() have difference: EseAPI tables:\n{:?}\n not equal to EseParser:\n{:?}\n",
+            return Err(SimpleError::new(format!("get_tables() have a different number of tables: EseAPI tables:\n{:?}\n not equal to EseParser:\n{:?}\n",
                 api_tables, parser_tables)));
         }
         for i in 0..api_tables.len() {
             if api_tables[i] != parser_tables[i] {
-                return Err(SimpleError::new(format!("get_tables() have difference: EseAPI table:\n{:?}\n not equal to EseParser:\n{:?}\n",
+                return Err(SimpleError::new(format!("get_tables() have a different number of tables: EseAPI table:\n{:?}\n not equal to EseParser:\n{:?}\n",
                     api_tables[i], parser_tables[i])));
             }
         }
@@ -77,7 +77,7 @@ impl EseDb for EseBoth {
         let api_columns = self.api.get_columns(table).map_err(|e| SimpleError::new(format!("EseAPI::get_columns failed: {}", e)))?;
         let parser_columns = self.parser.get_columns(table).map_err(|e| SimpleError::new(format!("EseParser::get_columns failed: {}", e)))?;
         if api_columns.len() != parser_columns.len() {
-            return Err(SimpleError::new(format!("get_columns({}) have difference: EseAPI columns:\n{:?}\n not equal to EseParser:\n{:?}\n",
+            return Err(SimpleError::new(format!("get_columns({}) have a different number of columns: EseAPI columns:\n{:?}\n not equal to EseParser:\n{:?}\n",
                 table, api_columns, parser_columns)));
         }
         for i in 0..api_columns.len() {
@@ -89,7 +89,7 @@ impl EseDb for EseBoth {
                    c1.cbmax != c2.cbmax ||
                    c1.cp    != c2.cp
                 {
-                    return Err(SimpleError::new(format!("get_columns({}) have difference: EseAPI table:\n{:?}\n not equal to EseParser:\n{:?}\n",
+                    return Err(SimpleError::new(format!("get_columns({}) have a different number of columns: EseAPI table:\n{:?}\n not equal to EseParser:\n{:?}\n",
                         table, api_columns[i], parser_columns[i])));
                 }
             }
