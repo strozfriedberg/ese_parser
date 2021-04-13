@@ -38,7 +38,7 @@ fn bytes_to_string(v: Vec<u8>, wide: bool) -> Option<String> {
     }
 }
 
-fn SystemTimeToFileTime(st: &SYSTEMTIME, t: &mut i64) {
+fn SystemTimeToFileTime(st: &SYSTEMTIME) -> i64 {
     const TICKSPERMSEC : i64  = 10000;
     const TICKSPERSEC : i64 = 10000000;
     const SECSPERDAY : i64 = 86400;
@@ -63,15 +63,16 @@ fn SystemTimeToFileTime(st: &SYSTEMTIME, t: &mut i64) {
         days as i64
     }
 
-    *t = DaysSinceEpoch(st.wYear as i32);
+    let mut t : i64 = DaysSinceEpoch(st.wYear as i32);
     for curMonth in 1..st.wMonth {
-        *t += monthLengths[IsLeapYear(st.wYear as i32) as usize][curMonth as usize  - 1];
+        t += monthLengths[IsLeapYear(st.wYear as i32) as usize][curMonth as usize  - 1];
     }
-    *t += st.wDay as i64 - 1;
-    *t *= SECSPERDAY;
-    *t += st.wHour as i64 * SECSPERHOUR + st.wMinute as i64 * SECSPERMIN + st.wSecond as i64;
-    *t *= TICKSPERSEC;
-    *t += st.wMilliseconds as i64 * TICKSPERMSEC;
+    t += st.wDay as i64 - 1;
+    t *= SECSPERDAY;
+    t += st.wHour as i64 * SECSPERHOUR + st.wMinute as i64 * SECSPERMIN + st.wSecond as i64;
+    t *= TICKSPERSEC;
+    t += st.wMilliseconds as i64 * TICKSPERMSEC;
+    t
 }
 
 #[pymethods]
@@ -300,8 +301,7 @@ impl PyEseDb {
                     Some(v) => {
                         let mut st = unsafe { std::mem::zeroed::<SYSTEMTIME>() };
                         if VariantTimeToSystemTime(v, &mut st) {
-                            let mut myft : i64 = 0;
-                            SystemTimeToFileTime(&st, &mut myft);
+                            let myft = SystemTimeToFileTime(&st);
                             // January 1, 1970 (start of Unix epoch) in "ticks"
                             const UNIX_TIME_START : i64 = 0x019DB1DED53E8000;
                             // a tick is 100ns
