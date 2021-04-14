@@ -218,7 +218,7 @@ fn get_column_val(jdb: &Box<dyn EseDb>, table_id: u64, c: &ColumnInfo) -> Result
                     if VariantTimeToSystemTime(v, &mut st) {
                         val = format!("{}.{}.{} {}:{}:{}", st.wDay, st.wMonth, st.wYear, st.wHour, st.wMinute, st.wSecond);
                     } else {
-                        return Err(SimpleError::new(format!("VariantTimeToSystemTimeX failed")));
+                        return Err(SimpleError::new(format!("VariantTimeToSystemTime failed")));
                     }
                 },
                 None => val = format!(" ")
