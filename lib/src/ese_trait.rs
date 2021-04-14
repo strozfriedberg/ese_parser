@@ -1,4 +1,3 @@
-
 use simple_error::SimpleError;
 
 #[derive(Debug)]
@@ -9,6 +8,31 @@ pub struct ColumnInfo {
     pub cbmax: u32,
     pub cp: u16
 }
+
+pub const ESE_coltypBit: u32 = 1;
+pub const ESE_coltypUnsignedByte: u32 = 2;
+pub const ESE_coltypShort: u32 = 3;
+pub const ESE_coltypLong: u32 = 4;
+pub const ESE_coltypCurrency: u32 = 5;
+pub const ESE_coltypIEEESingle: u32 = 6;
+pub const ESE_coltypIEEEDouble: u32 = 7;
+pub const ESE_coltypDateTime: u32 = 8;
+pub const ESE_coltypBinary: u32 = 9;
+pub const ESE_coltypText: u32 = 10;
+pub const ESE_coltypLongBinary: u32 = 11;
+pub const ESE_coltypLongText: u32 = 12;
+pub const ESE_coltypSLV: u32 = 13;
+pub const ESE_coltypUnsignedLong: u32 = 14;
+pub const ESE_coltypLongLong: u32 = 15;
+pub const ESE_coltypGUID: u32 = 16;
+pub const ESE_coltypUnsignedShort: u32 = 17;
+pub const ESE_coltypUnsignedLongLong: u32 = 18;
+pub const ESE_coltypMax: u32 = 19;
+
+pub const ESE_MoveFirst: u32 = 2147483648;
+pub const ESE_MovePrevious: i32 = -1;
+pub const ESE_MoveNext: u32 = 1;
+pub const ESE_MoveLast: u32 = 2147483647;
 
 pub trait EseDb {
     fn load(&mut self, dbpath: &str) -> Option<SimpleError>;

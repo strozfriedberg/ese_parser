@@ -1,19 +1,11 @@
+#![allow(non_upper_case_globals)]
+#![allow(non_snake_case)]
 
 use pyo3::prelude::*;
 use pyo3::exceptions;
 
-use ese_parser_lib::{esent, ese_trait::*, ese_parser::*};
-
-use std::ffi::OsString;
-use std::os::windows::prelude::*;
-
-extern "C" {
-    pub fn StringFromGUID2(
-        rguid: *const ::std::os::raw::c_void,
-        lpsz: *const ::std::os::raw::c_ushort,
-        cchMax: ::std::os::raw::c_int
-    ) -> ::std::os::raw::c_int;
-}
+use ese_parser_lib::{ese_trait::*, ese_parser::*, vartime::*};
+use widestring::U16String;
 
 #[pyclass]
 pub struct PyEseDb {
@@ -39,11 +31,48 @@ fn bytes_to_string(v: Vec<u8>, wide: bool) -> Option<String> {
         let t = v.as_slice();
         unsafe {
             let (_, v16, _) = t.align_to::<u16>();
-            OsString::from_wide(&v16).into_string().ok()
+            Some(U16String::from_ptr(v16.as_ptr(), v16.len()).to_string_lossy())
         }
     } else {
         std::str::from_utf8(&v).map(|s| s.to_string()).ok()
     }
+}
+
+fn SystemTimeToFileTime(st: &SYSTEMTIME) -> i64 {
+    const TICKSPERMSEC : i64  = 10000;
+    const TICKSPERSEC : i64 = 10000000;
+    const SECSPERDAY : i64 = 86400;
+    const SECSPERHOUR : i64 = 3600;
+    const SECSPERMIN : i64 = 60;
+
+    let monthLengths = vec![
+        vec![31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31],
+        vec![31, 29, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31]
+    ];
+
+    fn IsLeapYear(year: i32) -> bool {
+        year % 4 == 0 && (year % 100 != 0 || year % 400 == 0)
+    }
+
+    fn DaysSinceEpoch(mut year: i32) -> i64 {
+        const DAYSPERNORMALYEAR : i32 = 365;
+        const EPOCHYEAR : i32 = 1601;
+        year -= 1; // Don't include a leap day from the current year
+        let mut days = year * DAYSPERNORMALYEAR + year / 4 - year / 100 + year / 400;
+        days -= (EPOCHYEAR - 1) * DAYSPERNORMALYEAR + (EPOCHYEAR - 1) / 4 - (EPOCHYEAR - 1) / 100 + (EPOCHYEAR - 1) / 400;
+        days as i64
+    }
+
+    let mut t : i64 = DaysSinceEpoch(st.wYear as i32);
+    for curMonth in 1..st.wMonth {
+        t += monthLengths[IsLeapYear(st.wYear as i32) as usize][curMonth as usize  - 1];
+    }
+    t += st.wDay as i64 - 1;
+    t *= SECSPERDAY;
+    t += st.wHour as i64 * SECSPERHOUR + st.wMinute as i64 * SECSPERMIN + st.wSecond as i64;
+    t *= TICKSPERSEC;
+    t += st.wMilliseconds as i64 * TICKSPERMSEC;
+    t
 }
 
 #[pymethods]
@@ -146,51 +175,51 @@ impl PyEseDb {
         }
 
         match column.typ {
-            esent::JET_coltypBit => {
+            ESE_coltypBit => {
                 let n = get::<i8>(self, table, column)?;
                 Ok(Some(n.to_object(py)))
             },
-            esent::JET_coltypUnsignedByte => {
+            ESE_coltypUnsignedByte => {
                 let n = get::<u8>(self, table, column)?;
                 Ok(Some(n.to_object(py)))
             },
-            esent::JET_coltypShort => {
+            ESE_coltypShort => {
                 let n = get::<i16>(self, table, column)?;
                 Ok(Some(n.to_object(py)))
             },
-            esent::JET_coltypUnsignedShort => {
+            ESE_coltypUnsignedShort => {
                 let n = get::<u16>(self, table, column)?;
                 Ok(Some(n.to_object(py)))
             },
-            esent::JET_coltypLong => {
+            ESE_coltypLong => {
                 let n = get::<i32>(self, table, column)?;
                 Ok(Some(n.to_object(py)))
             },
-            esent::JET_coltypUnsignedLong => {
+            ESE_coltypUnsignedLong => {
                 let n = get::<u32>(self, table, column)?;
                 Ok(Some(n.to_object(py)))
             },
-            esent::JET_coltypLongLong => {
+            ESE_coltypLongLong => {
                 let n = get::<i64>(self, table, column)?;
                 Ok(Some(n.to_object(py)))
             },
-            esent::JET_coltypUnsignedLongLong => {
+            ESE_coltypUnsignedLongLong => {
                 let n = get::<u64>(self, table, column)?;
                 Ok(Some(n.to_object(py)))
             },
-            esent::JET_coltypCurrency => { // TODO
+            ESE_coltypCurrency => { // TODO
                 let n = get::<i64>(self, table, column)?;
                 Ok(Some(n.to_object(py)))
             },
-            esent::JET_coltypIEEESingle => {
+            ESE_coltypIEEESingle => {
                 let n = get::<f32>(self, table, column)?;
                 Ok(Some(n.to_object(py)))
             },
-            esent::JET_coltypIEEEDouble => {
+            ESE_coltypIEEEDouble => {
                 let n = get::<f64>(self, table, column)?;
                 Ok(Some(n.to_object(py)))
             },
-            esent::JET_coltypBinary => {
+            ESE_coltypBinary => {
                 match self.jdb.get_column_dyn(table, column.id, column.cbmax as usize) {
                     Ok(ov) => {
                         match ov {
@@ -201,7 +230,7 @@ impl PyEseDb {
                     Err(e) => return Err(PyErr::new::<exceptions::PyTypeError, _>(e.as_str().to_string()))
                 }
             },
-            esent::JET_coltypText => {
+            ESE_coltypText => {
                 match self.jdb.get_column_dyn(table, column.id, column.cbmax as usize) {
                     Ok(ov) => {
                         match ov {
@@ -214,7 +243,7 @@ impl PyEseDb {
                     Err(e) => return Err(PyErr::new::<exceptions::PyTypeError, _>(e.as_str().to_string()))
                 }
             },
-            esent::JET_coltypLongText => {
+            ESE_coltypLongText => {
                 let d;
                 if column.cbmax == 0 {
                     d = self.jdb.get_column_dyn_varlen(table, column.id);
@@ -233,7 +262,7 @@ impl PyEseDb {
                     Err(e) => return Err(PyErr::new::<exceptions::PyTypeError, _>(e.as_str().to_string()))
                 }
             },
-            esent::JET_coltypLongBinary => {
+            ESE_coltypLongBinary => {
                 let d;
                 if column.cbmax == 0 {
                     d = self.jdb.get_column_dyn_varlen(table, column.id);
@@ -250,24 +279,15 @@ impl PyEseDb {
                     Err(e) => return Err(PyErr::new::<exceptions::PyTypeError, _>(e.as_str().to_string()))
                 }
             },
-            esent::JET_coltypGUID => {
+            ESE_coltypGUID => {
                 match self.jdb.get_column_dyn(table, column.id, column.cbmax as usize) {
                     Ok(ov) => {
                         match ov {
                             Some(v) => {
-                                unsafe {
-                                    let mut vstr : Vec<u16> = Vec::new();
-                                    vstr.resize(39, 0);
-                                    let r = StringFromGUID2(v.as_ptr() as *const std::os::raw::c_void,
-                                        vstr.as_mut_ptr() as *const u16, vstr.len() as i32);
-                                    if r > 0 {
-                                        let mut s = OsString::from_wide(&vstr).into_string().unwrap();
-                                        // remove new line
-                                        s.pop();
-                                        return Ok(Some(s.to_object(py)));
-                                    }
-                                }
-                                return Err(PyErr::new::<exceptions::PyTypeError, _>("StringFromGUID2 failed"));
+                                // {CD2C96BD-DCA8-47CB-B829-8F1AE4E2E686}
+                                let val = format!("{{{:02X}{:02X}{:02X}{:02X}-{:02X}{:02X}-{:02X}{:02X}-{:02X}{:02X}-{:02X}{:02X}{:02X}{:02X}{:02X}{:02X}}}",
+                                    v[3], v[2], v[1], v[0], v[5], v[4], v[7], v[6], v[8], v[9], v[10], v[11], v[12], v[13], v[14], v[15]);
+                                return Ok(Some(val.to_object(py)));
                             },
                             None => return Ok(None)
                         }
@@ -275,37 +295,21 @@ impl PyEseDb {
                     Err(e) => return Err(PyErr::new::<exceptions::PyTypeError, _>(e.as_str().to_string()))
                 }
             },
-            esent::JET_coltypDateTime => {
+            ESE_coltypDateTime => {
                 let ov = get::<f64>(self, table, column)?;
                 match ov {
                     Some(v) => {
-                        use winapi::um::minwinbase::SYSTEMTIME;
-                        use winapi::shared::minwindef::FILETIME;
-                        use winapi::shared::ntdef::LARGE_INTEGER;
-                        use winapi::um::oleauto::VariantTimeToSystemTime;
-                        use winapi::um::timezoneapi::SystemTimeToFileTime;
-                        use std::io::Error;
-                        unsafe {
-                        let mut st = std::mem::zeroed::<SYSTEMTIME>();
-                            let r = VariantTimeToSystemTime(v as winapi::shared::wtypesbase::DOUBLE, &mut st);
-                            if r == 1 {
-                                let mut ft = std::mem::zeroed::<FILETIME>();
-                                let r = SystemTimeToFileTime(&mut st, &mut ft);
-                                if r > 0 {
-                                    let mut li = std::mem::zeroed::<LARGE_INTEGER>();
-                                    let mut qli = li.s_mut();
-                                    qli.LowPart = ft.dwLowDateTime;
-                                    qli.HighPart = ft.dwHighDateTime as i32;
-                                    // January 1, 1970 (start of Unix epoch) in "ticks"
-                                    const UNIX_TIME_START : i64 = 0x019DB1DED53E8000;
-                                    // a tick is 100ns
-                                    const TICKS_PER_SECOND : i64 = 10000000;
-                                    let unix_timestamp = (li.QuadPart() - UNIX_TIME_START) / TICKS_PER_SECOND;
-                                    return Ok(Some(unix_timestamp.to_object(py)));
-                                }
-                            }
-                            return Err(PyErr::new::<exceptions::PyTypeError, _>(format!("failed with error: {}", Error::last_os_error())));
+                        let mut st = unsafe { std::mem::zeroed::<SYSTEMTIME>() };
+                        if VariantTimeToSystemTime(v, &mut st) {
+                            let myft = SystemTimeToFileTime(&st);
+                            // January 1, 1970 (start of Unix epoch) in "ticks"
+                            const UNIX_TIME_START : i64 = 0x019DB1DED53E8000;
+                            // a tick is 100ns
+                            const TICKS_PER_SECOND : i64 = 10000000;
+                            let unix_timestamp = (myft - UNIX_TIME_START) / TICKS_PER_SECOND;
+                            return Ok(Some(unix_timestamp.to_object(py)));
                         }
+                        return Err(PyErr::new::<exceptions::PyTypeError, _>("VariantTimeToSystemTime failed"));
                     },
                     None => return Ok(None)
                 }
