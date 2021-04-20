@@ -141,7 +141,6 @@ pub fn prepare_db(filename: &str, table: &str, pg_size: usize, record_size: usiz
     jettry!(JetCreateDatabaseA(db_client.sesid, dbpath.as_ptr(), ptr::null(), &mut db_client.dbid, 0));
 
     let mut columns = Vec::<JET_COLUMNCREATE_A>::with_capacity(5);
-    //columns.push(EseAPI::create_num_column("PK",JET_bitColumnAutoincrement));
     columns.push(EseAPI::create_text_column("compressed_unicode", ESE_CP::Unicode, JET_bitColumnCompressed));
     columns.push(EseAPI::create_text_column("compressed_ascii", ESE_CP::ASCII, JET_bitColumnCompressed));
     columns.push(EseAPI::create_binary_column("compressed_binary", JET_bitColumnCompressed));
