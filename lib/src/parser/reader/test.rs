@@ -8,14 +8,14 @@ use encoding::{all::UTF_8, Encoding};
 #[cfg(target_os = "windows")]
 use crate::parser::reader::gen_db::*;
 
-#[cfg(target_os = "linux")]
+#[cfg(not(target_os = "windows"))]
 pub fn prepare_db(filename: &str, table: &str, pg_size: usize, record_size: usize, records_cnt: usize) -> PathBuf {
     let mut dst_path = PathBuf::from("testdata").canonicalize().unwrap();
     dst_path.push("decompress_test.edb");
     dst_path
 }
 
-#[cfg(target_os = "linux")]
+#[cfg(not(target_os = "windows"))]
 pub fn clean_db(dst_path: &PathBuf) {
 }
 

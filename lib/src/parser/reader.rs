@@ -1038,7 +1038,7 @@ pub fn decompress_size(
     0
 }
 
-#[cfg(target_os = "linux")]
+#[cfg(not(target_os = "windows"))]
 pub fn decompress_size(
     v: &Vec<u8>
 ) -> u32 {
@@ -1061,7 +1061,7 @@ pub fn decompress_buf(
     Ok(buf)
 }
 
-#[cfg(target_os = "linux")]
+#[cfg(not(target_os = "windows"))]
 pub fn decompress_buf(
     v: &Vec<u8>,
     decompressed_size: u32
