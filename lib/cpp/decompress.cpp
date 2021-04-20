@@ -78,21 +78,12 @@ struct CDataCompressor {
         FOSSyncPreinit();
         ErrInit();
     }
-    ERR ErrInit(/* const INT cbMin, const INT cbMax */)
+    ERR ErrInit()
     {
         ERR err = JET_errSuccess;
 
-        //Assert( cbMin >= 0 );
-        //m_cbMin = cbMin;
-        //Assert( cbMax >= cbMin );
-        //m_cbMax = cbMax;
-
-        //m_cencodeCachedMax = OSSyncGetProcessorCountMax();
         m_cdecodeCachedMax = OSSyncGetProcessorCountMax();
 
-        //Assert( m_rgencodeXpress == NULL );
-        //Assert( m_rgdecodeXpress == NULL );
-        //Alloc( m_rgencodeXpress = new XpressEncodeStream[ m_cencodeCachedMax ]() );
         Alloc( m_rgdecodeXpress = new XpressDecodeStream[ m_cdecodeCachedMax ]() );
 
         #ifdef XPRESS9_COMPRESSION
@@ -105,8 +96,6 @@ struct CDataCompressor {
         return err;
 
     HandleError:
-        //delete[] m_rgencodeXpress;
-        //m_rgencodeXpress = NULL;
         delete[] m_rgdecodeXpress;
         m_rgdecodeXpress = NULL;
         #ifdef XPRESS9_COMPRESSION
