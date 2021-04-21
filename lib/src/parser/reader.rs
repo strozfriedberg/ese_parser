@@ -312,7 +312,7 @@ pub fn load_catalog(
         if db_page.flags().contains(jet::PageFlags::IS_LEAF) {
             page_number = db_page.page_number;
         } else {
-            return Err(SimpleError::new(format!("pageno {}: IS_PARENT (branch) flag should be present in {:?}",
+            return Err(SimpleError::new(format!("pageno {}: neither IS_PARENT nor IS_LEAF is present in {:?}",
                                                 db_page.page_number, db_page.flags())));
         }
     }
