@@ -11,7 +11,7 @@ use crate::parser::reader::gen_db::*;
 #[cfg(not(target_os = "windows"))]
 pub fn prepare_db(filename: &str, table: &str, pg_size: usize, record_size: usize, records_cnt: usize) -> PathBuf {
     let mut dst_path = PathBuf::from("testdata").canonicalize().unwrap();
-    dst_path.push("decompress_test.edb");
+    dst_path.push(filename);
     dst_path
 }
 
@@ -23,7 +23,15 @@ pub fn clean_db(dst_path: &PathBuf) {
 pub fn caching_test() -> Result<(), SimpleError> {
     let cache_size: usize = 10;
     let table = "test_table";
-    let path = prepare_db("caching_test.edb", table, 1024 * 8, 1024, 1000);
+    let test_db;
+    if cfg!(target_os = "windows") {
+        test_db = "caching_test.edb";
+    } else {
+        // On Linux, decompress_test.edb is fine for the purposes of this test
+        test_db = "decompress_test.edb";
+    }
+    println!("db {}", test_db);
+    let path = prepare_db(test_db, table, 1024 * 8, 1024, 1000);
     let mut reader = Reader::new(&path, cache_size as usize)?;
     let page_size = reader.page_size as u64;
     let num_of_pages = std::cmp::min(fs::metadata(&path).unwrap().len() / page_size, page_size) as usize;
