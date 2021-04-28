@@ -1,7 +1,9 @@
 import ese_parser
 import unittest, datetime
+import platform
 
 from datetime import datetime
+from platform import system
 
 class TestEseDbMethods(unittest.TestCase):
 	def test_test_db(self):
@@ -26,7 +28,7 @@ class TestEseDbMethods(unittest.TestCase):
 		self.assertEqual(edb.get_row(tbl, edb.get_column(t, "UnsignedLong")), 4294967295)
 		self.assertEqual(edb.get_row(tbl, edb.get_column(t, "LongLong")), 9223372036854775807)
 		self.assertEqual(edb.get_row(tbl, edb.get_column(t, "UnsignedShort")), 65535)
-		self.assertEqual(datetime.utcfromtimestamp(edb.get_row(tbl, edb.get_column(t, "DateTime"))), datetime(2021, 3, 2, 11, 11, 17))
+		self.assertEqual(datetime.utcfromtimestamp(edb.get_row(tbl, edb.get_column(t, "DateTime"))), datetime(2021, 3, 29, 11, 49, 47))
 		self.assertEqual(edb.get_row(tbl, edb.get_column(t, "GUID")), "{4D36E96E-E325-11CE-BFC1-08002BE10318}")
 
 		b = edb.get_row(tbl, edb.get_column(t, "Binary"))
@@ -56,11 +58,12 @@ class TestEseDbMethods(unittest.TestCase):
 			self.assertEqual(b[i], ord(h[ind]))
 			ind += 1
 
-		b = edb.get_row(tbl, edb.get_column(t, "LongText"))
-		ind = 0
-		for i in b:
-			self.assertEqual(i, abc[ind % len(abc)])
-			ind += 1
+		if system() == 'Windows':
+			b = edb.get_row(tbl, edb.get_column(t, "LongText"))
+			ind = 0
+			for i in b:
+				self.assertEqual(i, abc[ind % len(abc)])
+				ind += 1
 
 		edb.close_table(tbl)
 

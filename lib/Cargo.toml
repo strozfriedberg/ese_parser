@@ -7,9 +7,11 @@ edition = "2018"
 [lib]
 name = "ese_parser_lib"
 test = true
+doctest = false
 
 [target.'cfg(windows)'.build-dependencies]
 bindgen = "0.56.0"
+cc = { version = "1.0", features = ["parallel"] }
 
 [target.'cfg(windows)'.dependencies]
 winapi = { version = "0.3", features = ["timezoneapi"] }
@@ -25,5 +27,6 @@ log = "*"
 chrono = "*"
 cache_2q = "*"
 widestring = "*"
+encoding = "*"
 strum = {version = "*", features = ["derive"]}
 strum_macros = "*"

@@ -9,6 +9,26 @@ pub struct ColumnInfo {
     pub cp: u16
 }
 
+#[derive(Debug, PartialEq)]
+pub enum ESE_CP {
+    None = 0,
+    Unicode = 1200,
+    ASCII = 1252
+}
+
+impl std::convert::TryFrom<u16> for ESE_CP {
+    type Error = ();
+
+    fn try_from(v: u16) -> Result<Self, Self::Error> {
+        match v {
+            x if x == ESE_CP::None as u16 => Ok(ESE_CP::None),
+            x if x == ESE_CP::ASCII as u16 => Ok(ESE_CP::ASCII),
+            x if x == ESE_CP::Unicode as u16 => Ok(ESE_CP::Unicode),
+            _ => Err(()),
+        }
+    }
+}
+
 pub const ESE_coltypBit: u32 = 1;
 pub const ESE_coltypUnsignedByte: u32 = 2;
 pub const ESE_coltypShort: u32 = 3;

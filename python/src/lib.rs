@@ -6,6 +6,7 @@ use pyo3::exceptions;
 
 use ese_parser_lib::{ese_trait::*, ese_parser::*, vartime::*};
 use widestring::U16String;
+use std::convert::TryFrom;
 
 #[pyclass]
 pub struct PyEseDb {
@@ -235,7 +236,8 @@ impl PyEseDb {
                     Ok(ov) => {
                         match ov {
                             Some(v) => {
-                               return Ok(bytes_to_string(v, column.cp == 1200).map(|s| s.to_object(py)));
+                                let unicode = ESE_CP::try_from(column.cp) == Ok(ESE_CP::Unicode);
+                                return Ok(bytes_to_string(v, unicode).map(|s| s.to_object(py)));
                             }
                             None => return Ok(None)
                         }
@@ -254,7 +256,8 @@ impl PyEseDb {
                     Ok(ov) => {
                         match ov {
                             Some(v) => {
-                                return Ok(bytes_to_string(v, column.cp == 1200).map(|s| s.to_object(py)));
+                                let unicode = ESE_CP::try_from(column.cp) == Ok(ESE_CP::Unicode);
+                                return Ok(bytes_to_string(v, unicode).map(|s| s.to_object(py)));
                             }
                             None => return Ok(None)
                         }

@@ -7,6 +7,7 @@ use ese_parser_lib::{ese_trait::*, ese_parser::*, vartime::*};
 use std::mem::size_of;
 use simple_error::SimpleError;
 use widestring::U16String;
+use std::convert::TryFrom;
 
 const CACHE_SIZE_ENTRIES : usize = 10;
 
@@ -129,7 +130,7 @@ fn get_column_val(jdb: &Box<dyn EseDb>, table_id: u64, c: &ColumnInfo) -> Result
         ESE_coltypText => {
             match jdb.get_column_dyn(table_id, c.id, c.cbmax as usize)? {
                 Some(v) => {
-                    if c.cp == 1200 {
+                    if ESE_CP::try_from(c.cp) == Ok(ESE_CP::Unicode) {
                         let t = v.as_slice();
                         unsafe {
                             let (_, v16, _) = t.align_to::<u16>();
@@ -138,8 +139,10 @@ fn get_column_val(jdb: &Box<dyn EseDb>, table_id: u64, c: &ColumnInfo) -> Result
                             val = format!("{}", ws);
                         }
                     } else {
-                        let s = std::str::from_utf8(&v).unwrap();
-                        val = format!("{}", s);
+                        match std::str::from_utf8(&v) {
+                            Ok(s) => val = format!("{}", s),
+                            Err(e) => val = format!("from_utf8 failed: {}", e)
+                        }
                     }
                 },
                 None => {
@@ -156,7 +159,7 @@ fn get_column_val(jdb: &Box<dyn EseDb>, table_id: u64, c: &ColumnInfo) -> Result
             }
             match v {
                 Some(v) => {
-                    if c.cp == 1200 {
+                    if ESE_CP::try_from(c.cp) == Ok(ESE_CP::Unicode) {
                         let t = v.as_slice();
                         unsafe {
                             let (_, v16, _) = t.align_to::<u16>();
@@ -169,8 +172,10 @@ fn get_column_val(jdb: &Box<dyn EseDb>, table_id: u64, c: &ColumnInfo) -> Result
                             }
                         }
                     } else {
-                        let s = std::str::from_utf8(&v).unwrap();
-                        val = format!("{}", s);
+                        match std::str::from_utf8(&v) {
+                            Ok(s) => val = format!("{}", s),
+                            Err(e) => val = format!("from_utf8 failed: {}", e)
+                        }
                     }
                 },
                 None => {

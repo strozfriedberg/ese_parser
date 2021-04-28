@@ -1,0 +1,42 @@
+#!/usr/bin/env groovy
+pipeline {
+    agent {
+        node {
+            label "raven-windows"
+        }
+    }
+    stages {
+        stage('building library and running tests') {
+            steps {
+                dir("lib") {
+                    bat "cargo test --target x86_64-pc-windows-msvc"
+                }
+            }
+		}
+        stage('building app') {
+            steps {
+                dir("app") {
+                    bat "cargo build --target x86_64-pc-windows-msvc"
+                }
+            }
+        }
+        stage('building python wheel') {
+            steps {
+                dir("python") {
+                    bat "maturin build --target x86_64-pc-windows-msvc --interpreter python --release"
+                    bat "python -m venv test"
+                    bat "call test/Scripts/activate.bat"
+                    bat "pip install --force-reinstall target/wheels/ese_parser-0.1.0-cp36-abi3-win_amd64.whl"
+                    bat "python py/test.py"
+                    bat "call test/Scripts/deactivate.bat"
+                }
+            }
+        }
+
+    }
+    post {
+        always {
+            archiveArtifacts artifacts: 'app/target/x86_64-pc-windows-msvc/debug/ese_parser.exe, python/target/wheels/ese_parser-0.1.0-cp36-abi3-win_amd64.whl', onlyIfSuccessful: true
+        }
+    }
+}

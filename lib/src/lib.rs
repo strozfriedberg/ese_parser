@@ -73,13 +73,13 @@ fn test_edb_table_all_values() {
         let mut st = unsafe { std::mem::MaybeUninit::<vartime::SYSTEMTIME>::zeroed().assume_init() };
         let r = vartime::VariantTimeToSystemTime(dt, &mut st);
         assert_eq!(r, true);
-        assert_eq!(st.wDayOfWeek, 2);
-        assert_eq!(st.wDay, 2);
+        assert_eq!(st.wDayOfWeek, 1);
+        assert_eq!(st.wDay, 29);
         assert_eq!(st.wMonth, 3);
         assert_eq!(st.wYear, 2021);
         assert_eq!(st.wHour, 11);
-        assert_eq!(st.wMinute, 11);
-        assert_eq!(st.wSecond, 17);
+        assert_eq!(st.wMinute, 49);
+        assert_eq!(st.wSecond, 47);
         assert_eq!(st.wMilliseconds, 0);
     }
 
@@ -128,7 +128,7 @@ fn test_edb_table_all_values() {
     {
         let text = columns.iter().find(|x| x.name == "Text" ).unwrap();
         assert_eq!(text.cbmax, 255);
-        assert_eq!(text.cp, 1252);
+        assert_eq!(text.cp, ESE_CP::ASCII as u16);
 
         let str = jdb.get_column_str(table_id, text.id, text.cbmax as u32).unwrap().unwrap();
         let t = jdb.get_column_dyn(table_id, text.id, text.cbmax as usize).unwrap().unwrap();
@@ -147,11 +147,13 @@ fn test_edb_table_all_values() {
         }
     }
 
-    // LongText
+    // LongText (compressed)
+    // TODO remove cfg line if decompression will be available under Linux
+    #[cfg(target_os = "windows")]
     {
         let long_text = columns.iter().find(|x| x.name == "LongText" ).unwrap();
         assert_eq!(long_text.cbmax, 8600);
-        assert_eq!(long_text.cp, 1200);
+        assert_eq!(long_text.cp, ESE_CP::Unicode as u16);
 
         let lt = jdb.get_column_dyn_varlen(table_id, long_text.id).unwrap().unwrap();
         let s = lt.as_slice();
@@ -171,7 +173,7 @@ fn test_edb_table_all_values() {
     {
         let deftext = columns.iter().find(|x| x.name == "TextDefaultValue" ).unwrap();
         assert_eq!(deftext.cbmax, 255);
-        assert_eq!(deftext.cp, 1252);
+        assert_eq!(deftext.cp, ESE_CP::ASCII as u16);
         let str = jdb.get_column_str(table_id, deftext.id, deftext.cbmax as u32).unwrap().unwrap();
         let defval = "Default value.".to_string();
         assert_eq!(str.len()-1, defval.len());
