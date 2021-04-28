@@ -148,7 +148,7 @@ fn test_edb_table_all_values() {
     }
 
     // LongText (compressed)
-    // TODO comment if decompression will be available under Linux
+    // TODO remove cfg line if decompression will be available under Linux
     #[cfg(target_os = "windows")]
     {
         let long_text = columns.iter().find(|x| x.name == "LongText" ).unwrap();
