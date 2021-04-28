@@ -139,8 +139,10 @@ fn get_column_val(jdb: &Box<dyn EseDb>, table_id: u64, c: &ColumnInfo) -> Result
                             val = format!("{}", ws);
                         }
                     } else {
-                        let s = std::str::from_utf8(&v).unwrap();
-                        val = format!("{}", s);
+                        match std::str::from_utf8(&v) {
+                            Ok(s) => val = format!("{}", s),
+                            Err(e) => val = format!("from_utf8 failed: {}", e)
+                        }
                     }
                 },
                 None => {
@@ -170,8 +172,10 @@ fn get_column_val(jdb: &Box<dyn EseDb>, table_id: u64, c: &ColumnInfo) -> Result
                             }
                         }
                     } else {
-                        let s = std::str::from_utf8(&v).unwrap();
-                        val = format!("{}", s);
+                        match std::str::from_utf8(&v) {
+                            Ok(s) => val = format!("{}", s),
+                            Err(e) => val = format!("from_utf8 failed: {}", e)
+                        }
                     }
                 },
                 None => {
