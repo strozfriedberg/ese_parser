@@ -1,5 +1,6 @@
 //reader.rs
 use std::{fs, io, io::{Seek, Read}, mem, os::raw, path::PathBuf, ptr, slice, convert::TryInto, cell::RefCell};
+use std::collections::BTreeSet;
 use simple_error::SimpleError;
 use cache_2q::Cache;
 
@@ -488,16 +489,25 @@ pub fn clean_pgtag_flag(reader: &Reader, db_page: &jet::DbPage, data: u16) -> u1
     data
 }
 
-pub fn find_first_leaf_page(reader: &Reader, page_number: u32)
+pub fn find_first_leaf_page(reader: &Reader, mut page_number: u32)
     -> Result<u32, SimpleError> {
-    let db_page = jet::DbPage::new(reader, page_number)?;
-    if db_page.flags().contains(jet::PageFlags::IS_LEAF) {
-        return Ok(page_number);
-    }
+    let mut visited_pages : BTreeSet<u32> = BTreeSet::new();
+    loop {
+        if visited_pages.contains(&page_number) {
+            return Err(SimpleError::new(format!("Child page loop detected at page number {}, visited pages: {:?}",
+                page_number, visited_pages)));
+        }
 
-    let pg_tags = &db_page.page_tags;
-    let child_page_number = page_tag_get_branch_child_page_number(reader, &db_page, &pg_tags[1])?;
-    return find_first_leaf_page(reader, child_page_number);
+        let db_page = jet::DbPage::new(reader, page_number)?;
+        if db_page.flags().contains(jet::PageFlags::IS_LEAF) {
+            return Ok(page_number);
+        } else {
+            visited_pages.insert(page_number);
+        }
+
+        let pg_tags = &db_page.page_tags;
+        page_number = page_tag_get_branch_child_page_number(reader, &db_page, &pg_tags[1])?;
+    }
 }
 
 pub fn load_data(
