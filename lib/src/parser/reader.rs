@@ -1,5 +1,5 @@
 //reader.rs
-use std::{fs, io, io::{Seek, Read}, mem, path::PathBuf, ptr, slice, convert::TryInto, cell::RefCell};
+use std::{fs, io, io::{Seek, Read}, mem, path::PathBuf, slice, convert::TryInto, cell::RefCell};
 use std::collections::BTreeSet;
 use simple_error::SimpleError;
 use cache_2q::Cache;
@@ -12,9 +12,6 @@ use crate::parser::jet;
 mod gen_db;
 
 mod test;
-
-const JET_wrnBufferTruncated: u32 = 1006;
-const JET_errSuccess: u32 = 0;
 
 pub struct Reader {
     file: RefCell<fs::File>,
@@ -1039,8 +1036,10 @@ extern "C" {
 pub fn decompress_size(
     v: &Vec<u8>
 ) -> u32 {
+    const JET_wrnBufferTruncated: u32 = 1006;
+
     let mut decompressed: u32 = 0;
-    let res = unsafe { decompress(v.as_ptr(), v.len() as u32, ptr::null_mut(), 0, &mut decompressed) };
+    let res = unsafe { decompress(v.as_ptr(), v.len() as u32, std::ptr::null_mut(), 0, &mut decompressed) };
 
     if res == JET_wrnBufferTruncated && decompressed as usize > v.len() {
         return decompressed;
@@ -1050,7 +1049,7 @@ pub fn decompress_size(
 
 #[cfg(not(target_os = "windows"))]
 pub fn decompress_size(
-    v: &Vec<u8>
+    _v: &Vec<u8>
 ) -> u32 {
     0
 }
@@ -1060,6 +1059,7 @@ pub fn decompress_buf(
     v: &Vec<u8>,
     decompressed_size: u32
 ) -> Result<Vec<u8>, SimpleError> {
+    const JET_errSuccess: u32 = 0;
     let mut buf = Vec::<u8>::with_capacity(decompressed_size as usize);
     unsafe { buf.set_len(buf.capacity()); }
     let mut decompressed : u32 = 0;
@@ -1073,8 +1073,8 @@ pub fn decompress_buf(
 
 #[cfg(not(target_os = "windows"))]
 pub fn decompress_buf(
-    v: &Vec<u8>,
-    decompressed_size: u32
+    _v: &Vec<u8>,
+    _decompressed_size: u32
 ) -> Result<Vec<u8>, SimpleError> {
     Err(SimpleError::new("TODO: Decompression is not implemented."))
 }
