@@ -58,8 +58,9 @@ impl EseAPI {
     }
 
     fn set_system_parameter_sz(paramId : u32, szParam: &str) -> bool {
+        let strParam = CString::new(szParam).unwrap();
         unsafe {
-            let err = JetSetSystemParameterA(std::ptr::null_mut(), 0, paramId, 0, CString::new(szParam).unwrap().as_ptr()) as u32;
+            let err = JetSetSystemParameterA(std::ptr::null_mut(), 0, paramId, 0, strParam.as_ptr()) as u32;
             err == JET_errSuccess
         }
     }

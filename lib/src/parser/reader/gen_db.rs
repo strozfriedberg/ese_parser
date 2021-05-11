@@ -1,7 +1,8 @@
 #![cfg(target_os = "windows")]
+#![cfg(test)]
 
 use super::*;
-use std::{str, ffi::CString, mem::size_of};
+use std::{str, ffi::CString, mem::size_of, os::raw};
 use crate::esent::esent::*;
 use encoding::{all::{ASCII, UTF_16LE, UTF_8}, Encoding, EncoderTrap};
 use crate::ese_trait::ESE_CP;
@@ -55,7 +56,8 @@ impl EseAPI {
     }
 
     fn set_system_parameter_sz(paramId : u32, szParam: &str) {
-        jettry!(JetSetSystemParameterA(ptr::null_mut(), 0, paramId, 0, CString::new(szParam).unwrap().as_ptr()));
+        let strParam = CString::new(szParam).unwrap();
+        jettry!(JetSetSystemParameterA(ptr::null_mut(), 0, paramId, 0, strParam.as_ptr()));
     }
 
     fn create_column(name: &str, col_type: JET_COLTYP, cp: ESE_CP, grbit: JET_GRBIT) -> JET_COLUMNCREATE_A {

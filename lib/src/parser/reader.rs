@@ -1,5 +1,5 @@
 //reader.rs
-use std::{fs, io, io::{Seek, Read}, mem, os::raw, path::PathBuf, ptr, slice, convert::TryInto, cell::RefCell};
+use std::{fs, io, io::{Seek, Read}, mem, path::PathBuf, ptr, slice, convert::TryInto, cell::RefCell};
 use std::collections::BTreeSet;
 use simple_error::SimpleError;
 use cache_2q::Cache;
@@ -1040,7 +1040,7 @@ pub fn decompress_size(
     v: &Vec<u8>
 ) -> u32 {
     let mut decompressed: u32 = 0;
-    let mut res = unsafe { decompress(v.as_ptr(), v.len() as u32, ptr::null_mut(), 0, &mut decompressed) };
+    let res = unsafe { decompress(v.as_ptr(), v.len() as u32, ptr::null_mut(), 0, &mut decompressed) };
 
     if res == JET_wrnBufferTruncated && decompressed as usize > v.len() {
         return decompressed;
