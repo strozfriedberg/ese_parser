@@ -2,7 +2,7 @@
 #![cfg(test)]
 
 use super::*;
-use std::{str, ffi::CString, mem::size_of, os::raw};
+use std::{str, ffi::CString, mem::size_of, os::raw, ptr};
 use crate::esent::esent::*;
 use encoding::{all::{ASCII, UTF_16LE, UTF_8}, Encoding, EncoderTrap};
 use crate::ese_trait::ESE_CP;
