@@ -671,6 +671,36 @@ pub fn load_data(
     Err(SimpleError::new(format!("column {} not found", column_id)))
 }
 
+fn init_tag_state(
+    tag_state: &mut tagged_data_state,
+    reader: &Reader,
+    var_state: variable_size_data_state,
+    offset: &mut u64,
+    offset_ddh : u64,
+    record_data_size: u64,
+) -> Result<Option<Vec<u8>>, SimpleError> {
+    tag_state.types_offset = var_state.value_offset;
+    tag_state.remaining_definition_data_size =
+        ((record_data_size - tag_state.types_offset as u64) as u16).try_into().unwrap();
+
+    *offset = offset_ddh + tag_state.types_offset as u64;
+
+    if tag_state.remaining_definition_data_size > 0 {
+        tag_state.identifier = reader.read_struct::<u16>(*offset)?;
+        *offset += 2;
+
+        tag_state.type_offset = reader.read_struct::<u16>(*offset)?;
+        *offset += 2;
+
+        if tag_state.type_offset == 0 {
+            return Err(SimpleError::new("tag_state.type_offset == 0"));
+        }
+        tag_state.offset_data_size = (tag_state.type_offset & 0x3fff) - 4;
+        tag_state.remaining_definition_data_size -= 4;
+    }
+    Ok(None)
+}
+
 fn load_tagged_data_linear(
     reader: &Reader,
     lv_tags: &Vec<LV_tags>,
@@ -684,25 +714,7 @@ fn load_tagged_data_linear(
     multi_value_index: usize,
 ) -> Result<Option<Vec<u8>>, SimpleError> {
     if tag_state.types_offset == 0 {
-        tag_state.types_offset = var_state.value_offset;
-        tag_state.remaining_definition_data_size =
-            ((record_data_size - tag_state.types_offset as u64) as u16).try_into().unwrap();
-
-        *offset = offset_ddh + tag_state.types_offset as u64;
-
-        if tag_state.remaining_definition_data_size > 0 {
-            tag_state.identifier = reader.read_struct::<u16>(*offset)?;
-            *offset += 2;
-
-            tag_state.type_offset = reader.read_struct::<u16>(*offset)?;
-            *offset += 2;
-
-            if tag_state.type_offset == 0 {
-                return Err(SimpleError::new("tag_state.type_offset == 0"));
-            }
-            tag_state.offset_data_size = (tag_state.type_offset & 0x3fff) - 4;
-            tag_state.remaining_definition_data_size -= 4;
-        }
+        init_tag_state(tag_state, reader, *var_state, offset, offset_ddh, record_data_size)?;
     }
     if tag_state.remaining_definition_data_size > 0 && col.identifier == tag_state.identifier as u32 {
         let previous_tagged_data_type_offset = tag_state.type_offset;
@@ -748,37 +760,58 @@ fn load_tagged_data_linear(
         }
         if tagged_data_type_size > 0 && col.identifier == column_id {
             *offset = offset_ddh + tagged_data_type_value_offset as u64;
-            let mut v = Vec::new();
-
-            use jet::ColumnFlags;
-            use jet::TaggedDataTypeFlag;
-
-            let col_flag = ColumnFlags::from_bits_truncate(col.flags);
-            let compressed = col_flag.intersects(ColumnFlags::Compressed);
-            let dtf = TaggedDataTypeFlag::from_bits_truncate(data_type_flags as u16);
-            if dtf.intersects(TaggedDataTypeFlag::LONG_VALUE) {
-                let key = reader.read_struct::<u32>(*offset)?;
-                v = load_lv_data(reader, &lv_tags, key, compressed)?;
-            } else if dtf.intersects(TaggedDataTypeFlag::MULTI_VALUE | TaggedDataTypeFlag::MULTI_VALUE_OFFSET) {
-                let mv = read_multi_value(
-                    &reader, *offset, tagged_data_type_size, &dtf, multi_value_index, &lv_tags, compressed)?;
-                if let Some(mv_data) = mv {
-                    v = mv_data;
+            match load_tagged_column(reader, lv_tags, col, *offset, tagged_data_type_size, data_type_flags,
+                multi_value_index) {
+                Err(e) => return Err(e),
+                Ok(r) => {
+                    if r.is_some() {
+                        return Ok(r);
+                    }
                 }
-            } else if dtf.intersects(jet::TaggedDataTypeFlag::COMPRESSED) {
-                v = reader.read_bytes(*offset, tagged_data_type_size as usize)?;
-                let dsize = decompress_size(&v);
-                if dsize > 0 {
-                    v = decompress_buf(&v, dsize)?;
-                }
-            } else {
-                v = reader.read_bytes(*offset, tagged_data_type_size as usize)?;
-            }
-
-            if v.len() > 0 {
-                return Ok(Some(v));
             }
         }
+    }
+    Ok(None)
+}
+
+fn load_tagged_column(
+    reader: &Reader,
+    lv_tags: &Vec<LV_tags>,
+    col: &jet::CatalogDefinition,
+    offset : u64,
+    tagged_data_type_size: u16,
+    data_type_flags: u8,
+    multi_value_index: usize,
+) -> Result<Option<Vec<u8>>, SimpleError> {
+    let mut v = Vec::new();
+
+    use jet::ColumnFlags;
+    use jet::TaggedDataTypeFlag;
+
+    let col_flag = ColumnFlags::from_bits_truncate(col.flags);
+    let compressed = col_flag.intersects(ColumnFlags::Compressed);
+    let dtf = TaggedDataTypeFlag::from_bits_truncate(data_type_flags as u16);
+    if dtf.intersects(TaggedDataTypeFlag::LONG_VALUE) {
+        let key = reader.read_struct::<u32>(offset)?;
+        v = load_lv_data(reader, &lv_tags, key, compressed)?;
+    } else if dtf.intersects(TaggedDataTypeFlag::MULTI_VALUE | TaggedDataTypeFlag::MULTI_VALUE_OFFSET) {
+        let mv = read_multi_value(
+            &reader, offset, tagged_data_type_size, &dtf, multi_value_index, &lv_tags, compressed)?;
+        if let Some(mv_data) = mv {
+            v = mv_data;
+        }
+    } else if dtf.intersects(jet::TaggedDataTypeFlag::COMPRESSED) {
+        v = reader.read_bytes(offset, tagged_data_type_size as usize)?;
+        let dsize = decompress_size(&v);
+        if dsize > 0 {
+            v = decompress_buf(&v, dsize)?;
+        }
+    } else {
+        v = reader.read_bytes(offset, tagged_data_type_size as usize)?;
+    }
+
+    if v.len() > 0 {
+        return Ok(Some(v));
     }
     Ok(None)
 }
