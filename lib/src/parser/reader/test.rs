@@ -1,3 +1,5 @@
+#![cfg(test)]
+
 use super::*;
 use std::collections::HashSet;
 use std::convert::TryFrom;
@@ -45,7 +47,7 @@ pub fn caching_test() -> Result<(), SimpleError> {
 
     for pass in 1..3 {
         for pg_no in 1_u32..12_u32 {
-            let offset: u64 = (pg_no as u64 * (page_size + chunk_size as u64));
+            let offset: u64 = pg_no as u64 * (page_size + chunk_size as u64);
 
             println!("pass {}, pg_no {}, offset {:x} ", pass, pg_no, offset);
 

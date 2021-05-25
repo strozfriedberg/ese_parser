@@ -1,5 +1,5 @@
 //reader.rs
-use std::{fs, io, io::{Seek, Read}, mem, os::raw, path::PathBuf, ptr, slice, convert::TryInto, cell::RefCell};
+use std::{fs, io, io::{Seek, Read}, mem, path::PathBuf, slice, convert::TryInto, cell::RefCell};
 use std::collections::BTreeSet;
 use simple_error::SimpleError;
 use cache_2q::Cache;
@@ -12,9 +12,6 @@ use crate::parser::jet;
 mod gen_db;
 
 mod test;
-
-const JET_wrnBufferTruncated: u32 = 1006;
-const JET_errSuccess: u32 = 0;
 
 pub struct Reader {
     file: RefCell<fs::File>,
@@ -510,6 +507,22 @@ pub fn find_first_leaf_page(reader: &Reader, mut page_number: u32)
     }
 }
 
+#[derive(Copy, Clone, Debug, Default)]
+struct tagged_data_state {
+    pub identifier : u16,
+    pub types_offset : u16,
+    pub type_offset : u16,
+    pub offset_data_size : u16,
+    pub remaining_definition_data_size : u16
+}
+
+#[derive(Copy, Clone, Debug, Default)]
+struct variable_size_data_state {
+    pub current_type : u32,
+    pub type_offset : u16,
+    pub value_offset : u16
+}
+
 pub fn load_data(
     reader: &Reader,
     tbl_def: &jet::TableDefinition,
@@ -571,11 +584,7 @@ pub fn load_data(
             fixed_data_bits_mask_size)?;
     }
 
-    let mut tagged_data_type_identifier : u16 = 0;
-    let mut tagged_data_types_offset : u16 = 0;
-    let mut tagged_data_type_offset : u16 = 0;
-    let mut tagged_data_type_offset_data_size : u16 = 0;
-    let mut remaining_definition_data_size : u16 = 0;
+    let mut tag_state : tagged_data_state = Default::default();
     let mut previous_variable_size_data_type_size : u16 = 0;
 
     let number_of_variable_size_data_types : u16;
@@ -585,9 +594,10 @@ pub fn load_data(
         number_of_variable_size_data_types = 0;
     }
 
-    let mut current_variable_size_data_type : u32 = 127;
-    let mut variable_size_data_type_offset = ddh.variable_size_data_types_offset;
-    let mut variable_size_data_type_value_offset : u16 =
+    let mut var_state : variable_size_data_state = Default::default();
+    var_state.current_type = 127;
+    var_state.type_offset = ddh.variable_size_data_types_offset;
+    var_state.value_offset =
         (ddh.variable_size_data_types_offset + (number_of_variable_size_data_types * 2)).try_into().unwrap();
     for j in 0..tbl_def.column_catalog_definition_array.len() {
         let col = &tbl_def.column_catalog_definition_array[j];
@@ -607,26 +617,26 @@ pub fn load_data(
                 // no value in tag
                 return Ok(None);
             }
-        } else if current_variable_size_data_type < ddh.last_variable_size_data_type as u32 {
+        } else if var_state.current_type < ddh.last_variable_size_data_type as u32 {
             // variable size
-            while current_variable_size_data_type < col.identifier {
-                let variable_size_data_type_size : u16 = reader.read_struct(offset_ddh + variable_size_data_type_offset as u64)?;
-                variable_size_data_type_offset += 2;
-                current_variable_size_data_type += 1;
-                if current_variable_size_data_type == col.identifier {
+            while var_state.current_type < col.identifier {
+                let variable_size_data_type_size : u16 = reader.read_struct(offset_ddh + var_state.type_offset as u64)?;
+                var_state.type_offset += 2;
+                var_state.current_type += 1;
+                if var_state.current_type == col.identifier {
                     if (variable_size_data_type_size & 0x8000) == 0 {
 
                         if col.identifier == column_id {
-                            let v = reader.read_bytes(offset_ddh + variable_size_data_type_value_offset as u64,
+                            let v = reader.read_bytes(offset_ddh + var_state.value_offset as u64,
                                 (variable_size_data_type_size - previous_variable_size_data_type_size) as usize)?;
                             return Ok(Some(v));
                         }
 
-                        variable_size_data_type_value_offset += variable_size_data_type_size - previous_variable_size_data_type_size;
+                        var_state.value_offset += variable_size_data_type_size - previous_variable_size_data_type_size;
                         previous_variable_size_data_type_size = variable_size_data_type_size;
                     }
                 }
-                if current_variable_size_data_type >= ddh.last_variable_size_data_type as u32 {
+                if var_state.current_type >= ddh.last_variable_size_data_type as u32 {
                     break;
                 }
             }
@@ -634,102 +644,14 @@ pub fn load_data(
             // tagged
             if tagged_data_types_format == jet::TaggedDataTypesFormats::Linear {
                 // TODO
-                println!("TODO tagged_data_types_format == jet::TaggedDataTypesFormats::Linear");
+                println!("TODO tagged_data_types_format ==-- jet::TaggedDataTypesFormats::Linear");
             } else if tagged_data_types_format == jet::TaggedDataTypesFormats::Index {
-                if tagged_data_types_offset == 0 {
-                    tagged_data_types_offset = variable_size_data_type_value_offset;
-                    remaining_definition_data_size =
-                        ((record_data_size - tagged_data_types_offset as u64) as u16).try_into().unwrap();
-
-                    offset = offset_ddh + tagged_data_types_offset as u64;
-
-                    if remaining_definition_data_size > 0 {
-                        tagged_data_type_identifier = reader.read_struct::<u16>(offset)?;
-                        offset += 2;
-
-                        tagged_data_type_offset = reader.read_struct::<u16>(offset)?;
-                        offset += 2;
-
-                        if tagged_data_type_offset == 0 {
-                            return Err(SimpleError::new("tagged_data_type_offset == 0"));
-                        }
-                        tagged_data_type_offset_data_size = (tagged_data_type_offset & 0x3fff) - 4;
-                        remaining_definition_data_size -= 4;
-                    }
-                }
-                if remaining_definition_data_size > 0 && col.identifier == tagged_data_type_identifier as u32 {
-                    let previous_tagged_data_type_offset = tagged_data_type_offset;
-                    if tagged_data_type_offset_data_size > 0 {
-                        tagged_data_type_identifier = reader.read_struct::<u16>(offset)?;
-                        offset += 2;
-
-                        tagged_data_type_offset = reader.read_struct::<u16>(offset)?;
-                        offset += 2;
-
-                        tagged_data_type_offset_data_size -= 4;
-                        remaining_definition_data_size    -= 4;
-                    }
-
-                    let tagged_data_type_offset_bitmask : u16;
-                    if reader.format_revision >= ESEDB_FORMAT_REVISION_EXTENDED_PAGE_HEADER && reader.page_size >= 16384 {
-                        tagged_data_type_offset_bitmask = 0x7fff;
-                    } else {
-                        tagged_data_type_offset_bitmask = 0x3fff;
-                    }
-                    let masked_previous_tagged_data_type_offset : u16 =
-                        previous_tagged_data_type_offset & tagged_data_type_offset_bitmask;
-                    let masked_tagged_data_type_offset = tagged_data_type_offset & tagged_data_type_offset_bitmask;
-
-                    let mut tagged_data_type_size;
-                    if masked_tagged_data_type_offset > masked_previous_tagged_data_type_offset {
-                        tagged_data_type_size = masked_tagged_data_type_offset - masked_previous_tagged_data_type_offset;
-                    } else {
-                        tagged_data_type_size = remaining_definition_data_size;
-                    }
-                    let mut tagged_data_type_value_offset = tagged_data_types_offset + masked_previous_tagged_data_type_offset;
-                    let mut data_type_flags : u8 = 0;
-                    if tagged_data_type_size > 0 {
-                        remaining_definition_data_size -= tagged_data_type_size;
-                        if (reader.format_revision >= ESEDB_FORMAT_REVISION_EXTENDED_PAGE_HEADER &&
-                            reader.page_size >= 16384) || (previous_tagged_data_type_offset & 0x4000 ) != 0
-                        {
-                            data_type_flags = reader.read_struct(offset_ddh + tagged_data_type_value_offset as u64)?;
-
-                            tagged_data_type_value_offset += 1;
-                            tagged_data_type_size         -= 1;
-                        }
-                    }
-                    if tagged_data_type_size > 0 && col.identifier == column_id {
-                        offset = offset_ddh + tagged_data_type_value_offset as u64;
-                        let mut v = Vec::new();
-
-                        use jet::ColumnFlags;
-                        use jet::TaggedDataTypeFlag;
-
-                        let col_flag = ColumnFlags::from_bits_truncate(col.flags);
-                        let compressed = col_flag.intersects(ColumnFlags::Compressed);
-                        let dtf = TaggedDataTypeFlag::from_bits_truncate(data_type_flags as u16);
-                        if dtf.intersects(TaggedDataTypeFlag::LONG_VALUE) {
-                            let key = reader.read_struct::<u32>(offset)?;
-                            v = load_lv_data(reader, &lv_tags, key, compressed)?;
-                        } else if dtf.intersects(TaggedDataTypeFlag::MULTI_VALUE | TaggedDataTypeFlag::MULTI_VALUE_OFFSET) {
-                            let mv = read_multi_value(
-                                &reader, offset, tagged_data_type_size, &dtf, multi_value_index, &lv_tags, compressed)?;
-                            if let Some(mv_data) = mv {
-                                v = mv_data;
-                            }
-                        } else if dtf.intersects(jet::TaggedDataTypeFlag::COMPRESSED) {
-                            v = reader.read_bytes(offset, tagged_data_type_size as usize)?;
-                            let dsize = decompress_size(&v);
-                            if dsize > 0 {
-                                v = decompress_buf(&v, dsize)?;
-                            }
-                        } else {
-                            v = reader.read_bytes(offset, tagged_data_type_size as usize)?;
-                        }
-
-                        if v.len() > 0 {
-                            return Ok(Some(v));
+                match load_tagged_data_linear(&reader, &lv_tags, &col, column_id, &mut tag_state, &mut var_state,
+                    &mut offset, offset_ddh, record_data_size, multi_value_index) {
+                    Err(e) => return Err(e),
+                    Ok(r) => {
+                        if r.is_some() {
+                            return Ok(r);
                         }
                     }
                 }
@@ -747,6 +669,151 @@ pub fn load_data(
     }
 
     Err(SimpleError::new(format!("column {} not found", column_id)))
+}
+
+fn init_tag_state(
+    tag_state: &mut tagged_data_state,
+    reader: &Reader,
+    var_state: variable_size_data_state,
+    offset: &mut u64,
+    offset_ddh : u64,
+    record_data_size: u64,
+) -> Result<Option<Vec<u8>>, SimpleError> {
+    tag_state.types_offset = var_state.value_offset;
+    tag_state.remaining_definition_data_size =
+        ((record_data_size - tag_state.types_offset as u64) as u16).try_into().unwrap();
+
+    *offset = offset_ddh + tag_state.types_offset as u64;
+
+    if tag_state.remaining_definition_data_size > 0 {
+        tag_state.identifier = reader.read_struct::<u16>(*offset)?;
+        *offset += 2;
+
+        tag_state.type_offset = reader.read_struct::<u16>(*offset)?;
+        *offset += 2;
+
+        if tag_state.type_offset == 0 {
+            return Err(SimpleError::new("tag_state.type_offset == 0"));
+        }
+        tag_state.offset_data_size = (tag_state.type_offset & 0x3fff) - 4;
+        tag_state.remaining_definition_data_size -= 4;
+    }
+    Ok(None)
+}
+
+fn load_tagged_data_linear(
+    reader: &Reader,
+    lv_tags: &Vec<LV_tags>,
+    col: &jet::CatalogDefinition,
+    column_id: u32,
+    tag_state: &mut tagged_data_state,
+    var_state: &mut variable_size_data_state,
+    offset : &mut u64,
+    offset_ddh : u64,
+    record_data_size: u64,
+    multi_value_index: usize,
+) -> Result<Option<Vec<u8>>, SimpleError> {
+    if tag_state.types_offset == 0 {
+        init_tag_state(tag_state, reader, *var_state, offset, offset_ddh, record_data_size)?;
+    }
+    if tag_state.remaining_definition_data_size > 0 && col.identifier == tag_state.identifier as u32 {
+        let previous_tagged_data_type_offset = tag_state.type_offset;
+        if tag_state.offset_data_size > 0 {
+            tag_state.identifier = reader.read_struct::<u16>(*offset)?;
+            *offset += 2;
+
+            tag_state.type_offset = reader.read_struct::<u16>(*offset)?;
+            *offset += 2;
+
+            tag_state.offset_data_size -= 4;
+            tag_state.remaining_definition_data_size    -= 4;
+        }
+
+        let tagged_data_type_offset_bitmask : u16;
+        if reader.format_revision >= ESEDB_FORMAT_REVISION_EXTENDED_PAGE_HEADER && reader.page_size >= 16384 {
+            tagged_data_type_offset_bitmask = 0x7fff;
+        } else {
+            tagged_data_type_offset_bitmask = 0x3fff;
+        }
+        let masked_previous_tagged_data_type_offset : u16 =
+            previous_tagged_data_type_offset & tagged_data_type_offset_bitmask;
+        let masked_tagged_data_type_offset = tag_state.type_offset & tagged_data_type_offset_bitmask;
+
+        let mut tagged_data_type_size;
+        if masked_tagged_data_type_offset > masked_previous_tagged_data_type_offset {
+            tagged_data_type_size = masked_tagged_data_type_offset - masked_previous_tagged_data_type_offset;
+        } else {
+            tagged_data_type_size = tag_state.remaining_definition_data_size;
+        }
+        let mut tagged_data_type_value_offset = tag_state.types_offset + masked_previous_tagged_data_type_offset;
+        let mut data_type_flags : u8 = 0;
+        if tagged_data_type_size > 0 {
+            tag_state.remaining_definition_data_size -= tagged_data_type_size;
+            if (reader.format_revision >= ESEDB_FORMAT_REVISION_EXTENDED_PAGE_HEADER &&
+                reader.page_size >= 16384) || (previous_tagged_data_type_offset & 0x4000 ) != 0
+            {
+                data_type_flags = reader.read_struct(offset_ddh + tagged_data_type_value_offset as u64)?;
+
+                tagged_data_type_value_offset += 1;
+                tagged_data_type_size         -= 1;
+            }
+        }
+        if tagged_data_type_size > 0 && col.identifier == column_id {
+            *offset = offset_ddh + tagged_data_type_value_offset as u64;
+            match load_tagged_column(reader, lv_tags, col, *offset, tagged_data_type_size, data_type_flags,
+                multi_value_index) {
+                Err(e) => return Err(e),
+                Ok(r) => {
+                    if r.is_some() {
+                        return Ok(r);
+                    }
+                }
+            }
+        }
+    }
+    Ok(None)
+}
+
+fn load_tagged_column(
+    reader: &Reader,
+    lv_tags: &Vec<LV_tags>,
+    col: &jet::CatalogDefinition,
+    offset : u64,
+    tagged_data_type_size: u16,
+    data_type_flags: u8,
+    multi_value_index: usize,
+) -> Result<Option<Vec<u8>>, SimpleError> {
+    let mut v = Vec::new();
+
+    use jet::ColumnFlags;
+    use jet::TaggedDataTypeFlag;
+
+    let col_flag = ColumnFlags::from_bits_truncate(col.flags);
+    let compressed = col_flag.intersects(ColumnFlags::Compressed);
+    let dtf = TaggedDataTypeFlag::from_bits_truncate(data_type_flags as u16);
+    if dtf.intersects(TaggedDataTypeFlag::LONG_VALUE) {
+        let key = reader.read_struct::<u32>(offset)?;
+        v = load_lv_data(reader, &lv_tags, key, compressed)?;
+    } else if dtf.intersects(TaggedDataTypeFlag::MULTI_VALUE | TaggedDataTypeFlag::MULTI_VALUE_OFFSET) {
+        let mv = read_multi_value(
+            &reader, offset, tagged_data_type_size, &dtf, multi_value_index, &lv_tags, compressed)?;
+        if let Some(mv_data) = mv {
+            v = mv_data;
+        }
+    } else if dtf.intersects(jet::TaggedDataTypeFlag::COMPRESSED) {
+        v = reader.read_bytes(offset, tagged_data_type_size as usize)?;
+        let dsize = decompress_size(&v);
+        if dsize > 0 {
+            v = decompress_buf(&v, dsize)?;
+        }
+    } else {
+        v = reader.read_bytes(offset, tagged_data_type_size as usize)?;
+    }
+
+    if v.len() > 0 {
+        return Ok(Some(v));
+    }
+    Ok(None)
 }
 
 fn read_multi_value(
@@ -1039,8 +1106,10 @@ extern "C" {
 pub fn decompress_size(
     v: &Vec<u8>
 ) -> u32 {
+    const JET_wrnBufferTruncated: u32 = 1006;
+
     let mut decompressed: u32 = 0;
-    let mut res = unsafe { decompress(v.as_ptr(), v.len() as u32, ptr::null_mut(), 0, &mut decompressed) };
+    let res = unsafe { decompress(v.as_ptr(), v.len() as u32, std::ptr::null_mut(), 0, &mut decompressed) };
 
     if res == JET_wrnBufferTruncated && decompressed as usize > v.len() {
         return decompressed;
@@ -1050,7 +1119,7 @@ pub fn decompress_size(
 
 #[cfg(not(target_os = "windows"))]
 pub fn decompress_size(
-    v: &Vec<u8>
+    _v: &Vec<u8>
 ) -> u32 {
     0
 }
@@ -1060,6 +1129,7 @@ pub fn decompress_buf(
     v: &Vec<u8>,
     decompressed_size: u32
 ) -> Result<Vec<u8>, SimpleError> {
+    const JET_errSuccess: u32 = 0;
     let mut buf = Vec::<u8>::with_capacity(decompressed_size as usize);
     unsafe { buf.set_len(buf.capacity()); }
     let mut decompressed : u32 = 0;
@@ -1073,8 +1143,8 @@ pub fn decompress_buf(
 
 #[cfg(not(target_os = "windows"))]
 pub fn decompress_buf(
-    v: &Vec<u8>,
-    decompressed_size: u32
+    _v: &Vec<u8>,
+    _decompressed_size: u32
 ) -> Result<Vec<u8>, SimpleError> {
     Err(SimpleError::new("TODO: Decompression is not implemented."))
 }
