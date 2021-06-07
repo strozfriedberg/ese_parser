@@ -266,7 +266,7 @@ fn dump_table(jdb: &Box<dyn EseDb>, t: &str)
     -> Result<Option<(/*cols:*/Vec<ColumnInfo>, /*rows:*/Vec<Vec<String>>)>, SimpleError> {
     let table_id = jdb.open_table(&t)?;
     let cols = jdb.get_columns(&t)?;
-    if !jdb.move_row(table_id, ESE_MoveFirst as u32) {
+    if !jdb.move_row(table_id, ESE_MoveFirst) {
         // empty table
         return Ok(None);
     }

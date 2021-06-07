@@ -376,7 +376,7 @@ impl EseDb for EseAPI {
                     cp: col_cp
                 });
 
-                if !self.move_row(subtable_id, ESE_MoveNext as u32) {
+                if !self.move_row(subtable_id, ESE_MoveNext) {
                     break;
                 }
             }
