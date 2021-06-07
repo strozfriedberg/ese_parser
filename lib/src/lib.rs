@@ -148,8 +148,6 @@ fn test_edb_table_all_values() {
     }
 
     // LongText (compressed)
-    // TODO remove cfg line if decompression will be available under Linux
-    #[cfg(target_os = "windows")]
     {
         let long_text = columns.iter().find(|x| x.name == "LongText" ).unwrap();
         assert_eq!(long_text.cbmax, 8600);

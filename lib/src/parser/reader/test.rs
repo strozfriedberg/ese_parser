@@ -97,11 +97,23 @@ fn check_row(jdb: &mut EseParser, table_id: u64, columns: &Vec<ColumnInfo>) -> H
     values
 }
 
-#[cfg(target_os = "windows")]
 #[test]
-pub fn decompress_test() -> Result<(), SimpleError> {
+pub fn decompress_test_7bit() -> Result<(), SimpleError> {
+	// if record size < 1024 - 7 bit compression is used
+	run_decompress_test("decompress_test.edb", 10)?;
+	Ok(())
+}
+
+#[test]
+pub fn decompress_test_lzxpress() -> Result<(), SimpleError> {
+	// if record size > 1024 - lzxpress compression is used
+	run_decompress_test("decompress_test2.edb", 2048)?;
+	Ok(())
+}
+
+pub fn run_decompress_test(filename: &str, record_size : usize) -> Result<(), SimpleError> {
     let table = "test_table";
-    let path = prepare_db("decompress_test.edb", table, 1024 * 8, 10, 10);
+    let path = prepare_db(filename, table, 1024 * 8, record_size, 10);
     let mut jdb : EseParser = EseParser::init(5);
 
     match jdb.load(&path.to_str().unwrap()) {
@@ -114,17 +126,15 @@ pub fn decompress_test() -> Result<(), SimpleError> {
 
     assert!(jdb.move_row(table_id, ESE_MoveFirst));
 
-    for rec_no in 0.. {
-        let values = check_row(&mut jdb, table_id, &columns);
-
-        println!("{}: {:?}", rec_no, values);
-        assert_eq!(values.len(), 1);
-
-        if !jdb.move_row(table_id, ESE_MoveNext) {
-            break;
-        }
+    for i in 0.. {
+		let values = check_row(&mut jdb, table_id, &columns);
+		assert_eq!(values.len(), 1);
+		let v = format!("Record {number:>width$}", number=i, width=record_size);
+		assert_eq!(values.contains(&v), true);
+		if !jdb.move_row(table_id, ESE_MoveNext) {
+			break;
+		}
     }
     clean_db(&path);
     Ok(())
 }
-
