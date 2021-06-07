@@ -7,6 +7,7 @@ use cache_2q::Cache;
 use crate::parser::ese_db;
 use crate::parser::ese_db::*;
 use crate::parser::jet;
+use crate::parser::decomp::*;
 
 #[cfg(target_os = "windows")]
 mod gen_db;
@@ -1094,57 +1095,4 @@ pub fn load_lv_data(
     } else {
         Err(SimpleError::new(format!("LV key {} not found", long_value_key)))
     }
-}
-
-#[cfg(target_os = "windows")]
-extern "C" {
-    fn decompress(
-        data: *const u8, data_size: u32, out_buffer: *mut u8, out_buffer_size: u32, decompressed: *mut u32) -> u32;
-}
-
-#[cfg(target_os = "windows")]
-pub fn decompress_size(
-    v: &Vec<u8>
-) -> u32 {
-    const JET_wrnBufferTruncated: u32 = 1006;
-
-    let mut decompressed: u32 = 0;
-    let res = unsafe { decompress(v.as_ptr(), v.len() as u32, std::ptr::null_mut(), 0, &mut decompressed) };
-
-    if res == JET_wrnBufferTruncated && decompressed as usize > v.len() {
-        return decompressed;
-    }
-    0
-}
-
-#[cfg(not(target_os = "windows"))]
-pub fn decompress_size(
-    _v: &Vec<u8>
-) -> u32 {
-    0
-}
-
-#[cfg(target_os = "windows")]
-pub fn decompress_buf(
-    v: &Vec<u8>,
-    decompressed_size: u32
-) -> Result<Vec<u8>, SimpleError> {
-    const JET_errSuccess: u32 = 0;
-    let mut buf = Vec::<u8>::with_capacity(decompressed_size as usize);
-    unsafe { buf.set_len(buf.capacity()); }
-    let mut decompressed : u32 = 0;
-    let res = unsafe { decompress(v.as_ptr(), v.len() as u32, buf.as_mut_ptr(), buf.len() as u32, &mut decompressed) };
-    debug_assert!(decompressed_size == decompressed && decompressed as usize == buf.len());
-    if res != JET_errSuccess {
-        return Err(SimpleError::new(format!("Decompress failed. Err {}", res)));
-    }
-    Ok(buf)
-}
-
-#[cfg(not(target_os = "windows"))]
-pub fn decompress_buf(
-    _v: &Vec<u8>,
-    _decompressed_size: u32
-) -> Result<Vec<u8>, SimpleError> {
-    Err(SimpleError::new("TODO: Decompression is not implemented."))
 }
