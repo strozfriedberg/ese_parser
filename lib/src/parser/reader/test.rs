@@ -74,7 +74,7 @@ fn check_row(jdb: &mut EseParser, table_id: u64, columns: &Vec<ColumnInfo>) -> H
     let mut values = HashSet::<String>::new();
 
     for col in columns {
-        match jdb.get_column_str(table_id, col.id, 0) {
+        match jdb.get_column_str(table_id, col.id) {
             Ok(result) =>
                 if let Some(mut value) = result {
                     if ESE_CP::try_from(col.cp).unwrap() == ESE_CP::Unicode {

@@ -22,7 +22,7 @@ fn get_column<T>(jdb: &Box<dyn EseDb>, table: u64, column: u32) -> Result<Option
     let size = size_of::<T>();
     let mut dst = std::mem::MaybeUninit::<T>::zeroed();
 
-    let vo = jdb.get_column_dyn(table, column, size)?;
+    let vo = jdb.get_column(table, column)?;
 
     unsafe {
         if let Some(v) = vo {
@@ -117,7 +117,7 @@ fn get_column_val(jdb: &Box<dyn EseDb>, table_id: u64, c: &ColumnInfo) -> Result
             }
         },
         ESE_coltypBinary => {
-            match jdb.get_column_dyn(table_id, c.id, c.cbmax as usize)? {
+            match jdb.get_column(table_id, c.id)? {
                 Some(v) => {
                     let s = v.iter().map(|c| format!("{:x?} ", c).to_string() ).collect::<String>();
                     val = format!("{} ", s);
@@ -128,7 +128,7 @@ fn get_column_val(jdb: &Box<dyn EseDb>, table_id: u64, c: &ColumnInfo) -> Result
             }
         },
         ESE_coltypText => {
-            match jdb.get_column_dyn(table_id, c.id, c.cbmax as usize)? {
+            match jdb.get_column(table_id, c.id)? {
                 Some(v) => {
                     if ESE_CP::try_from(c.cp) == Ok(ESE_CP::Unicode) {
                         let t = v.as_slice();
@@ -151,13 +151,7 @@ fn get_column_val(jdb: &Box<dyn EseDb>, table_id: u64, c: &ColumnInfo) -> Result
             }
         },
         ESE_coltypLongText => {
-            let v;
-            if c.cbmax == 0 {
-                v = jdb.get_column_dyn_varlen(table_id, c.id)?;
-            } else {
-                v = jdb.get_column_dyn(table_id, c.id, c.cbmax as usize)?;
-            }
-            match v {
+            match jdb.get_column(table_id, c.id)? {
                 Some(v) => {
                     if ESE_CP::try_from(c.cp) == Ok(ESE_CP::Unicode) {
                         let t = v.as_slice();
@@ -184,13 +178,7 @@ fn get_column_val(jdb: &Box<dyn EseDb>, table_id: u64, c: &ColumnInfo) -> Result
             }
         },
         ESE_coltypLongBinary => {
-            let v;
-            if c.cbmax == 0 {
-                v = jdb.get_column_dyn_varlen(table_id, c.id)?;
-            } else {
-                v = jdb.get_column_dyn(table_id, c.id, c.cbmax as usize)?;
-            }
-            match v {
+            match jdb.get_column(table_id, c.id)? {
                 Some(mut v) => {
                     let orig_size = v.len();
                     v.truncate(16);
@@ -203,7 +191,7 @@ fn get_column_val(jdb: &Box<dyn EseDb>, table_id: u64, c: &ColumnInfo) -> Result
             }
         },
         ESE_coltypGUID => {
-            match jdb.get_column_dyn(table_id, c.id, c.cbmax as usize)? {
+            match jdb.get_column(table_id, c.id)? {
                 Some(v) => {
                     // {CD2C96BD-DCA8-47CB-B829-8F1AE4E2E686}
                     val = format!("{{{:02X}{:02X}{:02X}{:02X}-{:02X}{:02X}-{:02X}{:02X}-{:02X}{:02X}-{:02X}{:02X}{:02X}{:02X}{:02X}{:02X}}}",

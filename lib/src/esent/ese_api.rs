@@ -83,7 +83,7 @@ impl EseAPI {
         }
     }
 
-    pub fn get_column<T>(&self, table: u64, column: u32) -> Result<Option<T>, SimpleError> {
+    pub fn get_fixed_column<T>(&self, table: u64, column: u32) -> Result<Option<T>, SimpleError> {
         let size : c_ulong = size_of::<T>() as u32;
         let mut v = MaybeUninit::<T>::zeroed();
 
@@ -195,49 +195,19 @@ impl EseDb for EseAPI {
         }
     }
 
-    fn get_column_str(&self, table: u64, column: u32, size: u32) -> Result<Option<String>, SimpleError> {
-        let mut bytes : c_ulong = 0;
-        let mut v : Vec<u8> = Vec::new();
-        v.resize(size as usize, 0);
-
-        unsafe {
-            let err = JetRetrieveColumn(self.sesid, table, column, v.as_mut_ptr() as *mut c_void, size,
-                &mut bytes, 0, std::ptr::null_mut());
-            if err != 0 {
-                if err == JET_wrnColumnNull as i32 {
-                    return Ok(None);
-                }
-                return Err(SimpleError::new(
-                    format!("JetRetrieveColumn failed with error {}", self.error_to_string(err))));
-            }
-        }
-        v.truncate(bytes as usize);
-
-        match std::str::from_utf8(&v) {
-            Ok(s) => Ok(Some(s.to_string())),
-            Err(e) => Err(SimpleError::new(format!("std::str::from_utf8 failed: {}", e)))
-        }
+    fn get_column_str(&self, table: u64, column: u32) -> Result<Option<String>, SimpleError> {
+		match self.get_column(table, column)? {
+			Some(s) => {
+				match std::str::from_utf8(&s) {
+					Ok(s) => Ok(Some(s.to_string())),
+					Err(e) => Err(SimpleError::new(format!("std::str::from_utf8 failed: {}", e)))
+				}
+			},
+			None => Ok(None)
+		}
     }
 
-    fn get_column_dyn(&self, table: u64, column: u32, size: usize) -> Result< Option<Vec<u8>>, SimpleError> {
-        let mut v : Vec<u8> = Vec::new();
-        v.resize(size, 0);
-        match self.get_column_dyn_helper(table, column, v.as_mut_slice(), size) {
-            Err(e) => Err(e),
-            Ok(s) => {
-                if s == 0{
-                    return Ok(None);
-                }
-                if s > size as u32 {
-                    return Err(SimpleError::new(format!("wrong size     {}, expected {}", s, size)));
-                }
-                v.truncate(s as usize);
-                Ok(Some(v))
-            }
-        }
-    }
-
-    fn get_column_dyn_varlen(&self, table: u64, column: u32) -> Result< Option<Vec<u8>>, SimpleError> {
+    fn get_column(&self, table: u64, column: u32) -> Result< Option<Vec<u8>>, SimpleError> {
         let mut vres : Vec<u8> = Vec::new();
 
         loop {
@@ -276,7 +246,7 @@ impl EseDb for EseAPI {
         Ok(Some(vres))
     }
 
-    fn get_column_dyn_mv(&self, table: u64, column: u32, multi_value_index: u32)
+    fn get_column_mv(&self, table: u64, column: u32, multi_value_index: u32)
         -> Result< Option<Vec<u8>>, SimpleError> {
             let mut vres : Vec<u8> = Vec::new();
 
@@ -331,8 +301,8 @@ impl EseDb for EseAPI {
 
         let mut err : Vec<String> = Vec::new();
         loop {
-            let name_str = self.get_column_str(table_id, c_name_info.columnid, c_name_info.cbMax)?.unwrap();
-            let type_word = self.get_column::<u16>(table_id, c_type_info.columnid)?.unwrap();
+            let name_str = self.get_column_str(table_id, c_name_info.columnid)?.unwrap();
+            let type_word = self.get_fixed_column::<u16>(table_id, c_type_info.columnid)?.unwrap();
 
             if type_word == 1 {
                err.push(name_str);
@@ -362,11 +332,11 @@ impl EseDb for EseAPI {
             let subtable_id = col_list.assume_init().tableid;
 
             loop {
-                let col_name = self.get_column_str(subtable_id, col_list.assume_init().columnidcolumnname, 255)?.unwrap();
-                let col_id = self.get_column::<u32>(subtable_id, col_list.assume_init().columnidcolumnid)?.unwrap();
-                let col_type = self.get_column::<u32>(subtable_id, col_list.assume_init().columnidcoltyp)?.unwrap();
-                let col_cbmax = self.get_column::<u32>(subtable_id, col_list.assume_init().columnidcbMax)?.unwrap();
-                let col_cp = self.get_column::<u16>(subtable_id, col_list.assume_init().columnidCp)?.unwrap();
+                let col_name = self.get_column_str(subtable_id, col_list.assume_init().columnidcolumnname)?.unwrap();
+                let col_id = self.get_fixed_column::<u32>(subtable_id, col_list.assume_init().columnidcolumnid)?.unwrap();
+                let col_type = self.get_fixed_column::<u32>(subtable_id, col_list.assume_init().columnidcoltyp)?.unwrap();
+                let col_cbmax = self.get_fixed_column::<u32>(subtable_id, col_list.assume_init().columnidcbMax)?.unwrap();
+                let col_cp = self.get_fixed_column::<u16>(subtable_id, col_list.assume_init().columnidCp)?.unwrap();
 
                 cols.push(ColumnInfo {
                     name: col_name,

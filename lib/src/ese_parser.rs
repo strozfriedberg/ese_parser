@@ -149,11 +149,11 @@ impl EseParser {
         Err(SimpleError::new(format!("move_row: TODO: implement me, crow {}", crow)))
     }
 
-    pub fn get_column<T>(&self, table: u64, column: u32) -> Result<Option<T>, SimpleError> {
+    pub fn get_fixed_column<T>(&self, table: u64, column: u32) -> Result<Option<T>, SimpleError> {
         let size = std::mem::size_of::<T>();
         let mut dst = std::mem::MaybeUninit::<T>::zeroed();
 
-        let vo = self.get_column_dyn(table, column, size)?;
+        let vo = self.get_column(table, column)?;
 
         unsafe {
             if let Some(v) = vo {
@@ -260,7 +260,7 @@ impl EseDb for EseParser {
         }
     }
 
-    fn get_column_str(&self, table: u64, column: u32, _size: u32) -> Result<Option<String>, SimpleError> {
+    fn get_column_str(&self, table: u64, column: u32) -> Result<Option<String>, SimpleError> {
         let v = self.get_column_dyn_helper(table, column, 0)?;
         if v.is_none() {
             return Ok(None);
@@ -271,15 +271,11 @@ impl EseDb for EseParser {
         }
     }
 
-    fn get_column_dyn(&self, table: u64, column: u32, _size: usize) -> Result< Option<Vec<u8>>, SimpleError> {
+    fn get_column(&self, table: u64, column: u32) -> Result< Option<Vec<u8>>, SimpleError> {
         self.get_column_dyn_helper(table, column, 0)
     }
 
-    fn get_column_dyn_varlen(&self, table: u64, column: u32) -> Result< Option<Vec<u8>>, SimpleError> {
-        self.get_column_dyn_helper(table, column, 0)
-    }
-
-    fn get_column_dyn_mv(&self, table: u64, column: u32, multi_value_index: u32)
+    fn get_column_mv(&self, table: u64, column: u32, multi_value_index: u32)
         -> Result< Option<Vec<u8>>, SimpleError> {
         self.get_column_dyn_helper(table, column, multi_value_index)
     }

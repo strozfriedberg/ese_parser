@@ -108,10 +108,10 @@ impl EseDb for EseBoth {
         r1
     }
 
-    fn get_column_str(&self, table: u64, column: u32, size: u32) -> Result<Option<String>, SimpleError> {
+    fn get_column_str(&self, table: u64, column: u32) -> Result<Option<String>, SimpleError> {
         let (api_table, parser_table) = self.opened_tables.borrow()[table as usize];
-        let s1 = self.api.get_column_str(api_table, column, size)?;
-        let s2 = self.parser.get_column_str(parser_table, column, size)?;
+        let s1 = self.api.get_column_str(api_table, column)?;
+        let s2 = self.parser.get_column_str(parser_table, column)?;
         if s1 != s2 {
             return Err(SimpleError::new(format!(r"table {}, column({}) EseAPI column '{:?}' not equal to EseParser '{:?}'",
                 table, column, s1, s2)));
@@ -119,10 +119,10 @@ impl EseDb for EseBoth {
         Ok(s1)
     }
 
-    fn get_column_dyn(&self, table: u64, column: u32, size: usize) -> Result< Option<Vec<u8>>, SimpleError> {
+    fn get_column(&self, table: u64, column: u32) -> Result< Option<Vec<u8>>, SimpleError> {
         let (api_table, parser_table) = self.opened_tables.borrow()[table as usize];
-        let s1 = self.api.get_column_dyn(api_table, column, size)?;
-        let s2 = self.parser.get_column_dyn(parser_table, column, size)?;
+        let s1 = self.api.get_column(api_table, column)?;
+        let s2 = self.parser.get_column(parser_table, column)?;
         if s1 != s2 {
             return Err(SimpleError::new(format!(r"table {}, column({}) EseAPI column '{:?}' not equal to EseParser '{:?}'",
                 table, column, s1, s2)));
@@ -130,22 +130,11 @@ impl EseDb for EseBoth {
         Ok(s1)
     }
 
-    fn get_column_dyn_varlen(&self, table: u64, column: u32) -> Result< Option<Vec<u8>>, SimpleError> {
-        let (api_table, parser_table) = self.opened_tables.borrow()[table as usize];
-        let s1 = self.api.get_column_dyn_varlen(api_table, column)?;
-        let s2 = self.parser.get_column_dyn_varlen(parser_table, column)?;
-        if s1 != s2 {
-            return Err(SimpleError::new(format!(r"table {}, column({}) EseAPI column '{:?}' not equal to EseParser '{:?}'",
-                table, column, s1, s2)));
-        }
-        Ok(s1)
-    }
-
-    fn get_column_dyn_mv(&self, table: u64, column: u32, multi_value_index: u32)
+    fn get_column_mv(&self, table: u64, column: u32, multi_value_index: u32)
         -> Result< Option<Vec<u8>>, SimpleError> {
         let (api_table, parser_table) = self.opened_tables.borrow()[table as usize];
-        let s1 = self.api.get_column_dyn_mv(api_table, column, multi_value_index)?;
-        let s2 = self.parser.get_column_dyn_mv(parser_table, column, multi_value_index)?;
+        let s1 = self.api.get_column_mv(api_table, column, multi_value_index)?;
+        let s2 = self.parser.get_column_mv(parser_table, column, multi_value_index)?;
         if s1 != s2 {
             return Err(SimpleError::new(format!(r"table {}, column({}) EseAPI column '{:?}' not equal to EseParser '{:?}'",
                 table, column, s1, s2)));
