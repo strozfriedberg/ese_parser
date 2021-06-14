@@ -183,7 +183,7 @@ pub struct LeafPageEntry {
 }
 
 #[repr(packed)]
-#[derive(Copy, Clone, Debug)]
+#[derive(Copy, Clone, Debug, Default)]
 pub struct DataDefinitionHeader {
     pub last_fixed_size_data_type: uint8_t,
     pub last_variable_size_data_type: uint8_t,
