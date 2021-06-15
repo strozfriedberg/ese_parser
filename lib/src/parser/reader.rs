@@ -20,7 +20,6 @@ pub struct Reader {
     format_version: jet::FormatVersion,
     format_revision: jet::FormatRevision,
     page_size: u32,
-    last_page_number: u32,
 }
 
 #[allow(clippy::mut_from_ref)]
@@ -92,14 +91,12 @@ impl Reader {
             page_size: 2 * 1024, //just to read header
             format_version: 0,
             format_revision: 0,
-            last_page_number: 0
         };
 
         let db_fh = reader.load_db_file_header()?;
         reader.format_version = db_fh.format_version;
         reader.format_revision = db_fh.format_revision;
         reader.page_size = db_fh.page_size;
-        reader.last_page_number = (db_fh.page_size * 2) / db_fh.page_size;
 
         reader.cache.get_mut().clear();
 
