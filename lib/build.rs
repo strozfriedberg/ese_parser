@@ -11,6 +11,7 @@ fn main() {
         let bindings = bindgen::Builder::default()
             .header("src/esent/esent.h")
             .parse_callbacks(Box::new(bindgen::CargoCallbacks))
+			.layout_tests(false)
             // required while cross-build from Linux
             .clang_args(&[
                 "-D__int64=long long",
