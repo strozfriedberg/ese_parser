@@ -4,7 +4,7 @@ use simple_error::SimpleError;
 fn seven_bit_decompress_get_size(
 	compressed_data: &[u8]
 ) -> usize {
-	if compressed_data.len() < 1 || compressed_data[0] >> 3 > 2 /* 7BITASCII or 7BITUNICODE */ {
+	if compressed_data.len() < 1 || compressed_data[0] >> 3 > 2 /* NOT 7BITASCII and NOT 7BITUNICODE */ {
 	  return 0;
 	}
 	let cbit_final = (compressed_data[0] & 0x7) + 1;
@@ -219,7 +219,7 @@ fn lz77_decompress(
     while in_pos < in_buf.len() {
         if flag_count == 0 {
             if (in_pos + 3) >= in_buf.len() {
-                return Err(SimpleError::new("out of input index"));
+                return Err(SimpleError::new("index out of bounds"));
             }
 
 			flags = u32::from_le_bytes([in_buf[in_pos], in_buf[in_pos+1], in_buf[in_pos+2], in_buf[in_pos+3]]);
@@ -231,7 +231,7 @@ fn lz77_decompress(
 
         if (flags & (1 << flag_count)) == 0 {
             if in_pos >= in_buf.len() {
-                return Err(SimpleError::new("MemLimit"));
+                return Err(SimpleError::new("index out of bounds"));
             }
             out_buf[out_i] = in_buf[in_pos];
 			out_i += 1;
@@ -242,7 +242,7 @@ fn lz77_decompress(
 			if in_pos == in_buf.len() {
 				break;
 			} else if (in_pos + 1) > in_buf.len() {
-                return Err(SimpleError::new("MemLimit"));
+                return Err(SimpleError::new("index out of bounds"));
             }
 
 			let mut length = u16::from_le_bytes([in_buf[in_pos], in_buf[in_pos+1]]) as usize;
@@ -254,7 +254,7 @@ fn lz77_decompress(
             if length == 7 {
                 if last_len == 0 {
                     if in_pos >= in_buf.len() {
-                        return Err(SimpleError::new("MemLimit"));
+                        return Err(SimpleError::new("index out of bounds"));
                     }
 
                     length = (in_buf[in_pos] % 16).into();
@@ -262,7 +262,7 @@ fn lz77_decompress(
                     in_pos += 1;
                 } else {
                     if last_len >= in_buf.len() {
-                        return Err(SimpleError::new("MemLimit"));
+                        return Err(SimpleError::new("index out of bounds"));
                     }
 
                     length = (in_buf[last_len] / 16).into();
@@ -271,7 +271,7 @@ fn lz77_decompress(
 
                 if length == 15 {
                     if in_pos >= in_buf.len() {
-                        return Err(SimpleError::new("MemLimit"));
+                        return Err(SimpleError::new("index out of bounds"));
                     }
 
                     length = in_buf[in_pos].into();
@@ -279,7 +279,7 @@ fn lz77_decompress(
 
                     if length == 255 {
                         if (in_pos + 1) >= in_buf.len() {
-                            return Err(SimpleError::new("MemLimit"));
+                            return Err(SimpleError::new("index out of bounds"));
                         }
 
 						length = u16::from_le_bytes([in_buf[in_pos], in_buf[in_pos+1]]) as usize;
@@ -292,7 +292,7 @@ fn lz77_decompress(
                         }
 
                         if length < 15 + 7 {
-                            return Err(SimpleError::new("CorruptedData"));
+                            return Err(SimpleError::new("corrupted data"));
                         }
                         length -= 15 + 7;
                     }
@@ -304,7 +304,7 @@ fn lz77_decompress(
 
             for _ in 0..length {
                 if offset > out_pos {
-                    return Err(SimpleError::new("CorruptedData"));
+                    return Err(SimpleError::new("corrupted data"));
                 }
 
                 out_buf[out_i] = out_buf[out_pos - offset];
