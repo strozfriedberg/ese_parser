@@ -582,7 +582,7 @@ pub fn load_data(
 		tagged_data_types_format = jet::TaggedDataTypesFormats::Linear;
 	}
 
-	let mut i = 0;
+	let mut start_i = 0;
 	if lls.last_column == 0 {
 		lls.offset = page_tag.offset(db_page);
 		let offset_start = lls.offset;
@@ -628,13 +628,13 @@ pub fn load_data(
 		for j in 0..tbl_def.column_catalog_definition_array.len() {
 			let col = &tbl_def.column_catalog_definition_array[j];
 			if col.identifier == lls.last_column {
-				i = j;
+				start_i = j;
 				break;
 			}
 		}
 	}
 
-    while i < tbl_def.column_catalog_definition_array.len() {
+    for i in start_i..tbl_def.column_catalog_definition_array.len() {
         let col = &tbl_def.column_catalog_definition_array[i];
         if col.identifier <= 127 {
             if col.identifier <= lls.ddh.last_fixed_size_data_type as u32 {
@@ -703,7 +703,6 @@ pub fn load_data(
             // empty
             return Ok(None)
         }
-		i += 1;
     }
 
     Err(SimpleError::new(format!("column {} not found", column_id)))
@@ -1033,11 +1032,6 @@ pub fn load_lv_metadata(
     if !db_page.flags().contains(jet::PageFlags::IS_LONG_VALUE) {
         return Err(SimpleError::new(format!("pageno {}: IS_LONG_VALUE flag should be present",
             db_page.page_number)));
-    }
-
-    let is_root = db_page.flags().contains(jet::PageFlags::IS_ROOT);
-    if is_root {
-        let _root_page_header = load_root_page_header(reader, &db_page, &pg_tags[0])?;
     }
 
     let mut res : Vec<LV_tags> = vec![];
