@@ -1,6 +1,6 @@
 //reader.rs
 use std::{fs, io, io::{Seek, Read}, mem, path::PathBuf, slice, convert::TryInto, cell::RefCell};
-use std::collections::BTreeSet;
+use std::collections::{BTreeSet, HashMap};
 use simple_error::SimpleError;
 use cache_2q::Cache;
 
@@ -538,10 +538,10 @@ pub struct last_load_state {
 }
 
 impl last_load_state {
-	pub fn calc_identifier(tbl_def: &jet::TableDefinition, lv_tags: &Vec<LV_tags>, db_page: &jet::DbPage, page_tag_index: usize)
+	pub fn calc_identifier(tbl_def: &jet::TableDefinition, lv_tags: &LV_tags, db_page: &jet::DbPage, page_tag_index: usize)
 		-> usize {
 		tbl_def as *const jet::TableDefinition as usize
-		+ lv_tags as *const Vec<LV_tags> as usize
+		+ lv_tags as *const LV_tags as usize
 		+ db_page as *const jet::DbPage as usize
 		+ page_tag_index
 	}
@@ -557,7 +557,7 @@ pub fn load_data(
 	lls: &mut last_load_state,
     reader: &Reader,
     tbl_def: &jet::TableDefinition,
-    lv_tags: &Vec<LV_tags>,
+    lv_tags: &LV_tags,
     db_page: &jet::DbPage,
     page_tag_index: usize,
     column_id: u32,
@@ -740,7 +740,7 @@ fn init_tag_state(
 
 fn load_tagged_data_linear(
     reader: &Reader,
-    lv_tags: &Vec<LV_tags>,
+    lv_tags: &LV_tags,
     col: &jet::CatalogDefinition,
     column_id: u32,
     tag_state: &mut tagged_data_state,
@@ -812,7 +812,7 @@ fn load_tagged_data_linear(
 
 fn load_tagged_column(
     reader: &Reader,
-    lv_tags: &Vec<LV_tags>,
+    lv_tags: &LV_tags,
     col: &jet::CatalogDefinition,
     offset : u64,
     tagged_data_type_size: u16,
@@ -858,7 +858,7 @@ fn read_multi_value(
     tagged_data_type_size: u16,
     dtf: &jet::TaggedDataTypeFlag,
     multi_value_index: usize,
-    lv_tags: &Vec<LV_tags>,
+    lv_tags: &LV_tags,
     compressed: bool
 ) -> Result<Option<Vec<u8>>, SimpleError> {
     let mut mv_indexes : Vec<(u16/*shift*/, (bool/*lv*/, u16/*size*/))> = Vec::new();
@@ -932,7 +932,7 @@ pub fn load_lv_tag(
     let mut offset = page_tag.offset(db_page);
     let page_tag_offset : u64 = offset;
 
-    let mut res = LV_tags { common_page_key: vec![], local_page_key: vec![], key: 0, offset: 0, size: 0, seg_offset: 0 };
+    let mut res = LV_tag { common_page_key: vec![], local_page_key: vec![], offset: 0, size: 0 };
 
     let mut first_word_read = false;
     let mut common_page_key_size : u16 = 0;
@@ -960,10 +960,8 @@ pub fn load_lv_tag(
     }
 
     if (page_tag.size as u64) - (offset - page_tag_offset) == 8 {
-        let skey: u32 = reader.read_struct(offset)?;
+        let _skey: u32 = reader.read_struct(offset)?;
         offset += 4;
-
-        res.key = skey;
 
         let _total_size : u32 = reader.read_struct(offset)?;
 
@@ -988,44 +986,56 @@ pub fn load_lv_tag(
             }
         }.to_be();
 
-        res.key = skey;
+		let mut seg_offset = 0;
 
         if page_key.len() == 8 {
             let segment_offset = unsafe {
                 std::mem::transmute::<[u8; 4], u32>(page_key[4..8].try_into().unwrap())
             }.to_be();
-            res.seg_offset = segment_offset;
+            seg_offset = segment_offset;
         }
 
         res.offset = offset;
         res.size = (page_tag.size as u64 - (offset - page_tag_offset)).try_into().unwrap();
 
-        return Ok(Some(res));
+		let mut t : HashMap<u32, LV_tag> = HashMap::new();
+		t.insert(seg_offset, res);
+		let mut new_tag : LV_tags = HashMap::new();
+		new_tag.insert(skey, t);
+
+        return Ok(Some(new_tag));
     }
 }
 
-// TODO: change to map[key] = vec![], sorted by seg_offset
 #[derive(Debug, Clone)]
-pub struct LV_tags {
+pub struct LV_tag {
     pub common_page_key: Vec<u8>,
     pub local_page_key: Vec<u8>,
-    pub key: u32,
     pub offset: u64,
     pub size: u32,
-    pub seg_offset: u32,
 }
 
-impl std::fmt::Display for LV_tags{
-    fn fmt (&self, fmt: &mut std::fmt::Formatter) -> std::result::Result<(), std::fmt::Error> {
-        write!(fmt, "common_page_key {:?}, local_page_key {:?}, key {}, offset {}, seg_offset {}, size {}",
-            self.common_page_key, self.local_page_key, self.key, self.offset, self.seg_offset, self.size)
-    }
+pub type LV_tags = HashMap<u32/*key*/, HashMap<u32/*seg_offset*/, LV_tag>>;
+
+fn merge_lv_tags(tags: &mut LV_tags, new_tags: LV_tags) {
+	for (new_key, new_segs) in new_tags {
+		if tags.contains_key(&new_key) {
+			let segs = tags.get_mut(&new_key).unwrap();
+			for (new_seg_offset, new_lv_tags) in new_segs {
+				let r = segs.insert(new_seg_offset, new_lv_tags);
+				assert_eq!(r.is_none(), true);
+			}
+		} else {
+			let r = tags.insert(new_key, new_segs);
+			debug_assert!(r.is_none() == true, "new_key wasn't there before insert fn called!");
+		}
+	}
 }
 
 pub fn load_lv_metadata(
     reader: &Reader,
     page_number: u32
-) -> Result<Vec<LV_tags>, SimpleError> {
+) -> Result<LV_tags, SimpleError> {
     let db_page = jet::DbPage::new(reader, page_number)?;
     let pg_tags = &db_page.page_tags;
 
@@ -1034,7 +1044,7 @@ pub fn load_lv_metadata(
             db_page.page_number)));
     }
 
-    let mut res : Vec<LV_tags> = vec![];
+    let mut tags : LV_tags = HashMap::new();
 
     if !db_page.flags().contains(jet::PageFlags::IS_LEAF) {
         let mut prev_page_number = page_number;
@@ -1048,12 +1058,11 @@ pub fn load_lv_metadata(
                     db_page.page_number, db_page.prev_page(), prev_page_number)));
             }
             if !db_page.flags().contains(jet::PageFlags::IS_LEAF | jet::PageFlags::IS_LONG_VALUE) {
-
                 // maybe it's "Parent of leaf" page
                 let r = load_lv_metadata(reader, page_number);
                 match r {
-                    Ok(mut r) => {
-                        res.append(&mut r);
+                    Ok(new_tags) => {
+						merge_lv_tags(&mut tags, new_tags);
                     },
                     Err(e) => {
                         return Err(e);
@@ -1065,14 +1074,14 @@ pub fn load_lv_metadata(
                         continue;
                     }
 
-                    match load_lv_tag(reader, &db_page, &pg_tags[i], &pg_tags[0]) {
-                        Ok(r) => {
-                            if let Some(lv_tag) = r {
-                                res.push(lv_tag);
-                            }
-                        },
-                        Err(e) => return Err(e)
-                    }
+					match load_lv_tag(reader, &db_page, &pg_tags[i], &pg_tags[0]) {
+						Ok(r) => {
+							if let Some(new_tag) = r {
+								merge_lv_tags(&mut tags, new_tag);
+							}
+						},
+						Err(e) => return Err(e)
+					}
                 }
             }
             prev_page_number = page_number;
@@ -1082,42 +1091,44 @@ pub fn load_lv_metadata(
         for i in 1..pg_tags.len() {
             match load_lv_tag(reader, &db_page, &pg_tags[i], &pg_tags[0]) {
                 Ok(r) => {
-                    if let Some(lv_tag) = r {
-                        res.push(lv_tag);
-                    }
+					if let Some(new_tag) = r {
+						merge_lv_tags(&mut tags, new_tag);
+					}
                 },
                 Err(e) => return Err(e)
             }
         }
     }
 
-    Ok(res)
+    Ok(tags)
 }
 
 pub fn load_lv_data(
     reader: &Reader,
-    lv_tags: &Vec<LV_tags>,
+    lv_tags: &LV_tags,
     long_value_key: u32,
     compressed: bool
 ) -> Result<Vec<u8>, SimpleError> {
     let mut res : Vec<u8> = vec![];
-    let mut i = 0;
-    while i < lv_tags.len() {
-        if long_value_key == lv_tags[i].key {
-            if res.len() == lv_tags[i].seg_offset as usize {
-                let mut v = reader.read_bytes(lv_tags[i].offset, lv_tags[i].size as usize)?;
-                if compressed {
-                    let dsize = decompress_size(&v);
-                    if dsize > 0 {
-                        v = decompress_buf(&v, dsize)?;
-                    }
-                }
-                res.append(&mut v);
-                i = 0; // search next seg_offset (lv_tags could be not sorted)
-                continue;
-            }
-        }
-        i += 1;
+	if lv_tags.contains_key(&long_value_key) {
+		let seg_offsets = lv_tags.get(&long_value_key).unwrap();
+		loop {
+			let offset = res.len() as u32;
+			if seg_offsets.contains_key(&offset) {
+				let tag = seg_offsets.get(&offset).unwrap();
+				let mut v = reader.read_bytes(tag.offset, tag.size as usize)?;
+				if compressed {
+					let dsize = decompress_size(&v);
+					if dsize > 0 {
+						v = decompress_buf(&v, dsize)?;
+					}
+				}
+				res.append(&mut v);
+				// search next offset
+			} else {
+				break;
+			}
+		}
     }
 
     if res.len() > 0 {

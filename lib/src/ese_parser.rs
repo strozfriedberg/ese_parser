@@ -5,10 +5,11 @@ use crate::parser::reader::*;
 
 use simple_error::SimpleError;
 use std::cell::{RefCell, RefMut};
+use std::collections::HashMap;
 
 struct Table {
 	cat: Box<jet::TableDefinition>,
-	lv_tags: Vec<LV_tags>,
+	lv_tags: LV_tags,
 	current_page: Option<jet::DbPage>,
 	page_tag_index: usize,
 	lls: RefCell<last_load_state>,
@@ -206,7 +207,7 @@ impl EseDb for EseParser {
         self.reader = Some(reader);
         for i in cat.drain(0..) {
             if i.table_catalog_definition.is_some() {
-                let itrnl = Table { cat: Box::new(i), lv_tags: vec![], current_page: None, page_tag_index: 0,
+                let itrnl = Table { cat: Box::new(i), lv_tags: HashMap::new(), current_page: None, page_tag_index: 0,
 					lls: RefCell::new( last_load_state { ..Default::default() }) };
                 self.tables.push(RefCell::new(itrnl));
             }
