@@ -12,7 +12,7 @@ struct Table {
 	lv_tags: LV_tags,
 	current_page: Option<jet::DbPage>,
 	page_tag_index: usize,
-	lls: RefCell<last_load_state>,
+	lls: RefCell<LastLoadState>,
 }
 
 pub struct EseParser {
@@ -27,11 +27,11 @@ impl Table {
     }
 
 	fn review_last_load_state(&mut self, column: u32) {
-		let id = last_load_state::calc_identifier(&self.cat, &self.lv_tags, &self.page(), self.page_tag_index);
+		let id = LastLoadState::calc_identifier(&self.cat, &self.lv_tags, &self.page(), self.page_tag_index);
 		let mut lls = self.lls.borrow_mut();
 		if lls.state_identifier != id || column <= lls.last_column {
 			// reset
-			*lls = last_load_state::init(id);
+			*lls = LastLoadState::init(id);
 		}
 	}
 }
@@ -208,7 +208,7 @@ impl EseDb for EseParser {
         for i in cat.drain(0..) {
             if i.table_catalog_definition.is_some() {
                 let itrnl = Table { cat: Box::new(i), lv_tags: HashMap::new(), current_page: None, page_tag_index: 0,
-					lls: RefCell::new( last_load_state { ..Default::default() }) };
+					lls: RefCell::new( LastLoadState { ..Default::default() }) };
                 self.tables.push(RefCell::new(itrnl));
             }
         }

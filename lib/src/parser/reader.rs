@@ -506,7 +506,7 @@ pub fn find_first_leaf_page(reader: &Reader, mut page_number: u32)
 }
 
 #[derive(Copy, Clone, Debug, Default)]
-pub struct tagged_data_state {
+pub struct TaggedDataState {
     pub identifier: u16,
     pub types_offset: u16,
     pub type_offset: u16,
@@ -516,14 +516,14 @@ pub struct tagged_data_state {
 }
 
 #[derive(Copy, Clone, Debug, Default)]
-pub struct variable_size_data_state {
+pub struct VariableSizeDataState {
     pub current_type: u32,
     pub type_offset: u16,
     pub value_offset: u16,
 }
 
 #[derive(Clone, Debug, Default)]
-pub struct last_load_state {
+pub struct LastLoadState {
 	pub state_identifier: usize,
 	pub last_column: u32,
 	pub offset: u64,
@@ -532,12 +532,12 @@ pub struct last_load_state {
 	pub ddh: ese_db::DataDefinitionHeader,
 	pub fixed_data_bits_mask_size: usize,
 	pub fixed_data_bits_mask : Vec<u8>,
-	pub tag_state: tagged_data_state,
+	pub tag_state: TaggedDataState,
 	pub previous_variable_size_data_type_size: u16,
-	pub var_state: variable_size_data_state,
+	pub var_state: VariableSizeDataState,
 }
 
-impl last_load_state {
+impl LastLoadState {
 	pub fn calc_identifier(tbl_def: &jet::TableDefinition, lv_tags: &LV_tags, db_page: &jet::DbPage, page_tag_index: usize)
 		-> usize {
 		tbl_def as *const jet::TableDefinition as usize
@@ -547,14 +547,14 @@ impl last_load_state {
 	}
 
 	pub fn init(state_identifier: usize) -> Self {
-		let mut lls: last_load_state = Default::default();
+		let mut lls: LastLoadState = Default::default();
 		lls.state_identifier = state_identifier;
 		lls
 	}
 }
 
 pub fn load_data(
-	lls: &mut last_load_state,
+	lls: &mut LastLoadState,
     reader: &Reader,
     tbl_def: &jet::TableDefinition,
     lv_tags: &LV_tags,
@@ -709,9 +709,9 @@ pub fn load_data(
 }
 
 fn init_tag_state(
-    tag_state: &mut tagged_data_state,
+    tag_state: &mut TaggedDataState,
     reader: &Reader,
-    var_state: variable_size_data_state,
+    var_state: VariableSizeDataState,
     offset: &mut u64,
     offset_ddh : u64,
     record_data_size: u64,
@@ -743,8 +743,8 @@ fn load_tagged_data_linear(
     lv_tags: &LV_tags,
     col: &jet::CatalogDefinition,
     column_id: u32,
-    tag_state: &mut tagged_data_state,
-    var_state: &mut variable_size_data_state,
+    tag_state: &mut TaggedDataState,
+    var_state: &mut VariableSizeDataState,
     offset : &mut u64,
     offset_ddh : u64,
     record_data_size: u64,
