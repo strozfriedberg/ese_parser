@@ -281,17 +281,6 @@ impl EseDb for EseParser {
         }
     }
 
-    fn get_column_str(&self, table: u64, column: u32) -> Result<Option<String>, SimpleError> {
-        let v = self.get_column_dyn_helper(table, column, 0)?;
-        if v.is_none() {
-            return Ok(None);
-        }
-        match std::str::from_utf8(&v.unwrap()) {
-            Ok(s) => Ok(Some(s.to_string())),
-            Err(e) => Err(SimpleError::new(format!("std::str::from_utf8 failed: {}", e)))
-        }
-    }
-
     fn get_column(&self, table: u64, column: u32) -> Result< Option<Vec<u8>>, SimpleError> {
         self.get_column_dyn_helper(table, column, 0)
     }

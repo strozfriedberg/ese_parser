@@ -130,7 +130,7 @@ fn test_edb_table_all_values() {
         assert_eq!(text.cbmax, 255);
         assert_eq!(text.cp, ESE_CP::ASCII as u16);
 
-        let str = jdb.get_column_str(table_id, text.id).unwrap().unwrap();
+        let str = jdb.get_column_str(table_id, text.id, text.cp).unwrap().unwrap();
         let t = jdb.get_column(table_id, text.id).unwrap().unwrap();
         for i in 0..t.len() {
             let expected_char = abc.as_bytes()[i % abc.len()];
@@ -172,7 +172,7 @@ fn test_edb_table_all_values() {
         let deftext = columns.iter().find(|x| x.name == "TextDefaultValue" ).unwrap();
         assert_eq!(deftext.cbmax, 255);
         assert_eq!(deftext.cp, ESE_CP::ASCII as u16);
-        let str = jdb.get_column_str(table_id, deftext.id).unwrap().unwrap();
+        let str = jdb.get_column_str(table_id, deftext.id, deftext.cp).unwrap().unwrap();
         let defval = "Default value.".to_string();
         assert_eq!(str.len()-1, defval.len());
         for i in 0..str.len()-1 {

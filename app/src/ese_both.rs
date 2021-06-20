@@ -108,10 +108,10 @@ impl EseDb for EseBoth {
         r1
     }
 
-    fn get_column_str(&self, table: u64, column: u32) -> Result<Option<String>, SimpleError> {
+    fn get_column_str(&self, table: u64, column: u32, cp: u16) -> Result<Option<String>, SimpleError> {
         let (api_table, parser_table) = self.opened_tables.borrow()[table as usize];
-        let s1 = self.api.get_column_str(api_table, column)?;
-        let s2 = self.parser.get_column_str(parser_table, column)?;
+        let s1 = self.api.get_column_str(api_table, column, cp)?;
+        let s2 = self.parser.get_column_str(parser_table, column, cp)?;
         if s1 != s2 {
             return Err(SimpleError::new(format!(r"table {}, column({}) EseAPI column '{:?}' not equal to EseParser '{:?}'",
                 table, column, s1, s2)));

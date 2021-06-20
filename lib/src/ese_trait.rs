@@ -65,9 +65,28 @@ pub trait EseDb {
     fn get_tables(&self) -> Result<Vec<String>, SimpleError>;
     fn get_columns(&self, table: &str) -> Result<Vec<ColumnInfo>, SimpleError>;
 
-    fn get_column_str(&self, table: u64, column: u32) -> Result<Option<String>, SimpleError>;
     fn get_column(&self, table: u64, column: u32) -> Result< Option<Vec<u8>>, SimpleError>;
     fn get_column_mv(&self, table: u64, column: u32, multi_value_index: u32) -> Result< Option<Vec<u8>>, SimpleError>;
 
     fn move_row(&self, table: u64, crow: u32) -> bool;
+
+	fn get_column_str(&self, table: u64, column: u32, cp: u16) -> Result<Option<String>, SimpleError> {
+		use std::convert::TryFrom;
+		let r = self.get_column(table, column)?;
+		if let Some(v) = r {
+			if ESE_CP::try_from(cp).unwrap() == ESE_CP::Unicode {
+				let buf = unsafe { std::slice::from_raw_parts(v.as_ptr() as *const u16, v.len() / 2) };
+				match String::from_utf16(&buf) {
+					Ok(s) => return Ok(Some(s.to_string())),
+					Err(e) => return Err(SimpleError::new(format!("String::from_utf16 failed: {}", e)))
+				}
+			} else {
+				match std::str::from_utf8(&v) {
+					Ok(s) => return Ok(Some(s.to_string())),
+					Err(e) => return Err(SimpleError::new(format!("std::str::from_utf8 failed: {}", e)))
+				}
+			}
+		}
+		Err(SimpleError::new(format!("can't decode string from {:?}", r)))
+	}
 }

@@ -195,18 +195,6 @@ impl EseDb for EseAPI {
         }
     }
 
-    fn get_column_str(&self, table: u64, column: u32) -> Result<Option<String>, SimpleError> {
-		match self.get_column(table, column)? {
-			Some(s) => {
-				match std::str::from_utf8(&s) {
-					Ok(s) => Ok(Some(s.to_string())),
-					Err(e) => Err(SimpleError::new(format!("std::str::from_utf8 failed: {}", e)))
-				}
-			},
-			None => Ok(None)
-		}
-    }
-
     fn get_column(&self, table: u64, column: u32) -> Result< Option<Vec<u8>>, SimpleError> {
         let mut vres : Vec<u8> = Vec::new();
 
@@ -301,7 +289,7 @@ impl EseDb for EseAPI {
 
         let mut err : Vec<String> = Vec::new();
         loop {
-            let name_str = self.get_column_str(table_id, c_name_info.columnid)?.unwrap();
+            let name_str = self.get_column_str(table_id, c_name_info.columnid, c_name_info.cp)?.unwrap();
             let type_word = self.get_fixed_column::<u16>(table_id, c_type_info.columnid)?.unwrap();
 
             if type_word == 1 {
@@ -332,11 +320,11 @@ impl EseDb for EseAPI {
             let subtable_id = col_list.assume_init().tableid;
 
             loop {
-                let col_name = self.get_column_str(subtable_id, col_list.assume_init().columnidcolumnname)?.unwrap();
-                let col_id = self.get_fixed_column::<u32>(subtable_id, col_list.assume_init().columnidcolumnid)?.unwrap();
-                let col_type = self.get_fixed_column::<u32>(subtable_id, col_list.assume_init().columnidcoltyp)?.unwrap();
-                let col_cbmax = self.get_fixed_column::<u32>(subtable_id, col_list.assume_init().columnidcbMax)?.unwrap();
-                let col_cp = self.get_fixed_column::<u16>(subtable_id, col_list.assume_init().columnidCp)?.unwrap();
+				let col_name = self.get_column_str(subtable_id, col_list.assume_init().columnidcolumnname, 0)?.unwrap();
+				let col_id = self.get_fixed_column::<u32>(subtable_id, col_list.assume_init().columnidcolumnid)?.unwrap();
+				let col_type = self.get_fixed_column::<u32>(subtable_id, col_list.assume_init().columnidcoltyp)?.unwrap();
+				let col_cbmax = self.get_fixed_column::<u32>(subtable_id, col_list.assume_init().columnidcbMax)?.unwrap();
+				let col_cp = self.get_fixed_column::<u16>(subtable_id, col_list.assume_init().columnidCp)?.unwrap();
 
                 cols.push(ColumnInfo {
                     name: col_name,
