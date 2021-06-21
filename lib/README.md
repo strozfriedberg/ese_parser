@@ -11,10 +11,7 @@ What's supported:
 - table page values (rows)
 - multi-valued sparse columns
 - default values
-
-TODO:
 - tagged data (un)compression
-
 
 This library implement `ese_trait` trait, that give such features:
 - load database
