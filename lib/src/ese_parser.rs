@@ -81,12 +81,12 @@ impl EseParser {
 		}
     }
 
-    fn move_next_row(&self, table_id: u64, crow: u32) -> Result<bool, SimpleError> {
+    fn move_next_row(&self, table_id: u64, crow: i32) -> Result<bool, SimpleError> {
         let reader = self.get_reader()?;
         let mut t = self.get_table_by_id(table_id)?;
 
         let mut i = t.page_tag_index + 1;
-        if crow == ESE_MoveFirst as u32 {
+        if crow == ESE_MoveFirst {
             let first_leaf_page = find_first_leaf_page(reader,
                 t.cat.table_catalog_definition.as_ref().unwrap().father_data_page_number)?;
             if t.current_page.is_none() || t.page().page_number != first_leaf_page {
@@ -121,12 +121,12 @@ impl EseParser {
         }
     }
 
-    fn move_previous_row(&self, table_id: u64, crow: u32) -> Result<bool, SimpleError> {
+    fn move_previous_row(&self, table_id: u64, crow: i32) -> Result<bool, SimpleError> {
         let reader = self.get_reader()?;
         let mut t = self.get_table_by_id(table_id)?;
 
         let mut i = t.page_tag_index - 1;
-        if crow == ESE_MoveLast as u32 {
+        if crow == ESE_MoveLast {
             while t.page().common().next_page != 0 {
                 let page = jet::DbPage::new(reader, t.page().common().next_page)?;
                 t.current_page = Some(page);
@@ -158,15 +158,27 @@ impl EseParser {
         }
     }
 
-    fn move_row_helper(&self, table_id: u64, crow: u32) -> Result<bool, SimpleError> {
-        if crow == ESE_MoveFirst as u32 || crow == ESE_MoveNext as u32 {
+    fn move_row_helper(&self, table_id: u64, crow: i32) -> Result<bool, SimpleError> {
+        if crow == ESE_MoveFirst || crow == ESE_MoveNext {
             return self.move_next_row(table_id, crow);
-        } else if crow == ESE_MoveLast as u32 || crow == ESE_MovePrevious as u32 {
+        } else if crow == ESE_MoveLast || crow == ESE_MovePrevious {
             return self.move_previous_row(table_id, crow);
         } else {
-            // TODO: movo to crow
+			if crow > 0 {
+				for _ in 0..crow {
+					if !self.move_next_row(table_id, ESE_MoveNext)? {
+						return Ok(false);
+					}
+				}
+			} else if crow < 0 {
+				for _ in crow..0 {
+					if !self.move_previous_row(table_id, ESE_MovePrevious)? {
+						return Ok(false);
+					}
+				}
+			}
+            Ok(true)
         }
-        Err(SimpleError::new(format!("move_row: TODO: implement me, crow {}", crow)))
     }
 
     pub fn get_fixed_column<T>(&self, table: u64, column: u32) -> Result<Option<T>, SimpleError> {
@@ -271,7 +283,7 @@ impl EseDb for EseParser {
         Ok(columns)
     }
 
-    fn move_row(&self, table: u64, crow: u32) -> bool {
+    fn move_row(&self, table: u64, crow: i32) -> bool {
         match self.move_row_helper(table, crow) {
             Ok(r) => r,
             Err(e) => {

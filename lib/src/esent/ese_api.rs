@@ -274,7 +274,7 @@ impl EseDb for EseAPI {
             Ok(Some(vres))
     }
 
-    fn move_row(&self, table: u64, crow: u32) -> bool {
+    fn move_row(&self, table: u64, crow: i32) -> bool {
         unsafe {
             let err = JetMove(self.sesid, table, crow as std::os::raw::c_long, 0);
             err == 0
@@ -296,7 +296,7 @@ impl EseDb for EseAPI {
                err.push(name_str);
             }
 
-            if !self.move_row(table_id, JET_MoveNext) {
+            if !self.move_row(table_id, ESE_MoveNext) {
                 break;
             }
         }

@@ -139,7 +139,7 @@ impl PyEseDb {
         }
     }
 
-    fn move_row(&self, table: u64, crow: u32) -> bool {
+    fn move_row(&self, table: u64, crow: i32) -> bool {
         self.jdb.move_row(table, crow)
     }
 

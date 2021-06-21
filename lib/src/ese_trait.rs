@@ -49,10 +49,10 @@ pub const ESE_coltypUnsignedShort: u32 = 17;
 pub const ESE_coltypUnsignedLongLong: u32 = 18;
 pub const ESE_coltypMax: u32 = 19;
 
-pub const ESE_MoveFirst: u32 = 2147483648;
+pub const ESE_MoveFirst: i32 = -2147483648;
 pub const ESE_MovePrevious: i32 = -1;
-pub const ESE_MoveNext: u32 = 1;
-pub const ESE_MoveLast: u32 = 2147483647;
+pub const ESE_MoveNext: i32 = 1;
+pub const ESE_MoveLast: i32 = 2147483647;
 
 pub trait EseDb {
     fn load(&mut self, dbpath: &str) -> Option<SimpleError>;
@@ -68,7 +68,7 @@ pub trait EseDb {
     fn get_column(&self, table: u64, column: u32) -> Result< Option<Vec<u8>>, SimpleError>;
     fn get_column_mv(&self, table: u64, column: u32, multi_value_index: u32) -> Result< Option<Vec<u8>>, SimpleError>;
 
-    fn move_row(&self, table: u64, crow: u32) -> bool;
+    fn move_row(&self, table: u64, crow: i32) -> bool;
 
 	fn get_column_str(&self, table: u64, column: u32, cp: u16) -> Result<Option<String>, SimpleError> {
 		use std::convert::TryFrom;
