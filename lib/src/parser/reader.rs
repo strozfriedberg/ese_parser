@@ -538,12 +538,8 @@ pub struct LastLoadState {
 }
 
 impl LastLoadState {
-	pub fn calc_identifier(tbl_def: &jet::TableDefinition, lv_tags: &LV_tags, db_page: &jet::DbPage, page_tag_index: usize)
-		-> usize {
-		tbl_def as *const jet::TableDefinition as usize
-		+ lv_tags as *const LV_tags as usize
-		+ db_page as *const jet::DbPage as usize
-		+ page_tag_index
+	pub fn calc_identifier(table_ptr: usize, page_number: u32, page_tag_index: usize) -> usize {
+		table_ptr + page_number as usize + page_tag_index
 	}
 
 	pub fn init(state_identifier: usize) -> Self {

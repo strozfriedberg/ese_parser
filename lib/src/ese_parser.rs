@@ -27,7 +27,7 @@ impl Table {
     }
 
 	fn review_last_load_state(&mut self, column: u32) {
-		let id = LastLoadState::calc_identifier(&self.cat, &self.lv_tags, &self.page(), self.page_tag_index);
+		let id = LastLoadState::calc_identifier(self as *const _ as usize, self.page().page_number, self.page_tag_index);
 		let mut lls = self.lls.borrow_mut();
 		if lls.state_identifier != id || column <= lls.last_column {
 			// reset
@@ -232,8 +232,8 @@ impl EseDb for EseParser {
         let mut index : usize = 0;
         { // used to drop borrow mut
             let mut t = self.get_table_by_name(table, &mut index)?;
-            let reader = self.get_reader()?;
             if t.cat.long_value_catalog_definition.is_some() {
+				let reader = self.get_reader()?;
                 t.lv_tags = load_lv_metadata(&reader,
                     t.cat.long_value_catalog_definition.as_ref().unwrap().father_data_page_number)?;
             }
