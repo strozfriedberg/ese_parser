@@ -956,12 +956,10 @@ pub fn load_lv_tag(
     }
 
     if (page_tag.size as u64) - (offset - page_tag_offset) == 8 {
-        let _skey: u32 = reader.read_struct(offset)?;
-        offset += 4;
-
-        let _total_size : u32 = reader.read_struct(offset)?;
-
-        // TODO: handle? page_tags with skey & total_size only
+        //let _skey: u32 = reader.read_struct(offset)?;
+        //offset += 4;
+        //let _total_size : u32 = reader.read_struct(offset)?;
+		// TODO: handle? page_tags with skey & total_size only (seems don't need)
         return Ok(None);
     } else {
         let mut page_key: Vec<u8> = vec![];
