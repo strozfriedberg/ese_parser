@@ -2,10 +2,8 @@
 
 use super::*;
 use std::collections::HashSet;
-use std::convert::TryFrom;
 use crate::ese_parser::EseParser;
 use crate::ese_trait::*;
-use encoding::{all::UTF_8, Encoding};
 
 #[cfg(target_os = "windows")]
 use crate::parser::reader::gen_db::*;
@@ -72,25 +70,15 @@ pub fn caching_test() -> Result<(), SimpleError> {
 
 fn check_row(jdb: &mut EseParser, table_id: u64, columns: &Vec<ColumnInfo>) -> HashSet<String> {
     let mut values = HashSet::<String>::new();
-
     for col in columns {
-        match jdb.get_column_str(table_id, col.id, 0) {
-            Ok(result) =>
-                if let Some(mut value) = result {
-                    if ESE_CP::try_from(col.cp).unwrap() == ESE_CP::Unicode {
-                        unsafe {
-                            let buffer = slice::from_raw_parts(value.as_bytes() as *const _ as *const u16, value.len() / 2);
-                            value = String::from_utf16(&buffer).unwrap();
-                        }
-                    }
-                    if let Ok(s) = UTF_8.decode(&value.as_bytes(), encoding::DecoderTrap::Strict) {
-                        value = s;
-                    }
+        match jdb.get_column_str(table_id, col.id, col.cp) {
+            Ok(result) => {
+                if let Some(value) = result {
                     values.insert(value);
                 } else {
-                    println!("column '{}' has no value", col.name);
                     values.insert("".to_string());
-                },
+                }
+			},
             Err(e) => panic!("error: {}", e),
         }
     }

@@ -139,7 +139,7 @@ impl PyEseDb {
         }
     }
 
-    fn move_row(&self, table: u64, crow: u32) -> bool {
+    fn move_row(&self, table: u64, crow: i32) -> bool {
         self.jdb.move_row(table, crow)
     }
 
@@ -147,7 +147,7 @@ impl PyEseDb {
         let gil = Python::acquire_gil();
         let py = gil.python();
 
-        let d = self.jdb.get_column_dyn_mv(table, column.id, multi_value_index);
+        let d = self.jdb.get_column_mv(table, column.id, multi_value_index);
         match d {
             Ok(ov) => {
                 match ov {
@@ -164,7 +164,7 @@ impl PyEseDb {
         let py = gil.python();
 
         fn get<T>(s : &PyEseDb, table: u64, column: &PyColumnInfo) -> PyResult<Option<T>> {
-            match s.jdb.get_column::<T>(table, column.id) {
+            match s.jdb.get_fixed_column::<T>(table, column.id) {
                 Ok(ov) => {
                     match ov {
                         Some(n) => return Ok(Some(n)),
@@ -221,7 +221,7 @@ impl PyEseDb {
                 Ok(Some(n.to_object(py)))
             },
             ESE_coltypBinary => {
-                match self.jdb.get_column_dyn(table, column.id, column.cbmax as usize) {
+                match self.jdb.get_column(table, column.id) {
                     Ok(ov) => {
                         match ov {
                             Some(n) => return Ok(Some(n.to_object(py))),
@@ -232,7 +232,7 @@ impl PyEseDb {
                 }
             },
             ESE_coltypText => {
-                match self.jdb.get_column_dyn(table, column.id, column.cbmax as usize) {
+                match self.jdb.get_column(table, column.id) {
                     Ok(ov) => {
                         match ov {
                             Some(v) => {
@@ -246,13 +246,7 @@ impl PyEseDb {
                 }
             },
             ESE_coltypLongText => {
-                let d;
-                if column.cbmax == 0 {
-                    d = self.jdb.get_column_dyn_varlen(table, column.id);
-                } else {
-                    d = self.jdb.get_column_dyn(table, column.id, column.cbmax as usize);
-                }
-                match d {
+                match self.jdb.get_column(table, column.id) {
                     Ok(ov) => {
                         match ov {
                             Some(v) => {
@@ -266,13 +260,7 @@ impl PyEseDb {
                 }
             },
             ESE_coltypLongBinary => {
-                let d;
-                if column.cbmax == 0 {
-                    d = self.jdb.get_column_dyn_varlen(table, column.id);
-                } else {
-                    d = self.jdb.get_column_dyn(table, column.id, column.cbmax as usize);
-                }
-                match d {
+                match self.jdb.get_column(table, column.id) {
                     Ok(ov) => {
                         match ov {
                             Some(n) => return Ok(Some(n.to_object(py))),
@@ -283,7 +271,7 @@ impl PyEseDb {
                 }
             },
             ESE_coltypGUID => {
-                match self.jdb.get_column_dyn(table, column.id, column.cbmax as usize) {
+                match self.jdb.get_column(table, column.id) {
                     Ok(ov) => {
                         match ov {
                             Some(v) => {
