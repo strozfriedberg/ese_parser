@@ -27,11 +27,11 @@ impl Table {
     }
 
 	fn review_last_load_state(&mut self, column: u32) {
-		let id = LastLoadState::calc_identifier(self as *const _ as usize, self.page().page_number, self.page_tag_index);
 		let mut lls = self.lls.borrow_mut();
-		if lls.state_identifier != id || column <= lls.last_column {
+		if lls.page_number != self.page().page_number || lls.page_tag_index != self.page_tag_index ||
+            column <= lls.last_column {
 			// reset
-			*lls = LastLoadState::init(id);
+			*lls = LastLoadState::init(self.page().page_number, self.page_tag_index);
 		}
 	}
 }

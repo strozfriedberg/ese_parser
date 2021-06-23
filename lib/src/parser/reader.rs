@@ -524,7 +524,8 @@ pub struct VariableSizeDataState {
 
 #[derive(Clone, Debug, Default)]
 pub struct LastLoadState {
-	pub state_identifier: usize,
+	pub page_number: u32,
+    pub page_tag_index: usize,
 	pub last_column: u32,
 	pub offset: u64,
 	pub offset_ddh: u64,
@@ -538,14 +539,11 @@ pub struct LastLoadState {
 }
 
 impl LastLoadState {
-	pub fn calc_identifier(table_ptr: usize, page_number: u32, page_tag_index: usize) -> usize {
-		table_ptr + page_number as usize + page_tag_index
-	}
-
-	pub fn init(state_identifier: usize) -> Self {
+	pub fn init(page_number: u32, page_tag_index: usize) -> Self {
 		let mut lls: LastLoadState = Default::default();
-		lls.state_identifier = state_identifier;
-		lls
+		lls.page_number = page_number;
+		lls.page_tag_index = page_tag_index;
+        lls
 	}
 }
 
