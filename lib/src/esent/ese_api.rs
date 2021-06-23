@@ -320,11 +320,11 @@ impl EseDb for EseAPI {
             let subtable_id = col_list.assume_init().tableid;
 
             loop {
-				let col_name = self.get_column_str(subtable_id, col_list.assume_init().columnidcolumnname, 0)?.unwrap();
-				let col_id = self.get_fixed_column::<u32>(subtable_id, col_list.assume_init().columnidcolumnid)?.unwrap();
-				let col_type = self.get_fixed_column::<u32>(subtable_id, col_list.assume_init().columnidcoltyp)?.unwrap();
-				let col_cbmax = self.get_fixed_column::<u32>(subtable_id, col_list.assume_init().columnidcbMax)?.unwrap();
-				let col_cp = self.get_fixed_column::<u16>(subtable_id, col_list.assume_init().columnidCp)?.unwrap();
+                let col_name = self.get_column_str(subtable_id, col_list.assume_init().columnidcolumnname, 0)?.unwrap();
+                let col_id = self.get_fixed_column::<u32>(subtable_id, col_list.assume_init().columnidcolumnid)?.unwrap();
+                let col_type = self.get_fixed_column::<u32>(subtable_id, col_list.assume_init().columnidcoltyp)?.unwrap();
+                let col_cbmax = self.get_fixed_column::<u32>(subtable_id, col_list.assume_init().columnidcbMax)?.unwrap();
+                let col_cp = self.get_fixed_column::<u16>(subtable_id, col_list.assume_init().columnidCp)?.unwrap();
 
                 cols.push(ColumnInfo {
                     name: col_name,
