@@ -77,6 +77,12 @@ impl EseDb for EseBoth {
         let api_columns = self.api.get_columns(table).map_err(|e| SimpleError::new(format!("EseAPI::get_columns failed: {}", e)))?;
         let parser_columns = self.parser.get_columns(table).map_err(|e| SimpleError::new(format!("EseParser::get_columns failed: {}", e)))?;
         if api_columns.len() != parser_columns.len() {
+            if api_columns.len() > parser_columns.len() && (table == "MSysObjects" || table == "MSysObjectsShadow") {
+                // there are such fields like KeyMost, LVChunkMax, SeparateLV, SpaceHints, SpaceDeferredLVHints, etc
+                // useless for us (database-dependend) and not present in catalog (TODO)
+                // https://github.com/libyal/libesedb/blob/main/documentation/Extensible%20Storage%20Engine%20(ESE)%20Database%20File%20(EDB)%20format.asciidoc#catalog
+                return Ok(parser_columns);
+            }
             return Err(SimpleError::new(format!("get_columns({}) have a different number of columns: EseAPI columns:\n{:?}\n not equal to EseParser:\n{:?}\n",
                 table, api_columns, parser_columns)));
         }
