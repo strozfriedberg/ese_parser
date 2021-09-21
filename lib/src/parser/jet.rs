@@ -80,10 +80,10 @@ pub enum ColumnType {
     Text = 10,
     LongBinary = 11,
     LongText = 12,
-    SLV = 13,
+    Slv = 13,
     UnsignedLong = 14,
     LongLong = 15,
-    GUID = 16,
+    Guid = 16,
     UnsignedShort = 17,
     Max = 18,
 }

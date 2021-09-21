@@ -4,7 +4,7 @@ use simple_error::SimpleError;
 fn seven_bit_decompress_get_size(
 	compressed_data: &[u8]
 ) -> usize {
-	if compressed_data.len() < 1 || compressed_data[0] >> 3 > 2 /* NOT 7BITASCII and NOT 7BITUNICODE */ {
+	if compressed_data.is_empty() || compressed_data[0] >> 3 > 2 /* NOT 7BITASCII and NOT 7BITUNICODE */ {
 	  return 0;
 	}
 	let cbit_final = (compressed_data[0] & 0x7) + 1;
@@ -15,7 +15,7 @@ fn seven_bit_decompress_get_size(
 fn seven_bit_decompress_buf(
     compressed_data: &[u8]
 ) -> Result<Vec<u8>, SimpleError> {
-	if compressed_data.len() < 1 || compressed_data[0] == 0x18 {
+	if compressed_data.is_empty() || compressed_data[0] == 0x18 {
 		return Err(SimpleError::new("compressed data is too short"));
 	}
 
@@ -41,7 +41,7 @@ fn seven_bit_decompress_buf(
 		*i = byte;
 		compressed_bit += 7;
 		if compressed_bit >= 8 {
-			compressed_bit = compressed_bit % 8;
+			compressed_bit %= 8;
 			compressed_index += 1;
 		}
 	}
@@ -91,25 +91,25 @@ fn test_7bit_decompression() {
 pub fn decompress_size(
 	compressed_data : &[u8]
 ) -> usize {
-    if compressed_data.len() < 1 {
+    if compressed_data.is_empty() {
 		return 0;
 	}
 	let identifier = compressed_data[0] >> 3;
 	match identifier {
 		1 => { // 7bit ASCII
-			return seven_bit_decompress_get_size(compressed_data);
+			seven_bit_decompress_get_size(compressed_data)
 		},
 		2 => { // 7bit UNICODE
-			return seven_bit_decompress_get_size(compressed_data) * 2;
+			seven_bit_decompress_get_size(compressed_data) * 2
 		},
 		3 => { // LZXPRESS
 			if compressed_data.len() < 3 {
 				return 0;
 			}
-			return u16::from_ne_bytes([compressed_data[1], compressed_data[2]]) as usize;
+			u16::from_ne_bytes([compressed_data[1], compressed_data[2]]) as usize
 		},
 		_ => {
-			return 0;
+			0
 		}
 	}
 }
@@ -118,13 +118,13 @@ pub fn decompress_buf(
     compressed_data: &[u8],
     decompressed_size: usize
 ) -> Result<Vec<u8>, SimpleError> {
-	if compressed_data.len() < 1 {
+	if compressed_data.is_empty() {
 		return Err(SimpleError::new("compressed data is too short"));
 	}
 	let identifier = compressed_data[0] >> 3;
 	match identifier {
 		1 => { // 7bit ASCII
-			return seven_bit_decompress_buf(compressed_data);
+			seven_bit_decompress_buf(compressed_data)
 		},
 		2 => { // 7bit UNICODE
 			let decompressed_buf = seven_bit_decompress_buf(compressed_data)?;
@@ -136,7 +136,7 @@ pub fn decompress_buf(
 				buf[i+1] = 0;
 				i += 2;
 			}
-			return Ok(buf);
+			Ok(buf)
 		},
 		3 => { // LZXPRESS
 			if compressed_data.len() < 3 {
@@ -144,12 +144,12 @@ pub fn decompress_buf(
 			}
 			match lz77_decompress(&compressed_data[3..], decompressed_size) {
 				Ok(unc) => {
-					return Ok(unc);
+					Ok(unc)
 				},
 				Err(e) => {
 					let s = format!("{:?}", e);
 					println!("{}", s);
-					return Err(SimpleError::new(s));
+					Err(SimpleError::new(s))
 				}
 			}
 		},
@@ -260,7 +260,7 @@ fn lz77_decompress(
             in_pos += 2;
 
 			let offset = (length / 8) + 1;
-            length = length % 8;
+            length %= 8;
 
             if length == 7 {
                 if last_len == 0 {

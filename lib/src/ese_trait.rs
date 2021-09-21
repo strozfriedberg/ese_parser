@@ -76,8 +76,8 @@ pub trait EseDb {
 		if let Some(v) = r {
 			if ESE_CP::try_from(cp).unwrap() == ESE_CP::Unicode {
 				let buf = unsafe { std::slice::from_raw_parts(v.as_ptr() as *const u16, v.len() / 2) };
-				match String::from_utf16(&buf) {
-					Ok(s) => return Ok(Some(s.to_string())),
+				match String::from_utf16(buf) {
+					Ok(s) => return Ok(Some(s)),
 					Err(e) => return Err(SimpleError::new(format!("String::from_utf16 failed: {}", e)))
 				}
 			} else {
