@@ -1003,18 +1003,6 @@ pub type LV_tags = HashMap<u32/*key*/, HashMap<u32/*seg_offset*/, LV_tag>>;
 
 fn merge_lv_tags(tags: &mut LV_tags, new_tags: LV_tags) {
 	for (new_key, new_segs) in new_tags {
-        /*
-		if tags.contains_key(&new_key) {
-			let segs = tags.get_mut(&new_key).unwrap();
-			for (new_seg_offset, new_lv_tags) in new_segs {
-				let r = segs.insert(new_seg_offset, new_lv_tags);
-				assert!(r.is_none(), "{}", true);
-			}
-		} else {
-			let r = tags.insert(new_key, new_segs);
-			debug_assert!(r.is_none(), "new_key wasn't there before insert fn called!");
-		}
-        */
         if let std::collections::hash_map::Entry::Vacant(e) = tags.entry(new_key) {
             let r : std::option::Option<u32> = { e.insert(new_segs); None };
             debug_assert!(r.is_none(), "new_key wasn't there before insert fn called!");
