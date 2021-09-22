@@ -24,7 +24,7 @@ fn truncate(s: &str, max_chars: usize) -> &str {
     }
 }
 
-fn get_column<T>(jdb: &Box<dyn EseDb>, table: u64, column: u32) -> Result<Option<T>, SimpleError> {
+fn get_column<T>(jdb: &dyn EseDb, table: u64, column: u32) -> Result<Option<T>, SimpleError> {
     let size = size_of::<T>();
     let mut dst = std::mem::MaybeUninit::<T>::zeroed();
 
@@ -40,7 +40,7 @@ fn get_column<T>(jdb: &Box<dyn EseDb>, table: u64, column: u32) -> Result<Option
 }
 
 fn get_column_val(
-    jdb: &Box<dyn EseDb>,
+    jdb: &dyn EseDb,
     table_id: u64,
     c: &ColumnInfo,
 ) -> Result<String, SimpleError> {
@@ -99,14 +99,14 @@ fn get_column_val(
             assert!(c.cbmax as usize == size_of::<u64>());
             match get_column::<u64>(jdb, table_id, c.id)? {
                 Some(v) => val = format!("{}", v),
-                None => val = format!(" "),
+                None => val = (" ").to_string(),
             }
         }
         ESE_coltypCurrency => {
             assert!(c.cbmax as usize == size_of::<i64>());
             match get_column::<i64>(jdb, table_id, c.id)? {
                 Some(v) => val = format!("{}", v),
-                None => val = format!(" "),
+                None => val = (" ").to_string(),
             }
         }
         ESE_coltypIEEESingle => {
@@ -264,15 +264,13 @@ fn print_table(cols: &[ColumnInfo], rows: &[Vec<String>]) {
         println!("{}|", row);
     }
 }
-
+//Is this really a clarity improvement? 
+type Table = (/*cols:*/ Vec<ColumnInfo>, /*rows:*/ Vec<Vec<String>>);
 fn dump_table(
-    jdb: &Box<dyn EseDb>,
+    jdb: &dyn EseDb,
     t: &str,
 ) -> Result<
-    Option<(
-        /*cols:*/ Vec<ColumnInfo>,
-        /*rows:*/ Vec<Vec<String>>,
-    )>,
+    Option<Table>,
     SimpleError,
 > {
     let table_id = jdb.open_table(t)?;
