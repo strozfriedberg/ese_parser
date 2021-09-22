@@ -1,15 +1,21 @@
-#![allow(non_upper_case_globals, non_snake_case, non_camel_case_types, clippy::mut_from_ref, clippy::cast_ptr_alignment)]
+#![allow(
+    non_upper_case_globals,
+    non_snake_case,
+    non_camel_case_types,
+    clippy::mut_from_ref,
+    clippy::cast_ptr_alignment
+)]
 
 mod ese_both;
 
-use std::env;
-use ese_parser_lib::{ese_trait::*, ese_parser::*, vartime::*};
-use std::mem::size_of;
+use ese_parser_lib::{ese_parser::*, ese_trait::*, vartime::*};
 use simple_error::SimpleError;
-use widestring::U16String;
 use std::convert::TryFrom;
+use std::env;
+use std::mem::size_of;
+use widestring::U16String;
 
-const CACHE_SIZE_ENTRIES : usize = 10;
+const CACHE_SIZE_ENTRIES: usize = 10;
 
 fn truncate(s: &str, max_chars: usize) -> &str {
     match s.char_indices().nth(max_chars) {
@@ -26,168 +32,170 @@ fn get_column<T>(jdb: &Box<dyn EseDb>, table: u64, column: u32) -> Result<Option
 
     unsafe {
         if let Some(v) = vo {
-            std::ptr::copy_nonoverlapping(
-                v.as_ptr(),
-                dst.as_mut_ptr() as *mut u8,
-                size);
+            std::ptr::copy_nonoverlapping(v.as_ptr(), dst.as_mut_ptr() as *mut u8, size);
             return Ok(Some(dst.assume_init()));
         }
-        return Ok(None);
+        Ok(None)
     }
 }
 
-fn get_column_val(jdb: &Box<dyn EseDb>, table_id: u64, c: &ColumnInfo) -> Result<String, SimpleError> {
+fn get_column_val(
+    jdb: &Box<dyn EseDb>,
+    table_id: u64,
+    c: &ColumnInfo,
+) -> Result<String, SimpleError> {
     let val;
     match c.typ {
         ESE_coltypBit => {
             assert!(c.cbmax as usize == size_of::<i8>());
             match get_column::<i8>(jdb, table_id, c.id)? {
                 Some(v) => val = format!("{}", v),
-                None => val = format!(" ")
+                None => val = (" ").to_string(),
             }
-        },
+        }
         ESE_coltypUnsignedByte => {
             assert!(c.cbmax as usize == size_of::<u8>());
             match get_column::<u8>(jdb, table_id, c.id)? {
                 Some(v) => val = format!("{}", v),
-                None => val = format!(" ")
+                None => val = (" ").to_string(),
             }
-        },
+        }
         ESE_coltypShort => {
             assert!(c.cbmax as usize == size_of::<i16>());
             match get_column::<i16>(jdb, table_id, c.id)? {
                 Some(v) => val = format!("{}", v),
-                None => val = format!(" ")
+                None => val = format!(" "),
             }
-        },
+        }
         ESE_coltypUnsignedShort => {
             assert!(c.cbmax as usize == size_of::<u16>());
             match get_column::<u16>(jdb, table_id, c.id)? {
                 Some(v) => val = format!("{}", v),
-                None => val = format!(" ")
+                None => val = (" ").to_string(),
             }
-        },
+        }
         ESE_coltypLong => {
             assert!(c.cbmax as usize == size_of::<i32>());
             match get_column::<i32>(jdb, table_id, c.id)? {
                 Some(v) => val = format!("{}", v),
-                None => val = format!(" ")
+                None => val = format!(" "),
             }
-        },
+        }
         ESE_coltypUnsignedLong => {
             assert!(c.cbmax as usize == size_of::<u32>());
             match get_column::<u32>(jdb, table_id, c.id)? {
                 Some(v) => val = format!("{}", v),
-                None => val = format!(" ")
+                None => val = format!(" "),
             }
-        },
+        }
         ESE_coltypLongLong => {
             assert!(c.cbmax as usize == size_of::<i64>());
             match get_column::<i64>(jdb, table_id, c.id)? {
                 Some(v) => val = format!("{}", v),
-                None => val = format!(" ")
+                None => val = (" ").to_string(),
             }
-        },
+        }
         ESE_coltypUnsignedLongLong => {
             assert!(c.cbmax as usize == size_of::<u64>());
             match get_column::<u64>(jdb, table_id, c.id)? {
                 Some(v) => val = format!("{}", v),
-                None => val = format!(" ")
+                None => val = format!(" "),
             }
-        },
+        }
         ESE_coltypCurrency => {
             assert!(c.cbmax as usize == size_of::<i64>());
             match get_column::<i64>(jdb, table_id, c.id)? {
                 Some(v) => val = format!("{}", v),
-                None => val = format!(" ")
+                None => val = format!(" "),
             }
-        },
+        }
         ESE_coltypIEEESingle => {
             assert!(c.cbmax as usize == size_of::<f32>());
             match get_column::<f32>(jdb, table_id, c.id)? {
                 Some(v) => val = format!("{}", v),
-                None => val = format!(" ")
+                None => val = (" ").to_string(),
             }
-        },
+        }
         ESE_coltypIEEEDouble => {
             assert!(c.cbmax as usize == size_of::<f64>());
             match get_column::<f64>(jdb, table_id, c.id)? {
                 Some(v) => val = format!("{}", v),
-                None => val = format!(" ")
+                None => val = (" ").to_string(),
+            }
+        }
+        ESE_coltypBinary => match jdb.get_column(table_id, c.id)? {
+            Some(v) => {
+                let s = v
+                    .iter()
+                    .map(|c| format!("{:x?} ", c))
+                    .collect::<String>();
+                val = format!("{} ", s);
+            }
+            None => {
+                val = (" ").to_string();
             }
         },
-        ESE_coltypBinary => {
-            match jdb.get_column(table_id, c.id)? {
-                Some(v) => {
-                    let s = v.iter().map(|c| format!("{:x?} ", c).to_string() ).collect::<String>();
-                    val = format!("{} ", s);
-                },
-                None => {
-                    val = format!(" ");
+        ESE_coltypText => match jdb.get_column(table_id, c.id)? {
+            Some(v) => {
+                if ESE_CP::try_from(c.cp) == Ok(ESE_CP::Unicode) {
+                    let t = v.as_slice();
+                    unsafe {
+                        let (_, v16, _) = t.align_to::<u16>();
+                        let U16Str = U16String::from_ptr(v16.as_ptr(), v16.len());
+                        val = U16Str.to_string_lossy();
+                    }
+                } else {
+                    match std::str::from_utf8(&v) {
+                        Ok(s) => val = s.to_string(),
+                        Err(e) => val = format!("from_utf8 failed: {}", e),
+                    }
                 }
             }
+            None => {
+                val = (" ").to_string();
+            }
         },
-        ESE_coltypText => {
-            match jdb.get_column(table_id, c.id)? {
-                Some(v) => {
-                    if ESE_CP::try_from(c.cp) == Ok(ESE_CP::Unicode) {
-                        let t = v.as_slice();
-                        unsafe {
-                            let (_, v16, _) = t.align_to::<u16>();
-                            let U16Str = U16String::from_ptr(v16.as_ptr(), v16.len());
-                            let ws = U16Str.to_string_lossy();
-                            val = format!("{}", ws);
-                        }
-                    } else {
-                        match std::str::from_utf8(&v) {
-                            Ok(s) => val = format!("{}", s),
-                            Err(e) => val = format!("from_utf8 failed: {}", e)
+        ESE_coltypLongText => match jdb.get_column(table_id, c.id)? {
+            Some(v) => {
+                if ESE_CP::try_from(c.cp) == Ok(ESE_CP::Unicode) {
+                    let t = v.as_slice();
+                    unsafe {
+                        let (_, v16, _) = t.align_to::<u16>();
+                        let U16Str = U16String::from_ptr(v16.as_ptr(), v16.len());
+                        let ws = U16Str.to_string_lossy();
+                        if ws.len() > 32 {
+                            val = format!(
+                                "{:4} bytes: {}...",
+                                ws.len(),
+                                truncate(&ws, 32).to_string()
+                            );
+                        } else {
+                            val = ws;
                         }
                     }
-                },
-                None => {
-                    val = format!(" ");
-                }
-            }
-        },
-        ESE_coltypLongText => {
-            match jdb.get_column(table_id, c.id)? {
-                Some(v) => {
-                    if ESE_CP::try_from(c.cp) == Ok(ESE_CP::Unicode) {
-                        let t = v.as_slice();
-                        unsafe {
-                            let (_, v16, _) = t.align_to::<u16>();
-                            let U16Str = U16String::from_ptr(v16.as_ptr(), v16.len());
-                            let ws = U16Str.to_string_lossy();
-                            if ws.len() > 32 {
-                                val = format!("{:4} bytes: {}...", ws.len(), truncate(&ws, 32).to_string());
-                            } else {
-                                val = format!("{}", ws);
-                            }
-                        }
-                    } else {
-                        match std::str::from_utf8(&v) {
-                            Ok(s) => val = format!("{}", s),
-                            Err(e) => val = format!("from_utf8 failed: {}", e)
-                        }
+                } else {
+                    match std::str::from_utf8(&v) {
+                        Ok(s) => val = s.to_string(),
+                        Err(e) => val = format!("from_utf8 failed: {}", e),
                     }
-                },
-                None => {
-                    val = format!(" ");
                 }
             }
+            None => {
+                val = (" ").to_string();
+            }
         },
-        ESE_coltypLongBinary => {
-            match jdb.get_column(table_id, c.id)? {
-                Some(mut v) => {
-                    let orig_size = v.len();
-                    v.truncate(16);
-                    let s = v.iter().map(|c| format!("{:02x} ", c).to_string() ).collect::<String>();
-                    val = format!("{:4} bytes: {}...", orig_size, s);
-                },
-                None => {
-                    val = format!(" ");
-                }
+        ESE_coltypLongBinary => match jdb.get_column(table_id, c.id)? {
+            Some(mut v) => {
+                let orig_size = v.len();
+                v.truncate(16);
+                let s = v
+                    .iter()
+                    .map(|c| format!("{:02x} ", c))
+                    .collect::<String>();
+                val = format!("{:4} bytes: {}...", orig_size, s);
+            }
+            None => {
+                val = (" ").to_string();
             }
         },
         ESE_coltypGUID => {
@@ -196,35 +204,42 @@ fn get_column_val(jdb: &Box<dyn EseDb>, table_id: u64, c: &ColumnInfo) -> Result
                     // {CD2C96BD-DCA8-47CB-B829-8F1AE4E2E686}
                     val = format!("{{{:02X}{:02X}{:02X}{:02X}-{:02X}{:02X}-{:02X}{:02X}-{:02X}{:02X}-{:02X}{:02X}{:02X}{:02X}{:02X}{:02X}}}",
                         v[3], v[2], v[1], v[0], v[5], v[4], v[7], v[6], v[8], v[9], v[10], v[11], v[12], v[13], v[14], v[15]);
-                },
+                }
                 None => {
-                    val = format!(" ");
+                    val = (" ").to_string();
                 }
             }
-        },
+        }
         ESE_coltypDateTime => {
             assert!(c.cbmax as usize == size_of::<f64>());
             match get_column::<f64>(jdb, table_id, c.id)? {
                 Some(v) => {
-                    let mut st = unsafe { std::mem::MaybeUninit::<SYSTEMTIME>::zeroed().assume_init() };
+                    let mut st =
+                        unsafe { std::mem::MaybeUninit::<SYSTEMTIME>::zeroed().assume_init() };
                     if VariantTimeToSystemTime(v, &mut st) {
-                        val = format!("{}.{}.{} {}:{}:{}", st.wDay, st.wMonth, st.wYear, st.wHour, st.wMinute, st.wSecond);
+                        val = format!(
+                            "{}.{}.{} {}:{}:{}",
+                            st.wDay, st.wMonth, st.wYear, st.wHour, st.wMinute, st.wSecond
+                        );
                     } else {
-                        return Err(SimpleError::new(format!("VariantTimeToSystemTime failed")));
+                        return Err(SimpleError::new(("VariantTimeToSystemTime failed").to_string()));
                     }
-                },
-                None => val = format!(" ")
+                }
+                None => val = (" ").to_string(),
             }
-        },
+        }
         _ => {
-            return Err(SimpleError::new(format!("Incorrect column type: {}, max is 19", c.typ)));
+            return Err(SimpleError::new(format!(
+                "Incorrect column type: {}, max is 19",
+                c.typ
+            )));
         }
     }
     Ok(val)
 }
 
-fn print_table(cols: &Vec<ColumnInfo>, rows: &Vec<Vec<String>>) {
-    let mut col_sp : Vec<usize> = Vec::new();
+fn print_table(cols: &[ColumnInfo], rows: &[Vec<String>]) {
+    let mut col_sp: Vec<usize> = Vec::new();
     for i in 0..cols.len() {
         let mut col_max_sz = cols[i].name.len();
         for j in 0..rows.len() {
@@ -250,24 +265,32 @@ fn print_table(cols: &Vec<ColumnInfo>, rows: &Vec<Vec<String>>) {
     }
 }
 
-fn dump_table(jdb: &Box<dyn EseDb>, t: &str)
-    -> Result<Option<(/*cols:*/Vec<ColumnInfo>, /*rows:*/Vec<Vec<String>>)>, SimpleError> {
-    let table_id = jdb.open_table(&t)?;
-    let cols = jdb.get_columns(&t)?;
+fn dump_table(
+    jdb: &Box<dyn EseDb>,
+    t: &str,
+) -> Result<
+    Option<(
+        /*cols:*/ Vec<ColumnInfo>,
+        /*rows:*/ Vec<Vec<String>>,
+    )>,
+    SimpleError,
+> {
+    let table_id = jdb.open_table(t)?;
+    let cols = jdb.get_columns(t)?;
     if !jdb.move_row(table_id, ESE_MoveFirst) {
         // empty table
         return Ok(None);
     }
-    let mut rows : Vec<Vec<String>> = Vec::new();
+    let mut rows: Vec<Vec<String>> = Vec::new();
     loop {
-        let mut values : Vec<String> = Vec::new();
+        let mut values: Vec<String> = Vec::new();
         for c in &cols {
-            let val = get_column_val(jdb, table_id, &c);
+            let val = get_column_val(jdb, table_id, c);
             match val {
                 Err(e) => {
                     println!("Error: {}", e);
                     values.push("".to_string());
-                },
+                }
                 Ok(v) => {
                     values.push(v);
                 }
@@ -287,7 +310,7 @@ fn dump_table(jdb: &Box<dyn EseDb>, t: &str)
 pub enum Mode {
     EseApi,
     EseParser,
-    Both
+    Both,
 }
 
 #[cfg(target_os = "windows")]
@@ -305,26 +328,33 @@ fn alloc_jdb(m: &Mode) -> Box<dyn EseDb> {
 #[cfg(any(target_os = "linux", target_os = "macos"))]
 fn alloc_jdb(m: &Mode) -> Box<dyn EseDb> {
     if *m != Mode::EseParser {
-        eprintln!("Unsupported mode: {:?}. EseAPI is available only under Windows build.", m);
+        eprintln!(
+            "Unsupported mode: {:?}. EseAPI is available only under Windows build.",
+            m
+        );
         std::process::exit(-1);
     }
-    return Box::new(EseParser::init(CACHE_SIZE_ENTRIES));
+    Box::new(EseParser::init(CACHE_SIZE_ENTRIES))
 }
 
 fn main() {
-    let mut mode : Mode = {
+    let mut mode: Mode = {
         #[cfg(target_os = "windows")]
-        { Mode::Both }
+        {
+            Mode::Both
+        }
         #[cfg(any(target_os = "linux", target_os = "macos"))]
-        { Mode::EseParser }
+        {
+            Mode::EseParser
+        }
     };
     let mut table = String::new();
     let mut args: Vec<String> = env::args().skip(1).collect();
-    if args.len() == 0 {
+    if args.is_empty() {
         eprintln!("db path required");
         return;
     }
-    if args[0].find("help").is_some() {
+    if args[0].contains("help") {
         eprintln!("[/m mode] [/t table] db path");
         eprintln!("where mode one of [EseAPI, EseParser, *Both - default]");
         std::process::exit(0);
@@ -346,7 +376,7 @@ fn main() {
         table = args[1].clone();
         args.drain(..2);
     }
-    if args.len() == 0 {
+    if args.is_empty() {
         eprintln!("db path required");
         std::process::exit(-1);
     }
@@ -358,18 +388,18 @@ fn main() {
     let v = jdb.load(&dbpath);
     if v.is_some() {
         println!("Error: {:?}", v.unwrap());
-        return ;
+        return;
     }
     println!("loaded {}", dbpath);
 
     let handle_table = |t: &str| {
         println!("table {}", &t);
-        match dump_table(&jdb, &t) {
+        match dump_table(&jdb, t) {
             Ok(opt) => match opt {
                 Some((cols, rows)) => print_table(&cols, &rows),
-                None => println!("table {} is empty.", &t)
+                None => println!("table {} is empty.", &t),
             },
-            Err(e) => println!("table {}: {}", &t, e)
+            Err(e) => println!("table {}: {}", &t, e),
         }
     };
 

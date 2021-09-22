@@ -325,7 +325,7 @@ pub fn load_catalog(
                 db_page.page_number)));
         }
 
-        for i in pg_tags {
+        for i in pg_tags.iter().skip(1) {
             if jet::PageTagFlags::from_bits_truncate(i.flags).intersects(jet::PageTagFlags::FLAG_IS_DEFUNCT) {
                 continue;
             }
