@@ -223,7 +223,7 @@ impl fmt::Display for DateTime {
             let dt: OsDateTime = OsDateTime::from(
                 chrono::FixedOffset::east(offset)
                     .from_local_datetime(&ndt)
-                    .unwrap(),
+                    .expect("Failed to get datetime"),
             );
 
             write!(f, "{}", dt)

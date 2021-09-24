@@ -56,7 +56,7 @@ impl EseAPI {
     }
 
     fn set_system_parameter_sz(paramId : u32, szParam: &str) {
-        let strParam = CString::new(szParam).unwrap();
+        let strParam = CString::new(szParam).expect("String param failed");
         jettry!(JetSetSystemParameterA(ptr::null_mut(), 0, paramId, 0, strParam.as_ptr()));
     }
 
@@ -65,7 +65,7 @@ impl EseAPI {
 
         JET_COLUMNCREATE_A{
             cbStruct: size_of::<JET_COLUMNCREATE_A>() as u32,
-            szColumnName: CString::new(name).unwrap().into_raw(),
+            szColumnName: CString::new(name).expect("Column name failed").into_raw(),
             coltyp: col_type,
             cbMax: 0,
             grbit,
@@ -87,7 +87,7 @@ impl EseAPI {
 
         let mut table_def =  JET_TABLECREATE_A{
                     cbStruct: size_of::<JET_TABLECREATE_A>() as u32,
-                    szTableName: CString::new(name).unwrap().into_raw(),
+                    szTableName: CString::new(name).unwrap("Failed to create table name").into_raw(),
                     szTemplateTableName: ptr::null_mut(),
                     ulPages: 0,
                     ulDensity: 0,
@@ -139,7 +139,7 @@ pub fn prepare_db(filename: &str, table: &str, pg_size: usize, record_size: usiz
     println!("creating {}", dst_path.display());
     let mut db_client = EseAPI::new(filename, pg_size);
 
-    let dbpath = CString::new(dst_path.to_str().unwrap()).unwrap();
+    let dbpath = CString::new(dst_path.to_str().expect()).unwrap();
     jettry!(JetCreateDatabaseA(db_client.sesid, dbpath.as_ptr(), ptr::null(), &mut db_client.dbid, 0));
 
     let mut columns = Vec::<JET_COLUMNCREATE_A>::with_capacity(5);

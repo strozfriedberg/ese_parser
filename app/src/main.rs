@@ -64,7 +64,7 @@ fn get_column_val(
             assert!(c.cbmax as usize == size_of::<i16>());
             match get_column::<i16>(jdb, table_id, c.id)? {
                 Some(v) => val = format!("{}", v),
-                None => val = format!(" "),
+                None => val = (" ").to_string(),
             }
         }
         ESE_coltypUnsignedShort => {
@@ -78,14 +78,14 @@ fn get_column_val(
             assert!(c.cbmax as usize == size_of::<i32>());
             match get_column::<i32>(jdb, table_id, c.id)? {
                 Some(v) => val = format!("{}", v),
-                None => val = format!(" "),
+                None => val = (" ").to_string(),
             }
         }
         ESE_coltypUnsignedLong => {
             assert!(c.cbmax as usize == size_of::<u32>());
             match get_column::<u32>(jdb, table_id, c.id)? {
                 Some(v) => val = format!("{}", v),
-                None => val = format!(" "),
+                None => val = (" ").to_string(),
             }
         }
         ESE_coltypLongLong => {
@@ -240,32 +240,34 @@ fn get_column_val(
 
 fn print_table(cols: &[ColumnInfo], rows: &[Vec<String>]) {
     let mut col_sp: Vec<usize> = Vec::new();
-    for i in 0..cols.len() {
-        let mut col_max_sz = cols[i].name.len();
-        for j in 0..rows.len() {
-            if rows[j][i].len() > col_max_sz {
-                col_max_sz = rows[j][i].len();
+    for (i, col) in cols.iter().enumerate() {
+        let mut col_max_sz = col.name.len();        
+        for row in rows.iter() {
+            if row[i].len() > col_max_sz {
+                col_max_sz = row[i].len();
             }
         }
         col_sp.push(col_max_sz);
     }
 
-    let mut nrow = String::new();
-    for i in 0..cols.len() {
-        nrow = format!("{}|{:2$}", nrow, cols[i].name, col_sp[i]);
+    let mut nrow = String::new(); 
+    for (i, col) in cols.iter().enumerate() {
+        nrow = format!("{}|{:2$}", nrow, col.name, col_sp[i]);
     }
     println!("{}|", nrow);
 
-    for i in 0..rows.len() {
-        let mut row = String::new();
-        for j in 0..rows[i].len() {
-            row = format!("{}|{:2$}", row, rows[i][j], col_sp[j]);
+    for r in rows.iter() {
+        let mut row = String::new();        
+        for (j, r2) in r.iter().enumerate() {
+            row = format!("{}|{:2$}", row, r2, col_sp[j]);
         }
         println!("{}|", row);
     }
 }
-//Is this really a clarity improvement? 
-type Table = (/*cols:*/ Vec<ColumnInfo>, /*rows:*/ Vec<Vec<String>>);
+
+type Row = Vec<Vec<String>>;
+type Col = Vec<ColumnInfo>;
+type Table = (Col, Row);
 fn dump_table(
     jdb: &dyn EseDb,
     t: &str,
@@ -383,16 +385,17 @@ fn main() {
     let mut jdb = alloc_jdb(&mode);
     println!("mode {:?}, path: {}", &mode, dbpath);
 
-    let v = jdb.load(&dbpath);
-    if v.is_some() {
+    let v = jdb.load(&dbpath).expect("Bad path");
+    /*if v.is_some() {
+        v.expect()
         println!("Error: {:?}", v.unwrap());
         return;
-    }
+    }*/
     println!("loaded {}", dbpath);
 
     let handle_table = |t: &str| {
         println!("table {}", &t);
-        match dump_table(&jdb, t) {
+        match dump_table(&*jdb, t) {
             Ok(opt) => match opt {
                 Some((cols, rows)) => print_table(&cols, &rows),
                 None => println!("table {} is empty.", &t),
@@ -402,7 +405,7 @@ fn main() {
     };
 
     if table.is_empty() {
-        let tables = jdb.get_tables().unwrap();
+        let tables = jdb.get_tables().expect("Tables not found");
         for t in tables {
             handle_table(&t);
         }

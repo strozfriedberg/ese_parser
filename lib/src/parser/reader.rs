@@ -3,6 +3,7 @@ use std::{fs, io, io::{Seek, Read}, mem, path::Path, slice, convert::TryInto, ce
 use std::collections::{BTreeSet, HashMap};
 use simple_error::SimpleError;
 use cache_2q::Cache;
+use std::convert::TryFrom;
 
 use crate::parser::ese_db;
 use crate::parser::ese_db::*;
@@ -29,6 +30,16 @@ unsafe fn _any_as_slice<'a, U: Sized, T: Sized>(p: &'a &T) -> &'a [U] {
         mem::size_of::<T>() / mem::size_of::<U>(),
     )
 }
+
+// enum SimpleError {
+//     UnsignedError(std::num::TryFromIntError),
+// }
+
+// impl TryFrom<std::num::TryFromIntError> for simple_error::SimpleError {
+//     fn try_from(error: std::num::TryFromIntError) -> Self {
+//         simple_error::SimpleError::UnsignedError(error)
+//     }
+// }
 
 impl Reader {
 
@@ -704,7 +715,8 @@ fn init_tag_state(
 ) -> Result<Option<Vec<u8>>, SimpleError> {
     tag_state.types_offset = var_state.value_offset;
     tag_state.remaining_definition_data_size =
-        (record_data_size - tag_state.types_offset as u64).try_into().unwrap();
+        //(record_data_size - tag_state.types_offset as u64).try_into()?;
+        u16::try_from(record_data_size - tag_state.types_offset as u64)?;
 
     *offset = offset_ddh + tag_state.types_offset as u64;
 
@@ -973,14 +985,15 @@ pub fn load_lv_tag(
 		let mut seg_offset = 0;
 
         if page_key.len() == 8 {
-            let segment_offset = unsafe {
-                std::mem::transmute::<[u8; 4], u32>(page_key[4..8].try_into().unwrap())
-            }.to_be();
+            // let segment_offset = unsafe {
+            //     std::mem::transmute::<[u8; 4], u32>(page_key[4..8].try_into().unwrap())
+            // }.to_be();
+            let segment_offset = u32::from_le_bytes(page_key[4..8].try_into().expect("Bad slice length")).to_be();
             seg_offset = segment_offset;
         }
 
         res.offset = offset;
-        res.size = (page_tag.size as u64 - (offset - page_tag_offset)).try_into().unwrap();
+        res.size = (page_tag.size as u64 - (offset - page_tag_offset)).try_into().expect("Bad res size");
 
 		let mut t : HashMap<u32, LV_tag> = HashMap::new();
 		t.insert(seg_offset, res);
@@ -1007,7 +1020,7 @@ fn merge_lv_tags(tags: &mut LV_tags, new_tags: LV_tags) {
             let r : std::option::Option<u32> = { e.insert(new_segs); None };
             debug_assert!(r.is_none(), "new_key wasn't there before insert fn called!");
         } else {
-            let segs = tags.get_mut(&new_key).unwrap();
+            let segs = tags.get_mut(&new_key).expect("No new_key found");
 			for (new_seg_offset, new_lv_tags) in new_segs {
 				let r = segs.insert(new_seg_offset, new_lv_tags);
 				assert!(r.is_none(), "{}", true);
@@ -1096,11 +1109,11 @@ pub fn load_lv_data(
 ) -> Result<Vec<u8>, SimpleError> {
     let mut res : Vec<u8> = vec![];
 	if lv_tags.contains_key(&long_value_key) {
-		let seg_offsets = lv_tags.get(&long_value_key).unwrap();
+		let seg_offsets = lv_tags.get(&long_value_key).expect("No long value key");
 		loop {
 			let offset = res.len() as u32;
 			if seg_offsets.contains_key(&offset) {
-				let tag = seg_offsets.get(&offset).unwrap();
+				let tag = seg_offsets.get(&offset).expect("No offset");
 				let mut v = reader.read_bytes(tag.offset, tag.size as usize)?;
 				if compressed {
 					let dsize = decompress_size(&v);

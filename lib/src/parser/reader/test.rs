@@ -4,6 +4,7 @@ use super::*;
 use std::collections::HashSet;
 use crate::ese_parser::EseParser;
 use crate::ese_trait::*;
+use std::path::PathBuf;
 
 #[cfg(target_os = "windows")]
 use crate::parser::reader::gen_db::*;
@@ -118,7 +119,7 @@ pub fn run_decompress_test(filename: &str, record_size : usize) -> Result<(), Si
 		let values = check_row(&mut jdb, table_id, &columns);
 		assert_eq!(values.len(), 1);
 		let v = format!("Record {number:>width$}", number=i, width=record_size);
-		assert_eq!(values.contains(&v), true);
+		assert!(values.contains(&v), true);
 		if !jdb.move_row(table_id, ESE_MoveNext) {
 			break;
 		}

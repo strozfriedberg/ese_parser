@@ -24,7 +24,7 @@ pub struct EseParser {
 
 impl Table {
     fn page(&self) -> &jet::DbPage {
-        self.current_page.as_ref().unwrap()
+        self.current_page.as_ref().expect("Did not find current page")
     }
 
 	fn review_last_load_state(&mut self, column: u32) {
@@ -41,7 +41,7 @@ impl EseParser {
     fn get_table_by_name(&self, table: &str, index: &mut usize) -> Result<RefMut<Table>, SimpleError> {
         for i in 0..self.tables.len() {
             let n = self.tables[i].borrow_mut();
-            if n.cat.table_catalog_definition.as_ref().unwrap().name == table {
+            if n.cat.table_catalog_definition.as_ref().expect("Did not find table").name == table {
                 *index = i;
                 return Ok(n);
             }
@@ -89,7 +89,7 @@ impl EseParser {
         let mut i = t.page_tag_index + 1;
         if crow == ESE_MoveFirst {
             let first_leaf_page = find_first_leaf_page(reader,
-                t.cat.table_catalog_definition.as_ref().unwrap().father_data_page_number)?;
+                t.cat.table_catalog_definition.as_ref().expect("First leaf page failed").father_data_page_number)?;
             if t.current_page.is_none() || t.page().page_number != first_leaf_page {
                 let page = jet::DbPage::new(reader, first_leaf_page)?;
                 t.current_page = Some(page);
@@ -110,7 +110,7 @@ impl EseParser {
                 t.page_tag_index = i;
                 return Ok(true);
             } else if t.page().common().next_page != 0 {
-                let page = jet::DbPage::new(self.get_reader().unwrap(), t.page().common().next_page)?;
+                let page = jet::DbPage::new(self.get_reader()?, t.page().common().next_page)?;
                 t.current_page = Some(page);
                 i = 1;
             } else {

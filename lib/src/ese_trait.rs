@@ -74,7 +74,7 @@ pub trait EseDb {
 		use std::convert::TryFrom;
 		let r = self.get_column(table, column)?;
 		if let Some(v) = r {
-			if ESE_CP::try_from(cp).unwrap() == ESE_CP::Unicode {
+			if ESE_CP::try_from(cp).expect("Failed to get ESE cp") == ESE_CP::Unicode {
 				let buf = unsafe { std::slice::from_raw_parts(v.as_ptr() as *const u16, v.len() / 2) };
 				match String::from_utf16(buf) {
 					Ok(s) => return Ok(Some(s)),

@@ -68,20 +68,20 @@ fn test_7bit_decompression() {
 	let uncompressed_data_size = seven_bit_decompress_get_size(&test_compression_7bit_compressed_data);
 	assert_eq!(uncompressed_data_size, 55);
 
-	let uncompressed_data = seven_bit_decompress_buf(&test_compression_7bit_compressed_data).unwrap();
+	let uncompressed_data = seven_bit_decompress_buf(&test_compression_7bit_compressed_data).expect("7-bit decompression failed");
 	assert_eq!(&uncompressed_data, &test_compression_7bit_uncompressed_data);
 
 	let empty : Vec<u8> = vec![];
 	assert_eq!(seven_bit_decompress_get_size(&empty), 0);
 	let empty_res = seven_bit_decompress_buf(&empty);
-	assert_eq!(empty_res.is_err(), true);
+	assert!(empty_res.is_err(), true);
 
 	// test 7bit UNICODE decompression
 	test_compression_7bit_compressed_data[0] = 0x16;
 	let uncompressed_data_size_u = decompress_size(&test_compression_7bit_compressed_data);
 	assert_eq!(uncompressed_data_size_u, 110);
 
-	let uncompressed_data_u = decompress_buf(&test_compression_7bit_compressed_data, uncompressed_data_size_u).unwrap();
+	let uncompressed_data_u = decompress_buf(&test_compression_7bit_compressed_data, uncompressed_data_size_u).expect("decompression failed");
 	for i in 0..uncompressed_data.len() {
 		assert_eq!(uncompressed_data[i], uncompressed_data_u[i*2]);
 		assert_eq!(uncompressed_data_u[i*2+1], 0);
@@ -205,8 +205,8 @@ fn test_lzxpress_decompression() {
 	let comp_data : Vec<u8> = vec![
 		0x18, 0x2C, 0x01, 0xff, 0xff, 0xff, 0x1f, 0x61, 0x62, 0x63, 0x17, 0x00, 0x0f, 0xff, 0x26, 0x01];
 	let ms1 = ms_impl_decompress_size(&comp_data);
-	let ms1_dec = ms_impl_decompress_buf(&comp_data, ms1).unwrap();
-	let unc = lz77_decompress(&comp_data[3..], ms1).unwrap();
+	let ms1_dec = ms_impl_decompress_buf(&comp_data, ms1).unwrap("ms_impl decomp failed");
+	let unc = lz77_decompress(&comp_data[3..], ms1).expect("lz77 decomp failed");
 	assert_eq!(ms1_dec, unc);
 }
 
