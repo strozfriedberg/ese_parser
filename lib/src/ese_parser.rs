@@ -41,9 +41,11 @@ impl EseParser {
     fn get_table_by_name(&self, table: &str, index: &mut usize) -> Result<RefMut<Table>, SimpleError> {
         for i in 0..self.tables.len() {
             let n = self.tables[i].borrow_mut();
-            if n.cat.table_catalog_definition.as_ref().expect("Did not find table").name == table {
-                *index = i;
-                return Ok(n);
+            if let Some(table_catalog_definition) = &n.cat.table_catalog_definition {
+                if table_catalog_definition.name == table {
+                    *index = i;
+                    return Ok(n);
+                }
             }
         }
         Err(SimpleError::new(format!("can't find table name {}", table)))
@@ -151,7 +153,7 @@ impl EseParser {
             } else {
                 // no more leaf pages
                 return Ok(false);
-            } 
+            }
         }
     }
 

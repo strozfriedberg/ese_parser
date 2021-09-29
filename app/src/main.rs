@@ -241,7 +241,7 @@ fn get_column_val(
 fn print_table(cols: &[ColumnInfo], rows: &[Vec<String>]) {
     let mut col_sp: Vec<usize> = Vec::new();
     for (i, col) in cols.iter().enumerate() {
-        let mut col_max_sz = col.name.len();        
+        let mut col_max_sz = col.name.len();
         for row in rows.iter() {
             if row[i].len() > col_max_sz {
                 col_max_sz = row[i].len();
@@ -250,14 +250,14 @@ fn print_table(cols: &[ColumnInfo], rows: &[Vec<String>]) {
         col_sp.push(col_max_sz);
     }
 
-    let mut nrow = String::new(); 
+    let mut nrow = String::new();
     for (i, col) in cols.iter().enumerate() {
         nrow = format!("{}|{:2$}", nrow, col.name, col_sp[i]);
     }
     println!("{}|", nrow);
 
     for r in rows.iter() {
-        let mut row = String::new();        
+        let mut row = String::new();
         for (j, r2) in r.iter().enumerate() {
             row = format!("{}|{:2$}", row, r2, col_sp[j]);
         }
@@ -385,12 +385,10 @@ fn main() {
     let mut jdb = alloc_jdb(&mode);
     println!("mode {:?}, path: {}", &mode, dbpath);
 
-    let v = jdb.load(&dbpath).expect("Bad path");
-    /*if v.is_some() {
-        v.expect()
-        println!("Error: {:?}", v.unwrap());
+    if let Some(load_error) = jdb.load(&dbpath) {
+        println!("Error: {:?}", load_error);
         return;
-    }*/
+    }
     println!("loaded {}", dbpath);
 
     let handle_table = |t: &str| {

@@ -4,7 +4,6 @@ use super::*;
 use std::collections::HashSet;
 use crate::ese_parser::EseParser;
 use crate::ese_trait::*;
-use std::path::PathBuf;
 
 #[cfg(target_os = "windows")]
 use crate::parser::reader::gen_db::*;
@@ -103,7 +102,7 @@ pub fn decompress_test_lzxpress() -> Result<(), SimpleError> {
 pub fn run_decompress_test(filename: &str, record_size : usize) -> Result<(), SimpleError> {
     let table = "test_table";
     let path = prepare_db(filename, table, 1024 * 8, record_size, 10);
-    let mut jdb : EseParser = EseParser::init(5);
+    let mut jdb = EseParser::init(5);
 
     match jdb.load(&path.to_str().unwrap()) {
         Some(e) => panic!("Error: {}", e),
