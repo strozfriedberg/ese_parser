@@ -1,6 +1,6 @@
 //reader.rs
 use std::{fs, io, io::{Seek, Read}, mem, path::Path, slice, convert::TryInto, cell::RefCell};
-use std::collections::{BTreeSet, HashMap};
+use std::collections::{BTreeSet, HashMap, hash_map::Entry};
 use simple_error::SimpleError;
 use cache_2q::Cache;
 
@@ -657,7 +657,7 @@ pub fn load_data(
                 let variable_size_data_type_size : u16 = reader.read_struct(lls.offset_ddh + lls.var_state.type_offset as u64)?;
                 lls.var_state.type_offset += 2;
                 lls.var_state.current_type += 1;
-                if lls.var_state.current_type == col.identifier && (variable_size_data_type_size & 0x8000) == 0 {                    
+                if lls.var_state.current_type == col.identifier && (variable_size_data_type_size & 0x8000) == 0 {
                     let var_offset = lls.offset_ddh + lls.var_state.value_offset as u64;
                     let var_size = variable_size_data_type_size - lls.previous_variable_size_data_type_size;
 
@@ -713,11 +713,18 @@ fn init_tag_state(
     record_data_size: u64,
 ) -> Result<Option<Vec<u8>>, SimpleError> {
     tag_state.types_offset = var_state.value_offset;
+<<<<<<< HEAD
     tag_state.remaining_definition_data_size =
         (record_data_size - tag_state.types_offset as u64)
         .try_into()
         .map_err(|e: std::num::TryFromIntError| SimpleError::new(e.to_string()))?;
         
+=======
+
+    tag_state.remaining_definition_data_size = (record_data_size - tag_state.types_offset as u64)
+        .try_into()
+        .map_err(|e: std::num::TryFromIntError| SimpleError::new(e.to_string()))?;
+>>>>>>> refs/remotes/origin/ASDF-3721
 
     *offset = offset_ddh + tag_state.types_offset as u64;
 
@@ -1015,20 +1022,36 @@ pub struct LV_tag {
 
 pub type LV_tags = HashMap<u32/*key*/, HashMap<u32/*seg_offset*/, LV_tag>>;
 
-fn merge_lv_tags(tags: &mut LV_tags, new_tags: LV_tags) {
+/*fn merge_lv_tags(tags: &mut LV_tags, new_tags: LV_tags) {
 	for (new_key, new_segs) in new_tags {
-        if let std::collections::hash_map::Entry::Vacant(e) = tags.entry(new_key) {
-            let r : std::option::Option<u32> = { e.insert(new_segs); None };
-            debug_assert!(r.is_none(), "new_key wasn't there before insert fn called!");
-        } else {
-            let segs = tags.get_mut(&new_key).expect("No new_key found");
+		if tags.contains_key(&new_key) {
+			let segs = tags.get_mut(&new_key).unwrap();
 			for (new_seg_offset, new_lv_tags) in new_segs {
 				let r = segs.insert(new_seg_offset, new_lv_tags);
-				assert!(r.is_none(), "{}", true);
+				//assert_eq!(r.is_none(), true);
+			    debug_assert!(r.is_none() != true, "new_key wasn't there before insert fn called!");
 			}
-        }
-        
+		} else {
+			let r = tags.insert(new_key, new_segs);
+			debug_assert!(r.is_none() == true, "new_key was there before insert fn called!");
+		}
 	}
+}*/
+
+fn merge_lv_tags(tags: &mut LV_tags, new_tags: LV_tags) {
+	for (new_key, new_segs) in new_tags {
+        match tags.entry(new_key) {
+            Entry::Vacant(e) => {
+                e.insert(new_segs);
+            },
+            Entry::Occupied(mut e) => {
+                let segs = e.get_mut();
+                for (new_seg_offset, new_lv_tags) in new_segs {
+                    segs.insert(new_seg_offset, new_lv_tags);
+                }
+            }
+        }
+    }
 }
 
 pub fn load_lv_metadata(

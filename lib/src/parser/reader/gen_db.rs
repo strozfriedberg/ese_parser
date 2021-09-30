@@ -2,7 +2,7 @@
 #![cfg(test)]
 
 use super::*;
-use std::{str, ffi::CString, mem::size_of, os::raw, ptr};
+use std::{str, ffi::CString, mem::size_of, os::raw, ptr, path::PathBuf};
 use crate::esent::esent::*;
 use encoding::{all::{ASCII, UTF_16LE, UTF_8}, Encoding, EncoderTrap};
 use crate::ese_trait::ESE_CP;
@@ -87,7 +87,7 @@ impl EseAPI {
 
         let mut table_def =  JET_TABLECREATE_A{
                     cbStruct: size_of::<JET_TABLECREATE_A>() as u32,
-                    szTableName: CString::new(name).unwrap("Failed to create table name").into_raw(),
+                    szTableName: CString::new(name).expect("Failed to create table name").into_raw(),
                     szTemplateTableName: ptr::null_mut(),
                     ulPages: 0,
                     ulDensity: 0,
@@ -139,7 +139,7 @@ pub fn prepare_db(filename: &str, table: &str, pg_size: usize, record_size: usiz
     println!("creating {}", dst_path.display());
     let mut db_client = EseAPI::new(filename, pg_size);
 
-    let dbpath = CString::new(dst_path.to_str().expect()).unwrap();
+    let dbpath = CString::new(dst_path.to_str().unwrap()).unwrap();
     jettry!(JetCreateDatabaseA(db_client.sesid, dbpath.as_ptr(), ptr::null(), &mut db_client.dbid, 0));
 
     let mut columns = Vec::<JET_COLUMNCREATE_A>::with_capacity(5);
