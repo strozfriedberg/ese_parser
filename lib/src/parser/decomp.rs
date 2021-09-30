@@ -74,7 +74,7 @@ fn test_7bit_decompression() {
 	let empty : Vec<u8> = vec![];
 	assert_eq!(seven_bit_decompress_get_size(&empty), 0);
 	let empty_res = seven_bit_decompress_buf(&empty);
-	assert!(empty_res.is_err(), true);
+	assert!(empty_res.is_err(), "{}", true);
 
 	// test 7bit UNICODE decompression
 	test_compression_7bit_compressed_data[0] = 0x16;

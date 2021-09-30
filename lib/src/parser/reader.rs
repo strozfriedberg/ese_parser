@@ -3,7 +3,6 @@ use std::{fs, io, io::{Seek, Read}, mem, path::Path, slice, convert::TryInto, ce
 use std::collections::{BTreeSet, HashMap};
 use simple_error::SimpleError;
 use cache_2q::Cache;
-use std::convert::TryFrom;
 
 use crate::parser::ese_db;
 use crate::parser::ese_db::*;
@@ -715,8 +714,10 @@ fn init_tag_state(
 ) -> Result<Option<Vec<u8>>, SimpleError> {
     tag_state.types_offset = var_state.value_offset;
     tag_state.remaining_definition_data_size =
-        //(record_data_size - tag_state.types_offset as u64).try_into()?;
-        u16::try_from(record_data_size - tag_state.types_offset as u64)?;
+        (record_data_size - tag_state.types_offset as u64)
+        .try_into()
+        .map_err(|e: std::num::TryFromIntError| SimpleError::new(e.to_string()))?;
+        
 
     *offset = offset_ddh + tag_state.types_offset as u64;
 

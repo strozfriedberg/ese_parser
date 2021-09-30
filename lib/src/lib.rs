@@ -29,10 +29,10 @@ fn test_edb_table_all_values() {
     let table = "TestTable";
     println!("table {}", table);
 
-    let columns = jdb.get_columns(&table).unwrap();
+    let columns = jdb.get_columns(table).unwrap();
 
-    let table_id = jdb.open_table(&table).unwrap();
-    assert!(jdb.move_row(table_id, ESE_MoveFirst), true);
+    let table_id = jdb.open_table(table).unwrap();
+    assert!(jdb.move_row(table_id, ESE_MoveFirst), "{}", true);
 
     let bit = columns.iter().find(|x| x.name == "Bit" ).unwrap();
     assert_eq!(jdb.get_fixed_column::<i8>(table_id, bit.id).unwrap(), Some(0));
@@ -50,10 +50,10 @@ fn test_edb_table_all_values() {
     assert_eq!(jdb.get_fixed_column::<i64>(table_id, currency.id).unwrap(), Some(350050)); // 35.0050
 
     let float = columns.iter().find(|x| x.name == "IEEESingle" ).unwrap();
-    assert_eq!(jdb.get_fixed_column::<f32>(table_id, float.id).unwrap(), Some(3.141592));
+    assert_eq!(jdb.get_fixed_column::<f32>(table_id, float.id).unwrap(), Some(std::f32::consts::PI));
 
     let double = columns.iter().find(|x| x.name == "IEEEDouble" ).unwrap();
-    assert_eq!(jdb.get_fixed_column::<f64>(table_id, double.id).unwrap(), Some(3.141592653589));
+    assert_eq!(jdb.get_fixed_column::<f64>(table_id, double.id).unwrap(), Some(std::f64::consts::PI));
 
     let unsigned_long = columns.iter().find(|x| x.name == "UnsignedLong" ).unwrap();
     assert_eq!(jdb.get_fixed_column::<u32>(table_id, unsigned_long.id).unwrap(), Some(4294967295));
@@ -71,7 +71,7 @@ fn test_edb_table_all_values() {
 
         let mut st = unsafe { std::mem::MaybeUninit::<vartime::SYSTEMTIME>::zeroed().assume_init() };
         let r = vartime::VariantTimeToSystemTime(dt, &mut st);
-        assert!(r, true);
+        assert!(r, "{}", true);
         assert_eq!(st.wDayOfWeek, 1);
         assert_eq!(st.wDay, 29);
         assert_eq!(st.wMonth, 3);
@@ -97,8 +97,8 @@ fn test_edb_table_all_values() {
         assert_eq!(binary.cbmax, 255);
 
         let b = jdb.get_column(table_id, binary.id).unwrap().unwrap();
-        for i in 0..b.len() {
-            assert_eq!(b[i], (i % 255) as u8);
+        for (i,&bin) in b.iter().enumerate() {
+            assert_eq!(bin, (i % 255) as u8);
         }
     }
 
@@ -109,15 +109,15 @@ fn test_edb_table_all_values() {
 
         let b = jdb.get_column(table_id, long_binary.id).unwrap().unwrap();
         assert_eq!(b.len(), 128);
-        for i in 0..b.len() {
-            assert_eq!(b[i], (i % 255) as u8);
+        for (i,&long_bin) in b.iter().enumerate() {
+            assert_eq!(long_bin, (i % 255) as u8);
         }
 
         // multi-test value inside of long-value test
         let b = jdb.get_column_mv(table_id, long_binary.id, 2).unwrap().unwrap();
         assert_eq!(b.len(), 65536);
-        for i in 0..b.len() {
-            assert_eq!(b[i], (i % 255) as u8);
+        for (i,&long_bin) in b.iter().enumerate() {
+            assert_eq!(long_bin, (i % 255) as u8);
         }
     }
 
@@ -131,9 +131,9 @@ fn test_edb_table_all_values() {
 
         let str = jdb.get_column_str(table_id, text.id, text.cp).unwrap().unwrap();
         let t = jdb.get_column(table_id, text.id).unwrap().unwrap();
-        for i in 0..t.len() {
+        for (i,&text) in t.iter().enumerate() {
             let expected_char = abc.as_bytes()[i % abc.len()];
-            assert_eq!(t[i], expected_char);
+            assert_eq!(text, expected_char);
             assert_eq!(str.as_bytes()[i], expected_char);
         }
 
@@ -141,8 +141,8 @@ fn test_edb_table_all_values() {
         let v = jdb.get_column_mv(table_id, text.id, 2).unwrap().unwrap();
         let h = "Hello".to_string();
         assert_eq!(v.len()-2, h.len());
-        for i in 0..v.len()-2 {
-            assert_eq!(v[i], h.as_bytes()[i]);
+        for (i, &text) in v.iter().enumerate().take(v.len()-2) {
+            assert_eq!(text, h.as_bytes()[i]);
         }
     }
 

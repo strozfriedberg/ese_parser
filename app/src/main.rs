@@ -385,12 +385,11 @@ fn main() {
     let mut jdb = alloc_jdb(&mode);
     println!("mode {:?}, path: {}", &mode, dbpath);
 
-    let v = jdb.load(&dbpath).expect("Bad path");
-    /*if v.is_some() {
-        v.expect()
+    let v = jdb.load(&dbpath);
+    if v.is_some() {
         println!("Error: {:?}", v.unwrap());
         return;
-    }*/
+    }
     println!("loaded {}", dbpath);
 
     let handle_table = |t: &str| {

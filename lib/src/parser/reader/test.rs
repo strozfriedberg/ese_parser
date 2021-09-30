@@ -10,14 +10,14 @@ use std::path::PathBuf;
 use crate::parser::reader::gen_db::*;
 
 #[cfg(not(target_os = "windows"))]
-pub fn prepare_db(filename: &str, table: &str, pg_size: usize, record_size: usize, records_cnt: usize) -> PathBuf {
+pub fn prepare_db(filename: &str, _table: &str, _pg_size: usize, _record_size: usize, _records_cnt: usize) -> PathBuf {
     let mut dst_path = PathBuf::from("testdata").canonicalize().unwrap();
     dst_path.push(filename);
     dst_path
 }
 
 #[cfg(not(target_os = "windows"))]
-pub fn clean_db(dst_path: &PathBuf) {
+pub fn clean_db(_dst_path: &Path) {
 }
 
 #[test]
@@ -49,14 +49,13 @@ pub fn caching_test() -> Result<(), SimpleError> {
             let offset: u64 = pg_no as u64 * (page_size + chunk_size as u64);
 
             println!("pass {}, pg_no {}, offset {:x} ", pass, pg_no, offset);
+            let mut chunk = Vec::<u8>::with_capacity(stride as usize);
 
             if pass == 1 {
-                let mut chunk = Vec::<u8>::with_capacity(stride as usize);
                 assert!(!reader.cache.get_mut().contains_key(&pg_no));
                 reader.read(offset, &mut chunk)?;
                 chunks.push(chunk);
             } else {
-                let mut chunk = Vec::<u8>::with_capacity(stride as usize);
                 // pg_no == 1 was deleted, because cache_size is 10 pages
                 // and we read 11, so least recently used page (1) was deleted
                 assert_eq!(reader.cache.get_mut().contains_key(&pg_no), pg_no != 1);
@@ -69,7 +68,7 @@ pub fn caching_test() -> Result<(), SimpleError> {
     Ok(())
 }
 
-fn check_row(jdb: &mut EseParser, table_id: u64, columns: &Vec<ColumnInfo>) -> HashSet<String> {
+fn check_row(jdb: &mut EseParser, table_id: u64, columns: &[ColumnInfo]) -> HashSet<String> {
     let mut values = HashSet::<String>::new();
     for col in columns {
         match jdb.get_column_str(table_id, col.id, col.cp) {
@@ -105,13 +104,13 @@ pub fn run_decompress_test(filename: &str, record_size : usize) -> Result<(), Si
     let path = prepare_db(filename, table, 1024 * 8, record_size, 10);
     let mut jdb : EseParser = EseParser::init(5);
 
-    match jdb.load(&path.to_str().unwrap()) {
+    match jdb.load(path.to_str().unwrap()) {
         Some(e) => panic!("Error: {}", e),
         None => println!("Loaded {}", path.display())
     }
 
-    let table_id = jdb.open_table(&table)?;
-    let columns = jdb.get_columns(&table)?;
+    let table_id = jdb.open_table(table)?;
+    let columns = jdb.get_columns(table)?;
 
     assert!(jdb.move_row(table_id, ESE_MoveFirst));
 
@@ -119,7 +118,7 @@ pub fn run_decompress_test(filename: &str, record_size : usize) -> Result<(), Si
 		let values = check_row(&mut jdb, table_id, &columns);
 		assert_eq!(values.len(), 1);
 		let v = format!("Record {number:>width$}", number=i, width=record_size);
-		assert!(values.contains(&v), true);
+		assert!(values.contains(&v), "{}", true);
 		if !jdb.move_row(table_id, ESE_MoveNext) {
 			break;
 		}
