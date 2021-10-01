@@ -385,14 +385,8 @@ fn main() {
     let mut jdb = alloc_jdb(&mode);
     println!("mode {:?}, path: {}", &mode, dbpath);
 
-<<<<<<< HEAD
-    let v = jdb.load(&dbpath);
-    if v.is_some() {
-        println!("Error: {:?}", v.unwrap());
-=======
     if let Some(load_error) = jdb.load(&dbpath) {
         println!("Error: {:?}", load_error);
->>>>>>> refs/remotes/origin/ASDF-3721
         return;
     }
     println!("loaded {}", dbpath);

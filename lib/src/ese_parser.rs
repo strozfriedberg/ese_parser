@@ -264,11 +264,17 @@ impl EseDb for EseParser {
         let mut index : usize = 0;
         { // used to drop borrow mut
             let mut t = self.get_table_by_name(table, &mut index)?;
-            if t.cat.long_value_catalog_definition.is_some() {
-				let reader = self.get_reader()?;
+            if let Some(long_value_catalog_definition) = &t.cat.long_value_catalog_definition {
+                let reader = self.get_reader()?;
                 t.lv_tags = load_lv_metadata(reader,
-                    t.cat.long_value_catalog_definition.as_ref().unwrap().father_data_page_number)?;
+                    long_value_catalog_definition.father_data_page_number)?;
             }
+            
+            // if t.cat.long_value_catalog_definition.is_some() {
+			// 	let reader = self.get_reader()?;
+            //     t.lv_tags = load_lv_metadata(reader,
+            //         t.cat.long_value_catalog_definition.as_ref().map_err(|e: std::num::TryFromIntError| SimpleError::new(e.to_string())).father_data_page_number)?;
+            // } 
         }
         // ignore return result
         self.move_row_helper(index as u64, ESE_MoveFirst)?;

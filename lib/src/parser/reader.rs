@@ -1,5 +1,5 @@
 //reader.rs
-use std::{fs, io, io::{Seek, Read}, mem, path::Path, slice, convert::TryInto, cell::RefCell};
+use std::{fs, io, io::{Seek, Read}, mem, path::Path, slice, convert::TryInto, cell::RefCell, array::TryFromSliceError};
 use std::collections::{BTreeSet, HashMap, hash_map::Entry};
 use simple_error::SimpleError;
 use cache_2q::Cache;
@@ -713,18 +713,10 @@ fn init_tag_state(
     record_data_size: u64,
 ) -> Result<Option<Vec<u8>>, SimpleError> {
     tag_state.types_offset = var_state.value_offset;
-<<<<<<< HEAD
-    tag_state.remaining_definition_data_size =
-        (record_data_size - tag_state.types_offset as u64)
-        .try_into()
-        .map_err(|e: std::num::TryFromIntError| SimpleError::new(e.to_string()))?;
-        
-=======
 
     tag_state.remaining_definition_data_size = (record_data_size - tag_state.types_offset as u64)
         .try_into()
         .map_err(|e: std::num::TryFromIntError| SimpleError::new(e.to_string()))?;
->>>>>>> refs/remotes/origin/ASDF-3721
 
     *offset = offset_ddh + tag_state.types_offset as u64;
 
@@ -996,12 +988,17 @@ pub fn load_lv_tag(
             // let segment_offset = unsafe {
             //     std::mem::transmute::<[u8; 4], u32>(page_key[4..8].try_into().unwrap())
             // }.to_be();
-            let segment_offset = u32::from_le_bytes(page_key[4..8].try_into().expect("Bad slice length")).to_be();
+            let segment_offset = u32::from_le_bytes(page_key[4..8]
+                    .try_into()
+                    .map_err(|e: std::array::TryFromSliceError| SimpleError::new(e.to_string()))?
+            ).to_be();
             seg_offset = segment_offset;
         }
 
         res.offset = offset;
-        res.size = (page_tag.size as u64 - (offset - page_tag_offset)).try_into().expect("Bad res size");
+        res.size = (page_tag.size as u64 - (offset - page_tag_offset))
+            .try_into()
+            .map_err(|e: std::num::TryFromIntError| SimpleError::new(e.to_string()))?;
 
 		let mut t : HashMap<u32, LV_tag> = HashMap::new();
 		t.insert(seg_offset, res);
@@ -1021,22 +1018,6 @@ pub struct LV_tag {
 }
 
 pub type LV_tags = HashMap<u32/*key*/, HashMap<u32/*seg_offset*/, LV_tag>>;
-
-/*fn merge_lv_tags(tags: &mut LV_tags, new_tags: LV_tags) {
-	for (new_key, new_segs) in new_tags {
-		if tags.contains_key(&new_key) {
-			let segs = tags.get_mut(&new_key).unwrap();
-			for (new_seg_offset, new_lv_tags) in new_segs {
-				let r = segs.insert(new_seg_offset, new_lv_tags);
-				//assert_eq!(r.is_none(), true);
-			    debug_assert!(r.is_none() != true, "new_key wasn't there before insert fn called!");
-			}
-		} else {
-			let r = tags.insert(new_key, new_segs);
-			debug_assert!(r.is_none() == true, "new_key was there before insert fn called!");
-		}
-	}
-}*/
 
 fn merge_lv_tags(tags: &mut LV_tags, new_tags: LV_tags) {
 	for (new_key, new_segs) in new_tags {

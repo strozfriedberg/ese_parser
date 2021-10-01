@@ -4,6 +4,7 @@ use super::*;
 use std::collections::HashSet;
 use crate::ese_parser::EseParser;
 use crate::ese_trait::*;
+use std::path::PathBuf;
 
 #[cfg(target_os = "windows")]
 use crate::parser::reader::gen_db::*;

@@ -65,7 +65,9 @@ impl EseAPI {
 
         JET_COLUMNCREATE_A{
             cbStruct: size_of::<JET_COLUMNCREATE_A>() as u32,
-            szColumnName: CString::new(name).expect("Column name failed").into_raw(),
+            szColumnName: CString::new(name)
+                .map_err(|e: std::ffi::NulError | SimpleError::new(e.to_string()))?
+                .into_raw(),
             coltyp: col_type,
             cbMax: 0,
             grbit,
@@ -87,7 +89,9 @@ impl EseAPI {
 
         let mut table_def =  JET_TABLECREATE_A{
                     cbStruct: size_of::<JET_TABLECREATE_A>() as u32,
-                    szTableName: CString::new(name).expect("Failed to create table name").into_raw(),
+                    szTableName: CString::new(name)
+                        .map_err(|e: std::ffi::NulError | SimpleError::new(e.to_string()))?
+                        .into_raw(),
                     szTemplateTableName: ptr::null_mut(),
                     ulPages: 0,
                     ulDensity: 0,
@@ -131,7 +135,7 @@ pub fn prepare_db(filename: &str, table: &str, pg_size: usize, record_size: usiz
     -> PathBuf {
     let mut dst_path = std::env::temp_dir();
     dst_path.push(filename);
-
+    //I think the error handling should be right here, and then 146 can be shortened
     if dst_path.exists() {
         let _ = fs::remove_file(&dst_path);
     }
@@ -139,7 +143,7 @@ pub fn prepare_db(filename: &str, table: &str, pg_size: usize, record_size: usiz
     println!("creating {}", dst_path.display());
     let mut db_client = EseAPI::new(filename, pg_size);
 
-    let dbpath = CString::new(dst_path.to_str().unwrap()).unwrap();
+    let dbpath = CString::new(dst_path.to_str().unwrap()).map_err(|e: std::ffi::NulError | SimpleError::new(e.to_string()))?; //hmm 
     jettry!(JetCreateDatabaseA(db_client.sesid, dbpath.as_ptr(), ptr::null(), &mut db_client.dbid, 0));
 
     let mut columns = Vec::<JET_COLUMNCREATE_A>::with_capacity(5);
@@ -191,6 +195,6 @@ pub fn prepare_db(filename: &str, table: &str, pg_size: usize, record_size: usiz
 }
 
 pub fn clean_db(dst_path: &PathBuf) {
-    fs::remove_file(dst_path.with_extension("jfm")).unwrap();
-    fs::remove_file(dst_path).unwrap();
+    fs::remove_file(dst_path.with_extension("jfm")).map_err(remove_file)?;
+    fs::remove_file(dst_path).map_err(remove_file)?;
 }
