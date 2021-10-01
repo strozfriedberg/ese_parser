@@ -1,5 +1,5 @@
 //reader.rs
-use std::{fs, io, io::{Seek, Read}, mem, path::Path, slice, convert::TryInto, cell::RefCell, array::TryFromSliceError};
+use std::{fs, io, io::{Seek, Read}, mem, path::Path, slice, convert::TryInto, cell::RefCell};
 use std::collections::{BTreeSet, HashMap, hash_map::Entry};
 use simple_error::SimpleError;
 use cache_2q::Cache;
