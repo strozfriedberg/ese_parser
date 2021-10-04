@@ -1,4 +1,4 @@
-#![allow(non_upper_case_globals, non_snake_case, non_camel_case_types, clippy::mut_from_ref, clippy::cast_ptr_alignment)]
+#![allow(non_upper_case_globals, non_snake_case, non_camel_case_types, clippy::mut_from_ref, clippy::cast_ptr_alignment, clippy::approx_constant)]
 mod parser;
 
 #[cfg(target_os = "windows")]
@@ -20,6 +20,7 @@ fn test_edb_table_all_values() {
     }
 
     let expected_tables = vec!["MSysObjects", "MSysObjectsShadow", "MSysObjids", "MSysLocales", "TestTable"];
+    
     let tables = jdb.get_tables().unwrap();
     assert_eq!(tables.len(), expected_tables.len());
     for i in 0..tables.len() {
@@ -50,10 +51,10 @@ fn test_edb_table_all_values() {
     assert_eq!(jdb.get_fixed_column::<i64>(table_id, currency.id).unwrap(), Some(350050)); // 35.0050
 
     let float = columns.iter().find(|x| x.name == "IEEESingle" ).unwrap();
-    assert_eq!(jdb.get_fixed_column::<f32>(table_id, float.id).unwrap(), Some(std::f32::consts::PI));
+    assert_eq!(jdb.get_fixed_column::<f32>(table_id, float.id).unwrap(), Some(3.141592));
 
     let double = columns.iter().find(|x| x.name == "IEEEDouble" ).unwrap();
-    assert_eq!(jdb.get_fixed_column::<f64>(table_id, double.id).unwrap(), Some(std::f64::consts::PI));
+    assert_eq!(jdb.get_fixed_column::<f64>(table_id, double.id).unwrap(), Some(3.141592653589));
 
     let unsigned_long = columns.iter().find(|x| x.name == "UnsignedLong" ).unwrap();
     assert_eq!(jdb.get_fixed_column::<u32>(table_id, unsigned_long.id).unwrap(), Some(4294967295));
