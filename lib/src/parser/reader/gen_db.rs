@@ -127,7 +127,7 @@ impl Drop for EseAPI {
     }
 }
 
-pub fn prepare_db(filename: &str, table: &str, pg_size: usize, record_size: usize, records_cnt: usize)
+pub fn prepare_db_gen(filename: &str, table: &str, pg_size: usize, record_size: usize, records_cnt: usize)
     -> PathBuf {
     let mut dst_path = std::env::temp_dir();
     dst_path.push(filename);
@@ -190,7 +190,7 @@ pub fn prepare_db(filename: &str, table: &str, pg_size: usize, record_size: usiz
     dst_path
 }
 
-pub fn clean_db(dst_path: &PathBuf) {
+pub fn clean_db_gen(dst_path: &PathBuf) {
     fs::remove_file(dst_path.with_extension("jfm")).unwrap();
     fs::remove_file(dst_path).unwrap();
 }
