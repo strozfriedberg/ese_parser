@@ -29,7 +29,7 @@ fn VARIANT_JulianFromDate(dateIn: i32) -> i32 {
 
 	julian_days -= DATE_MIN; // Convert to + days from 1 Jan 100 AD
 	julian_days += 1757585;  // Convert to + days from 23 Nov 4713 BC (Julian)
-	return julian_days;
+	julian_days
 }
 
 // Convert a Julian date to Day/Month/Year - from PostgreSQL
@@ -62,22 +62,22 @@ fn VARIANT_RollUdate(st: &mut SYSTEMTIME)
 		return ; // Invalid value
     }
 	// Year 0 to 29 are treated as 2000 + year
-	if iYear >= 0 && iYear < 30 {
+	if (0..30).contains(&iYear) {
 		iYear += 2000;
     }
 	// Remaining years < 100 are treated as 1900 + year
-	else if iYear >= 30 && iYear < 100 {
+	else if (30..100).contains(&iYear) {
 		iYear += 1900;
     }
 
 	iMinute += iSecond / 60;
-	iSecond = iSecond % 60;
+	iSecond %= 60;
 	iHour += iMinute / 60;
-	iMinute = iMinute % 60;
+	iMinute %= 60;
 	iDay += iHour / 24;
-	iHour = iHour % 24;
+	iHour %= 24;
 	iYear += iMonth / 12;
-	iMonth = iMonth % 12;
+	iMonth %= 12;
 	if iMonth <= 0 { iMonth += 12; iYear-=1; }
 	while iDay > days[iMonth as usize] {
 		if iMonth == 2 && IsLeapYear(iYear as u16) {
@@ -87,7 +87,7 @@ fn VARIANT_RollUdate(st: &mut SYSTEMTIME)
         }
 		iMonth+=1;
 		iYear += iMonth / 12;
-		iMonth = iMonth % 12;
+		iMonth %= 12;
 	}
 	while iDay <= 0 {
 		iMonth-=1;
@@ -177,12 +177,12 @@ pub fn VariantTimeToSystemTime(dateIn: f64, st: &mut SYSTEMTIME) -> bool {
 			}
 		}
 	}
-	return true;
+	true
 }
 
 #[test]
 fn test_vartimes() {
-	let t1 : f64 = 44286.466608796298;
+	let t1 : f64 = 44_286.466_608_796_3; 
 	let mut st : SYSTEMTIME = unsafe { std::mem::MaybeUninit::<SYSTEMTIME>::zeroed().assume_init() };
 	VariantTimeToSystemTime(t1, &mut st);
 	assert_eq!(st.wYear, 2021);

@@ -1,6 +1,6 @@
 //reader.rs
-use std::{fs, io, io::{Seek, Read}, mem, path::PathBuf, slice, convert::TryInto, cell::RefCell};
-use std::collections::{BTreeSet, HashMap};
+use std::{fs, io, io::{Seek, Read}, mem, path::Path, slice, convert::TryInto, cell::RefCell};
+use std::collections::{BTreeSet, HashMap, hash_map::Entry};
 use simple_error::SimpleError;
 use cache_2q::Cache;
 
@@ -30,6 +30,16 @@ unsafe fn _any_as_slice<'a, U: Sized, T: Sized>(p: &'a &T) -> &'a [U] {
     )
 }
 
+// enum SimpleError {
+//     UnsignedError(std::num::TryFromIntError),
+// }
+
+// impl TryFrom<std::num::TryFromIntError> for simple_error::SimpleError {
+//     fn try_from(error: std::num::TryFromIntError) -> Self {
+//         simple_error::SimpleError::UnsignedError(error)
+//     }
+// }
+
 impl Reader {
 
     fn load_db_file_header(&mut self) -> Result<ese_db::FileHeader, SimpleError> {
@@ -47,7 +57,7 @@ impl Reader {
         }
 
         let stored_checksum = db_file_header.checksum;
-        let checksum = calc_crc32(&&mut db_file_header);
+        let checksum = calc_crc32(&db_file_header);
         if stored_checksum != checksum {
             return Err(SimpleError::new(format!("wrong checksum: {}, calculated {}", stored_checksum, checksum)));
         }
@@ -80,7 +90,7 @@ impl Reader {
         Ok(db_file_header)
     }
 
-    fn new(path: &PathBuf, cache_size: usize) -> Result<Reader, SimpleError> {
+    fn new(path: &Path, cache_size: usize) -> Result<Reader, SimpleError> {
         let f = match fs::File::open(path) {
             Ok(f) => f,
             Err(e) => return Err(SimpleError::new(format!("File::open failed: {:?}", e)))
@@ -163,7 +173,7 @@ impl Reader {
         }
     }
 
-    pub fn load_db(path: &std::path::PathBuf, cache_size: usize) -> Result<Reader, SimpleError> {
+    pub fn load_db(path: &std::path::Path, cache_size: usize) -> Result<Reader, SimpleError> {
         Reader::new(path, cache_size)
     }
 
@@ -304,13 +314,11 @@ pub fn load_catalog(
     let mut page_number;
     if db_page.flags().contains(jet::PageFlags::IS_PARENT) {
         page_number = page_tag_get_branch_child_page_number(reader, &db_page, &pg_tags[1])?;
-    } else {
-        if db_page.flags().contains(jet::PageFlags::IS_LEAF) {
+    } else if db_page.flags().contains(jet::PageFlags::IS_LEAF) {
             page_number = db_page.page_number;
         } else {
             return Err(SimpleError::new(format!("pageno {}: neither IS_PARENT nor IS_LEAF is present in {:?}",
                                                 db_page.page_number, db_page.flags())));
-        }
     }
     let mut prev_page_number = db_page.page_number;
 
@@ -327,17 +335,17 @@ pub fn load_catalog(
                 db_page.page_number)));
         }
 
-        for i in 1..pg_tags.len() {
-            if jet::PageTagFlags::from_bits_truncate(pg_tags[i].flags).intersects(jet::PageTagFlags::FLAG_IS_DEFUNCT) {
+        for i in pg_tags.iter().skip(1) {
+            if jet::PageTagFlags::from_bits_truncate(i.flags).intersects(jet::PageTagFlags::FLAG_IS_DEFUNCT) {
                 continue;
             }
-            let cat_item = load_catalog_item(reader, &db_page, &pg_tags[i])?;
+            let cat_item = load_catalog_item(reader, &db_page, i)?;
             if cat_item.cat_type == jet::CatalogType::Table as u16 {
                 if table_def.table_catalog_definition.is_some() {
                     res.push(table_def);
                     table_def = jet::TableDefinition { table_catalog_definition: None,
                         column_catalog_definition_array: vec![], long_value_catalog_definition: None };
-                } else if table_def.column_catalog_definition_array.len() > 0 ||
+                } else if !table_def.column_catalog_definition_array.is_empty() ||
                     table_def.long_value_catalog_definition.is_some() {
                     return Err(SimpleError::new(
                         "corrupted table detected: column/long definition is going before table"));
@@ -540,13 +548,11 @@ pub struct LastLoadState {
 
 impl LastLoadState {
 	pub fn init(page_number: u32, page_tag_index: usize) -> Self {
-		let mut lls: LastLoadState = Default::default();
-		lls.page_number = page_number;
-		lls.page_tag_index = page_tag_index;
-        lls
+        LastLoadState { page_number, page_tag_index, ..Default::default() }
 	}
 }
 
+#[allow(clippy::too_many_arguments)]
 pub fn load_data(
 	lls: &mut LastLoadState,
     reader: &Reader,
@@ -588,7 +594,7 @@ pub fn load_data(
 		}
 		let mut local_page_key_size : u16 = reader.read_struct(lls.offset)?;
 		if !first_word_read {
-			local_page_key_size = clean_pgtag_flag(reader, &db_page, local_page_key_size);
+			local_page_key_size = clean_pgtag_flag(reader, db_page, local_page_key_size);
 		}
 		lls.offset += 2;
 		lls.offset += local_page_key_size as u64;
@@ -616,8 +622,7 @@ pub fn load_data(
 
 		lls.var_state.current_type = 127;
 		lls.var_state.type_offset = lls.ddh.variable_size_data_types_offset;
-		lls.var_state.value_offset =
-			(lls.ddh.variable_size_data_types_offset + (number_of_variable_size_data_types * 2)).try_into().unwrap();
+		lls.var_state.value_offset = lls.ddh.variable_size_data_types_offset + (number_of_variable_size_data_types * 2);
 	} else {
 		for j in 0..tbl_def.column_catalog_definition_array.len() {
 			let col = &tbl_def.column_catalog_definition_array[j];
@@ -652,19 +657,16 @@ pub fn load_data(
                 let variable_size_data_type_size : u16 = reader.read_struct(lls.offset_ddh + lls.var_state.type_offset as u64)?;
                 lls.var_state.type_offset += 2;
                 lls.var_state.current_type += 1;
-                if lls.var_state.current_type == col.identifier {
-                    if (variable_size_data_type_size & 0x8000) == 0 {
+                if lls.var_state.current_type == col.identifier && (variable_size_data_type_size & 0x8000) == 0 {
+                    let var_offset = lls.offset_ddh + lls.var_state.value_offset as u64;
+                    let var_size = variable_size_data_type_size - lls.previous_variable_size_data_type_size;
 
-						let var_offset = lls.offset_ddh + lls.var_state.value_offset as u64;
-						let var_size = variable_size_data_type_size - lls.previous_variable_size_data_type_size;
+                    lls.var_state.value_offset += var_size;
+                    lls.previous_variable_size_data_type_size = variable_size_data_type_size;
 
-						lls.var_state.value_offset += var_size;
-                        lls.previous_variable_size_data_type_size = variable_size_data_type_size;
-
-                        if col.identifier == column_id {
-                            let v = reader.read_bytes(var_offset, var_size as usize)?;
-                            return Ok(Some(v));
-                        }
+                    if col.identifier == column_id {
+                        let v = reader.read_bytes(var_offset, var_size as usize)?;
+                        return Ok(Some(v));
                     }
                 }
                 if lls.var_state.current_type >= lls.ddh.last_variable_size_data_type as u32 {
@@ -677,7 +679,7 @@ pub fn load_data(
                 // TODO
                 println!("TODO tagged_data_types_format ==-- jet::TaggedDataTypesFormats::Linear");
             } else if tagged_data_types_format == jet::TaggedDataTypesFormats::Index {
-                match load_tagged_data_linear(&reader, &lv_tags, &col, column_id, &mut lls.tag_state, &mut lls.var_state,
+                match load_tagged_data_linear(reader, lv_tags, col, column_id, &mut lls.tag_state, &mut lls.var_state,
                     &mut lls.offset, lls.offset_ddh, lls.record_data_size, multi_value_index) {
                     Err(e) => return Err(e),
                     Ok(r) => {
@@ -691,7 +693,7 @@ pub fn load_data(
         // column not found?
         if col.identifier == column_id {
             // default present?
-            if col.default_value.len() > 0 {
+            if !col.default_value.is_empty() {
                 return Ok(Some(col.default_value.clone()));
             }
             // empty
@@ -711,8 +713,10 @@ fn init_tag_state(
     record_data_size: u64,
 ) -> Result<Option<Vec<u8>>, SimpleError> {
     tag_state.types_offset = var_state.value_offset;
-    tag_state.remaining_definition_data_size =
-        ((record_data_size - tag_state.types_offset as u64) as u16).try_into().unwrap();
+
+    tag_state.remaining_definition_data_size = (record_data_size - tag_state.types_offset as u64)
+        .try_into()
+        .map_err(|e: std::num::TryFromIntError| SimpleError::new(e.to_string()))?;
 
     *offset = offset_ddh + tag_state.types_offset as u64;
 
@@ -731,7 +735,7 @@ fn init_tag_state(
     }
     Ok(None)
 }
-
+#[allow(clippy::too_many_arguments)]
 fn load_tagged_data_linear(
     reader: &Reader,
     lv_tags: &LV_tags,
@@ -823,10 +827,10 @@ fn load_tagged_column(
     let dtf = TaggedDataTypeFlag::from_bits_truncate(data_type_flags as u16);
     if dtf.intersects(TaggedDataTypeFlag::LONG_VALUE) {
         let key = reader.read_struct::<u32>(offset)?;
-        v = load_lv_data(reader, &lv_tags, key, compressed)?;
+        v = load_lv_data(reader, lv_tags, key, compressed)?;
     } else if dtf.intersects(TaggedDataTypeFlag::MULTI_VALUE | TaggedDataTypeFlag::MULTI_VALUE_OFFSET) {
         let mv = read_multi_value(
-            &reader, offset, tagged_data_type_size, &dtf, multi_value_index, &lv_tags, compressed)?;
+            reader, offset, tagged_data_type_size, &dtf, multi_value_index, lv_tags, compressed)?;
         if let Some(mv_data) = mv {
             v = mv_data;
         }
@@ -840,7 +844,7 @@ fn load_tagged_column(
         v = reader.read_bytes(offset, tagged_data_type_size as usize)?;
     }
 
-    if v.len() > 0 {
+    if !v.is_empty() {
         return Ok(Some(v));
     }
     Ok(None)
@@ -901,7 +905,7 @@ fn read_multi_value(
         let v;
         if lv {
             let key = reader.read_struct::<u32>(offset + shift as u64)?;
-            v = load_lv_data(reader, &lv_tags, key, compressed)?;
+            v = load_lv_data(reader, lv_tags, key, compressed)?;
         } else {
             v = reader.read_bytes(offset + shift as u64, size as usize)?;
             if compressed {
@@ -958,7 +962,7 @@ pub fn load_lv_tag(
         //offset += 4;
         //let _total_size : u32 = reader.read_struct(offset)?;
 		// TODO: handle? page_tags with skey & total_size only (seems don't need)
-        return Ok(None);
+        Ok(None)
     } else {
         let mut page_key: Vec<u8> = vec![];
         if common_page_key_size + local_page_key_size == 8 {
@@ -981,21 +985,27 @@ pub fn load_lv_tag(
 		let mut seg_offset = 0;
 
         if page_key.len() == 8 {
-            let segment_offset = unsafe {
-                std::mem::transmute::<[u8; 4], u32>(page_key[4..8].try_into().unwrap())
-            }.to_be();
+            // let segment_offset = unsafe {
+            //     std::mem::transmute::<[u8; 4], u32>(page_key[4..8].try_into().unwrap())
+            // }.to_be();
+            let segment_offset = u32::from_le_bytes(page_key[4..8]
+                    .try_into()
+                    .map_err(|e: std::array::TryFromSliceError| SimpleError::new(e.to_string()))?
+            ).to_be();
             seg_offset = segment_offset;
         }
 
         res.offset = offset;
-        res.size = (page_tag.size as u64 - (offset - page_tag_offset)).try_into().unwrap();
+        res.size = (page_tag.size as u64 - (offset - page_tag_offset))
+            .try_into()
+            .map_err(|e: std::num::TryFromIntError| SimpleError::new(e.to_string()))?;
 
 		let mut t : HashMap<u32, LV_tag> = HashMap::new();
 		t.insert(seg_offset, res);
 		let mut new_tag : LV_tags = HashMap::new();
 		new_tag.insert(skey, t);
 
-        return Ok(Some(new_tag));
+        Ok(Some(new_tag))
     }
 }
 
@@ -1011,17 +1021,18 @@ pub type LV_tags = HashMap<u32/*key*/, HashMap<u32/*seg_offset*/, LV_tag>>;
 
 fn merge_lv_tags(tags: &mut LV_tags, new_tags: LV_tags) {
 	for (new_key, new_segs) in new_tags {
-		if tags.contains_key(&new_key) {
-			let segs = tags.get_mut(&new_key).unwrap();
-			for (new_seg_offset, new_lv_tags) in new_segs {
-				let r = segs.insert(new_seg_offset, new_lv_tags);
-				assert_eq!(r.is_none(), true);
-			}
-		} else {
-			let r = tags.insert(new_key, new_segs);
-			debug_assert!(r.is_none() == true, "new_key wasn't there before insert fn called!");
-		}
-	}
+        match tags.entry(new_key) {
+            Entry::Vacant(e) => {
+                e.insert(new_segs);
+            },
+            Entry::Occupied(mut e) => {
+                let segs = e.get_mut();
+                for (new_seg_offset, new_lv_tags) in new_segs {
+                    segs.insert(new_seg_offset, new_lv_tags);
+                }
+            }
+        }
+    }
 }
 
 pub fn load_lv_metadata(
@@ -1103,11 +1114,11 @@ pub fn load_lv_data(
 ) -> Result<Vec<u8>, SimpleError> {
     let mut res : Vec<u8> = vec![];
 	if lv_tags.contains_key(&long_value_key) {
-		let seg_offsets = lv_tags.get(&long_value_key).unwrap();
+		let seg_offsets = lv_tags.get(&long_value_key).expect("No long value key");
 		loop {
 			let offset = res.len() as u32;
 			if seg_offsets.contains_key(&offset) {
-				let tag = seg_offsets.get(&offset).unwrap();
+				let tag = seg_offsets.get(&offset).expect("No offset");
 				let mut v = reader.read_bytes(tag.offset, tag.size as usize)?;
 				if compressed {
 					let dsize = decompress_size(&v);
@@ -1123,7 +1134,7 @@ pub fn load_lv_data(
 		}
     }
 
-    if res.len() > 0 {
+    if !res.is_empty() {
         Ok(res)
     } else {
         Err(SimpleError::new(format!("LV key {} not found", long_value_key)))

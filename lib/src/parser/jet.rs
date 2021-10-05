@@ -16,8 +16,6 @@ pub type uint16_t = u16;
 pub type uint32_t = u32;
 pub type uint64_t = u64;
 
-type OsDateTime = chrono::DateTime<chrono::Utc>;
-
 pub type FormatVersion = u32;
 pub type FormatRevision = u32;
 
@@ -80,10 +78,10 @@ pub enum ColumnType {
     Text = 10,
     LongBinary = 11,
     LongText = 12,
-    SLV = 13,
+    Slv = 13,
     UnsignedLong = 14,
     LongLong = 15,
-    GUID = 16,
+    Guid = 16,
     UnsignedShort = 17,
     Max = 18,
 }
@@ -201,26 +199,36 @@ pub struct DateTime {
     pub os_snapshot: uint8_t,
 }
 
-#[cfg(target_os = "windows")]
-impl fmt::Display for DateTime {
+/*impl fmt::Display for DateTime {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         use chrono::naive::NaiveDate;
-        use chrono::TimeZone;
-        use winapi::um::timezoneapi::GetTimeZoneInformation;
+        use chrono::{Local,TimeZone, Utc};
         if self.year > 0 {
             let ndt =
                 NaiveDate::from_ymd(self.year as i32 + 1900, self.month as u32, self.day as u32)
                     .and_hms(self.hours as u32, self.minutes as u32, self.seconds as u32);
-            let offset = if self.time_is_utc != 0 {
-                0
+
+            let offset = if self.time_is_utc == 0 {
+                Local.timestamp(0, 0).offset().local_minus_utc()
             } else {
-                unsafe {
-                    let mut tz = mem::zeroed();
-                    GetTimeZoneInformation(&mut tz);
-                    -60 * (tz.Bias + tz.StandardBias)
-                }
+                0
             };
-            let dt: OsDateTime = OsDateTime::from(
+
+           /* let dt = if self.time_is_utc == 0 {
+                let offset = Local.timestamp(0, 0).offset().local_minus_utc()
+                /*chrono::DateTime::<Utc>::from(
+                    chrono::FixedOffset::east(offset)
+                        .from_local_datetime(&ndt)
+                        .unwrap(),
+                );*/
+                chrono::DateTime::<Utc>::from()  ndt, chrono::FixedOffset::east(offset))
+                chrono::DateTime::<Local>::from
+            } else {
+                //chrono::DateTime::<Utc>::from_utc(NaiveDateTime::from_timestamp(61, 0), Utc)
+                chrono::DateTime::<Utc>::from_utc(ndt, Utc)
+            };*/
+
+            let dt = chrono::DateTime::<Utc>::from(
                 chrono::FixedOffset::east(offset)
                     .from_local_datetime(&ndt)
                     .unwrap(),
@@ -231,7 +239,29 @@ impl fmt::Display for DateTime {
             write!(f, "")
         }
     }
-}
+}*/
+
+/*#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_date_time_display() {
+        let date_time = DateTime {
+            seconds: 4,
+            minutes: 5,
+            hours: 6,
+            day: 7,
+            month: 8,
+            year: 121,
+            time_is_utc: 0,
+            os_snapshot: 0,
+        };
+
+        let s = format!("{}", date_time);
+        let t=3;
+    }
+}*/
 
 #[derive(Copy, Clone, Default, Debug)]
 #[repr(C)]
@@ -383,10 +413,10 @@ pub struct CatalogDefinition {
     pub father_data_page_object_identifier: uint32_t,
     pub cat_type: uint16_t,
     pub identifier: uint32_t,
- 
+
     pub column_type: uint32_t,
     pub father_data_page_number: uint32_t,
- 
+
     pub size: uint32_t,
     pub codepage: uint32_t,
     pub lcmap_flags: uint32_t,

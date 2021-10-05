@@ -6,6 +6,7 @@ use crate::parser::reader::*;
 use simple_error::SimpleError;
 use std::cell::{RefCell, RefMut};
 use std::collections::HashMap;
+use std::cmp::Ordering;
 
 struct Table {
 	cat: Box<jet::TableDefinition>,
@@ -23,7 +24,7 @@ pub struct EseParser {
 
 impl Table {
     fn page(&self) -> &jet::DbPage {
-        self.current_page.as_ref().unwrap()
+        self.current_page.as_ref().expect("Did not find current page")
     }
 
 	fn review_last_load_state(&mut self, column: u32) {
@@ -40,9 +41,11 @@ impl EseParser {
     fn get_table_by_name(&self, table: &str, index: &mut usize) -> Result<RefMut<Table>, SimpleError> {
         for i in 0..self.tables.len() {
             let n = self.tables[i].borrow_mut();
-            if n.cat.table_catalog_definition.as_ref().unwrap().name == table {
-                *index = i;
-                return Ok(n);
+            if let Some(table_catalog_definition) = &n.cat.table_catalog_definition {
+                if table_catalog_definition.name == table {
+                    *index = i;
+                    return Ok(n);
+                }
             }
         }
         Err(SimpleError::new(format!("can't find table name {}", table)))
@@ -71,7 +74,7 @@ impl EseParser {
         }
 		table.review_last_load_state(column);
 		let mut lls = table.lls.borrow_mut();
-        match load_data(&mut lls, reader, &table.cat, &table.lv_tags, &table.page(), table.page_tag_index, column,
+        match load_data(&mut lls, reader, &table.cat, &table.lv_tags, table.page(), table.page_tag_index, column,
 			mv_index as usize) {
 			Ok(r) => {
 				lls.last_column = column;
@@ -88,7 +91,7 @@ impl EseParser {
         let mut i = t.page_tag_index + 1;
         if crow == ESE_MoveFirst {
             let first_leaf_page = find_first_leaf_page(reader,
-                t.cat.table_catalog_definition.as_ref().unwrap().father_data_page_number)?;
+                t.cat.table_catalog_definition.as_ref().expect("First leaf page failed").father_data_page_number)?;
             if t.current_page.is_none() || t.page().page_number != first_leaf_page {
                 let page = jet::DbPage::new(reader, first_leaf_page)?;
                 t.current_page = Some(page);
@@ -108,15 +111,13 @@ impl EseParser {
                 // found non-free data tag
                 t.page_tag_index = i;
                 return Ok(true);
+            } else if t.page().common().next_page != 0 {
+                let page = jet::DbPage::new(self.get_reader()?, t.page().common().next_page)?;
+                t.current_page = Some(page);
+                i = 1;
             } else {
-                if t.page().common().next_page != 0 {
-                    let page = jet::DbPage::new(&mut self.get_reader().unwrap(), t.page().common().next_page)?;
-                    t.current_page = Some(page);
-                    i = 1;
-                } else {
-                    // no more leaf pages
-                    return Ok(false);
-                }
+                // no more leaf pages
+                return Ok(false);
             }
         }
     }
@@ -145,25 +146,43 @@ impl EseParser {
                 // found non-free data tag
                 t.page_tag_index = i;
                 return Ok(true);
-            } else {
-                if t.page().common().previous_page != 0 {
+            } else if t.page().common().previous_page != 0 {
                     let page = jet::DbPage::new(reader, t.page().common().previous_page)?;
                     t.current_page = Some(page);
                     i = t.page().page_tags.len()-1;
-                } else {
-                    // no more leaf pages
-                    return Ok(false);
-                }
+            } else {
+                // no more leaf pages
+                return Ok(false);
             }
         }
     }
 
     fn move_row_helper(&self, table_id: u64, crow: i32) -> Result<bool, SimpleError> {
         if crow == ESE_MoveFirst || crow == ESE_MoveNext {
-            return self.move_next_row(table_id, crow);
+            self.move_next_row(table_id, crow)
         } else if crow == ESE_MoveLast || crow == ESE_MovePrevious {
-            return self.move_previous_row(table_id, crow);
+            self.move_previous_row(table_id, crow)
         } else {
+            match crow.cmp(&0) {
+                Ordering::Greater => {
+                    for _ in 0..crow {
+                        if !self.move_next_row(table_id, ESE_MoveNext)? {
+                            return Ok(false);
+                        }
+                    }
+                },
+                Ordering::Less => {
+                    for _ in crow..0 {
+                        if !self.move_previous_row(table_id, ESE_MovePrevious)? {
+                            return Ok(false);
+                        }
+                    }
+				},
+                Ordering::Equal => {
+                    return Ok(true)
+                },
+            }
+            /*
 			if crow > 0 {
 				for _ in 0..crow {
 					if !self.move_next_row(table_id, ESE_MoveNext)? {
@@ -177,6 +196,7 @@ impl EseParser {
 					}
 				}
 			}
+            */
             Ok(true)
         }
     }
@@ -194,25 +214,25 @@ impl EseParser {
                     dst.as_mut_ptr() as *mut u8,
                     size);
             }
-            return Ok(Some(dst.assume_init()));
+            Ok(Some(dst.assume_init()))
         }
     }
 
     // reserve room for cache_size recent entries, and cache_size frequent entries
     pub fn init(cache_size: usize) -> EseParser {
-        EseParser { cache_size: cache_size, reader: None, tables: vec![] }
+        EseParser { cache_size, reader: None, tables: vec![] }
     }
 }
 
 impl EseDb for EseParser {
     fn load(&mut self, dbpath: &str) -> Option<SimpleError> {
-        let mut reader = match Reader::load_db(&std::path::PathBuf::from(dbpath), self.cache_size) {
+        let reader = match Reader::load_db(&std::path::PathBuf::from(dbpath), self.cache_size) {
             Ok(h) => h,
             Err(e) => {
                 return Some(SimpleError::new(e.to_string()));
             }
         };
-        let mut cat = match load_catalog(&mut reader) {
+        let mut cat = match load_catalog(&reader) {
             Ok(c) => c,
             Err(e) => return Some(e)
         };
@@ -244,11 +264,17 @@ impl EseDb for EseParser {
         let mut index : usize = 0;
         { // used to drop borrow mut
             let mut t = self.get_table_by_name(table, &mut index)?;
-            if t.cat.long_value_catalog_definition.is_some() {
-				let reader = self.get_reader()?;
-                t.lv_tags = load_lv_metadata(&reader,
-                    t.cat.long_value_catalog_definition.as_ref().unwrap().father_data_page_number)?;
+            if let Some(long_value_catalog_definition) = &t.cat.long_value_catalog_definition {
+                let reader = self.get_reader()?;
+                t.lv_tags = load_lv_metadata(reader,
+                    long_value_catalog_definition.father_data_page_number)?;
             }
+            
+            // if t.cat.long_value_catalog_definition.is_some() {
+			// 	let reader = self.get_reader()?;
+            //     t.lv_tags = load_lv_metadata(reader,
+            //         t.cat.long_value_catalog_definition.as_ref().map_err(|e: std::num::TryFromIntError| SimpleError::new(e.to_string())).father_data_page_number)?;
+            // } 
         }
         // ignore return result
         self.move_row_helper(index as u64, ESE_MoveFirst)?;
@@ -288,7 +314,7 @@ impl EseDb for EseParser {
             Ok(r) => r,
             Err(e) => {
                 println!("move_row_helper failed: {:?}", e);
-                return false;
+                false
             }
         }
     }
