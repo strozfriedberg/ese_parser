@@ -22,13 +22,7 @@ pub fn clean_db(_dst_path: &Path) {
 pub fn caching_test() -> Result<(), SimpleError> {
     let cache_size: usize = 10;
     let table = "test_table";
-    let test_db;
-    //if cfg!(target_os = "windows") {
-    //    test_db = "caching_test.edb";
-    //} else {
-        // On Linux, decompress_test.edb is fine for the purposes of this test
-        test_db = "decompress_test.edb";
-    //}
+    let test_db = "decompress_test.edb";
     println!("db {}", test_db);
     let path = prepare_db(test_db, table, 1024 * 8, 1024, 1000);
     let mut reader = Reader::new(&path, cache_size as usize)?;
