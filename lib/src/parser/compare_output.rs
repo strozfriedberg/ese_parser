@@ -1,14 +1,8 @@
-#![cfg(test)]
+//#![cfg(test)]
 
-use super::*;
-use std::collections::HashSet;
-use std::hash::Hasher
-use crate::ese_parser::EseParser;
-use crate::ese_trait::*;
+use md5;
 use std::path::PathBuf;
-use fasthash::{xx, XXHasher};
-
-use ese_parser_lib::{ese_parser::*, ese_trait::*, esent::ese_api::*}
+use std::fs;
 
 // #[cfg(target_os = "windows")]
 // use crate::parser::reader::gen_db::*;
@@ -115,13 +109,13 @@ pub fn get_esent
 pub fn get_parser
 */
 
-pub fn xxhash_digest<T: Hash>(input: &str) -> u64 {
-    let mut s : XXHasher = Default::default();
-    input.hash(&mut s);
-    s.finish()
+
+pub fn md5_digest(input: String) -> u64 {
+    let digest = md5::compute(input);
+    format!("{:x}",digest)
 }
 
-pub fn get_file_contents(filename: &str) -> PathBuf {
+pub fn get_file_contents(filename: &str) -> String {
     let mut dst_path = PathBuf::from("testdata").canonicalize().unwrap();
     dst_path.push(filename);
     let contents = fs::read_to_string(dst_path).unwrap();
@@ -129,16 +123,14 @@ pub fn get_file_contents(filename: &str) -> PathBuf {
 }
 
 #[test]
-pub fn test_compare_output() -> Result<(), SimpleError> {
+fn test_compare_output() {
     let esent_file = "esentoutput.txt";
     let parser_file = "parseroutput.txt";
     let esent_hash_input = get_file_contents(esent_file);
-    println!("Sample esent output path: {}", esent_path);
     let parser_hash_input = get_file_contents(parser_file);
-    println!("Sample parser output path: {}", parser_path);
 
-    let esent_digest = xxhash_digest(esent_hash_input);
-    let parser_digest = xxhash_digest(parser_hash_input);
+    let esent_digest = md5_digest(esent_hash_input);
+    let parser_digest = md5_digest(parser_hash_input);
 
     assert_eq!(esent_digest, parser_digest);
 }

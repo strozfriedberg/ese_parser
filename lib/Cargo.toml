@@ -30,3 +30,4 @@ widestring = "*"
 encoding = "*"
 strum = {version = "*", features = ["derive"]}
 strum_macros = "*"
+md5 = "*"
