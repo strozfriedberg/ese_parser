@@ -7,6 +7,7 @@ pub mod esent;
 pub mod ese_trait;
 pub mod ese_parser;
 pub mod vartime;
+pub mod process_tables;
 
 #[test]
 fn test_edb_table_all_values() {
