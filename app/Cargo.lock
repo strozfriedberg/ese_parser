@@ -257,6 +257,7 @@ dependencies = [
  "cc",
  "chrono",
  "encoding",
+ "filepath",
  "hexdump",
  "libc",
  "log",
@@ -266,6 +267,16 @@ dependencies = [
  "strum",
  "strum_macros",
  "widestring",
+ "winapi",
+]
+
+[[package]]
+name = "filepath"
+version = "0.1.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "0dd50318458226958db06f173610f54f01d26f0a9ccfa3d38bd60f70bc9939ff"
+dependencies = [
+ "libc",
  "winapi",
 ]
 

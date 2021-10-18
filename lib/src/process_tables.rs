@@ -3,6 +3,32 @@ use simple_error::SimpleError;
 use std::mem::size_of;
 use std::convert::TryFrom;
 use widestring::U16String;
+use std::fs::File;
+use std::io::{self, Error, Write};
+use std::path::PathBuf;
+use std::env;
+use std::fs::OpenOptions;
+
+#[derive(Debug)]
+struct Args {
+    /// write to the provided file, or `stdout` when not provided
+    output: Option<PathBuf>,
+}
+
+impl Args {
+    fn from_env() -> Args {
+        Args {
+            output: env::args().nth(1).map(PathBuf::from),
+        }
+    }
+
+    fn get_output(&self) -> Result<Box<dyn Write>, Error> {
+        match self.output {
+            Some(ref path) => File::open(path).map(|f| Box::new(f) as Box<dyn Write>),
+            None => Ok(Box::new(io::stdout())),
+        }
+    }
+}
 
 fn truncate(s: &str, max_chars: usize) -> &str {
     match s.char_indices().nth(max_chars) {
@@ -267,6 +293,7 @@ fn dump_table(
 }
 
 const CACHE_SIZE_ENTRIES: usize = 10;
+
 #[cfg(target_os = "windows")]
 fn alloc_jdb(m: &Mode) -> Box<dyn EseDb> {
     if *m != Mode::EseParser {
@@ -292,6 +319,8 @@ fn alloc_jdb(m: &Mode) -> Box<dyn EseDb> {
 }
 
 fn print_table(cols: &[ColumnInfo], rows: &[Vec<String>]) {
+    let output_file = Args::from_env(); //print, or write to file depending on value
+    let mut output_file = output_file.get_output().unwrap();
     let mut col_sp: Vec<usize> = Vec::new();
     for (i, col) in cols.iter().enumerate() {
         let mut col_max_sz = col.name.len();
@@ -307,14 +336,15 @@ fn print_table(cols: &[ColumnInfo], rows: &[Vec<String>]) {
     for (i, col) in cols.iter().enumerate() {
         nrow = format!("{}|{:2$}", nrow, col.name, col_sp[i]);
     }
-    println!("{}|", nrow);
+    writeln!(output_file, "{}|", nrow).unwrap();
+    
 
     for r in rows.iter() {
         let mut row = String::new();
         for (j, r2) in r.iter().enumerate() {
             row = format!("{}|{:2$}", row, r2, col_sp[j]);
         }
-        println!("{}|", row);
+        writeln!(output_file, "{}|", nrow).unwrap();
     }
 }
 
@@ -325,43 +355,106 @@ pub enum Mode {
     Both,
 }
 
-fn process_table(dbpath: &str, table: &String) {
-    let mut mode: Mode = {
+pub fn process_table(dbpath: String) {
+    let table = String::new();
+    let mode: Mode = {
         #[cfg(target_os = "windows")]
         {
-            Mode::Both
+            Mode::EseParser
         }
         #[cfg(any(target_os = "linux", target_os = "macos"))]
         {
             Mode::EseParser
         }
     };
+    //let output_file = Args::from_env(); //print, or write to file depending on value
+    //let mut output_file = output_file.get_output().unwrap();
+    let mut output_file = File::open("parseroutput.txt").unwrap();
     let mut jdb = alloc_jdb(&mode);
-    println!("mode {:?}, path: {}", &mode, dbpath);
 
+    println!("mode {:?}, path: {}", &mode, dbpath);
     if let Some(load_error) = jdb.load(&dbpath) {
         println!("Error: {:?}", load_error);
         return;
     }
     println!("loaded {}", dbpath);
 
-    let handle_table = |t: &str| {
-        println!("table {}", &t);
+    let mut handle_table = |t: &str| {
+        writeln!(output_file, "table {}", &t).unwrap();
         match dump_table(&*jdb, t) {
             Ok(opt) => match opt {
                 Some((cols, rows)) => print_table(&cols, &rows),
-                None => println!("table {} is empty.", &t),
+                None => writeln!(output_file, "table {} is empty.", &t).unwrap()
             },
-            Err(e) => println!("table {}: {}", &t, e),
+            Err(e) => writeln!(output_file, "table {}: {}", &t, e).unwrap(),
         }
     };
-
     if table.is_empty() {
         let tables = jdb.get_tables().expect("Tables not found");
         for t in tables {
             handle_table(&t);
         }
     } else {
-        handle_table(table);
+        handle_table(&table);
     }
+    
+    /*
+    match output_file {
+        Some(mut f) => {
+            println!("mode {:?}, path: {}", &mode, dbpath);
+            if let Some(load_error) = jdb.load(&dbpath) {
+                writeln!(f, "Error: {:?}", load_error);
+                return;
+            }
+            println!("loaded {}", dbpath);
+
+            let handle_table = |t: &str| {
+                writeln!(f, "table {}", &t);
+                match dump_table(&*jdb, t) {
+                    Ok(opt) => match opt {
+                        Some((cols, rows)) => print_table(&cols, &rows, Some(f)),
+                        None => writeln!(f, "table {} is empty.", &t).unwrap()
+                    },
+                    Err(e) => writeln!(f, "table {}: {}", &t, e).unwrap(),
+                }
+            };
+            if table.is_empty() {
+                let tables = jdb.get_tables().expect("Tables not found");
+                for t in tables {
+                    handle_table(&t);
+                }
+            } else {
+                handle_table(&table);
+            }
+        },
+        None => {
+            println!("mode {:?}, path: {}", &mode, dbpath);
+
+            if let Some(load_error) = jdb.load(&dbpath) {
+                println!("Error: {:?}", load_error);
+                return;
+            }
+            println!("loaded {}", dbpath);
+
+            let handle_table = |t: &str| {
+                println!("table {}", &t);
+                match dump_table(&*jdb, t) {
+                    Ok(opt) => match opt {
+                        Some((cols, rows)) => print_table(&cols, &rows, None),
+                        None => println!("table {} is empty.", &t),
+                    },
+                    Err(e) => println!("table {}: {}", &t, e),
+                }
+            };
+            if table.is_empty() {
+                let tables = jdb.get_tables().expect("Tables not found");
+                for t in tables {
+                    handle_table(&t);
+                }
+            } else {
+                handle_table(&table);
+            }
+        }
+    }
+    */
 }

@@ -8,12 +8,8 @@
 
 mod ese_both;
 
-use ese_parser_lib::{ese_parser::*, ese_trait::*, vartime::*, process_tables::*};
-use simple_error::SimpleError;
-use std::convert::TryFrom;
+use ese_parser_lib::{ese_parser::*, process_tables::*};
 use std::env;
-use std::mem::size_of;
-use widestring::U16String;
 
 const CACHE_SIZE_ENTRIES: usize = 10;
 #[derive(PartialEq, Debug)]
@@ -24,6 +20,7 @@ pub enum Mode {
 }
 
 fn main() {
+    let mut table = String::new();
     let mut mode: Mode = {
         #[cfg(target_os = "windows")]
         {
@@ -34,7 +31,6 @@ fn main() {
             Mode::EseParser
         }
     };
-    let mut table = String::new();
     let mut args: Vec<String> = env::args().skip(1).collect();
     if args.is_empty() {
         eprintln!("db path required");
