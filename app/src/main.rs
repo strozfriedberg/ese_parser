@@ -6,18 +6,8 @@
     clippy::cast_ptr_alignment
 )]
 
-mod ese_both;
-
-use ese_parser_lib::{ese_parser::*, process_tables::*};
+use ese_parser_lib::process_tables::*;
 use std::env;
-
-const CACHE_SIZE_ENTRIES: usize = 10;
-#[derive(PartialEq, Debug)]
-pub enum Mode {
-    EseApi,
-    EseParser,
-    Both,
-}
 
 fn main() {
     let mut table = String::new();
@@ -64,5 +54,5 @@ fn main() {
     }
     let dbpath = args.concat();
 
-    process_table(dbpath, None);
+    process_table(&dbpath, None, mode, table);
 }

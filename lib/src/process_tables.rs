@@ -6,27 +6,12 @@ use widestring::U16String;
 use std::fs::File;
 use std::io::{self, Error, Write};
 use std::path::PathBuf;
-use std::env;
+use crate::parser::ese_both::*;
 
 #[derive(Debug)]
 struct Args {
     /// write to the provided file, or `stdout` when not provided
     output: Option<PathBuf>,
-}
-
-impl Args {
-    fn from_env() -> Args {
-        Args {
-            output: env::args().nth(1).map(PathBuf::from),
-        }
-    }
-
-    fn get_output(&self) -> Result<Box<dyn Write>, Error> {
-        match self.output {
-            Some(ref path) => File::open(path).map(|f| Box::new(f) as Box<dyn Write>),
-            None => Ok(Box::new(io::stdout())),
-        }
-    }
 }
 
 fn truncate(s: &str, max_chars: usize) -> &str {
@@ -295,14 +280,14 @@ const CACHE_SIZE_ENTRIES: usize = 10;
 
 #[cfg(target_os = "windows")]
 fn alloc_jdb(m: &Mode) -> Box<dyn EseDb> {
-    if *m != Mode::EseParser {
-        eprintln!(
-            "Unsupported mode: {:?}. EseAPI is available only under Windows build.",
-            m
-        );
-        std::process::exit(-1);
+    use crate::esent::ese_api::EseAPI;
+
+    if *m == Mode::EseApi {
+        return Box::new(EseAPI::init());
+    } else if *m == Mode::EseParser {
+        return Box::new(EseParser::init(CACHE_SIZE_ENTRIES));
     }
-    Box::new(EseParser::init(CACHE_SIZE_ENTRIES))
+    return Box::new(EseBoth::init());
 }
 
 #[cfg(any(target_os = "linux", target_os = "macos"))]
@@ -317,8 +302,7 @@ fn alloc_jdb(m: &Mode) -> Box<dyn EseDb> {
     Box::new(EseParser::init(CACHE_SIZE_ENTRIES))
 }
 
-fn print_table(cols: &[ColumnInfo], rows: &[Vec<String>], output_destination: std::boxed::Box<dyn std::io::Write>) {
-    let mut output_destination = output_destination;
+fn print_table(cols: &[ColumnInfo], rows: &[Vec<String>], output_destination: &mut dyn std::io::Write) {
     let mut col_sp: Vec<usize> = Vec::new();
     for (i, col) in cols.iter().enumerate() {
         let mut col_max_sz = col.name.len();
@@ -342,7 +326,7 @@ fn print_table(cols: &[ColumnInfo], rows: &[Vec<String>], output_destination: st
         for (j, r2) in r.iter().enumerate() {
             row = format!("{}|{:2$}", row, r2, col_sp[j]);
         }
-        writeln!(output_destination, "{}|", nrow).unwrap();
+        writeln!(output_destination, "{}|", row).unwrap();
     }
 }
 
@@ -355,24 +339,13 @@ pub enum Mode {
 
 pub fn resolve_path(test_file: Option<PathBuf>) -> Result<Box<dyn Write>, Error> {
     match test_file {
-        Some(ref path) => File::open(path).map(|f| Box::new(f) as Box<dyn Write>),
+        Some(ref path) => File::create(path).map(|f| Box::new(f) as Box<dyn Write>),
         None => Ok(Box::new(io::stdout()))
     }
 }
 
-pub fn process_table(dbpath: &str, test_file: Option<PathBuf>) {
-    let table = String::new();
-    let mode: Mode = {
-        #[cfg(target_os = "windows")]
-        {
-            Mode::EseParser
-        }
-        #[cfg(any(target_os = "linux", target_os = "macos"))]
-        {
-            Mode::EseParser
-        }
-    };
-
+pub fn process_table(dbpath: &str, test_file: Option<PathBuf>, mode: Mode, table: String) {
+    
     let mut output_destination = resolve_path(test_file).unwrap();
     let mut jdb = alloc_jdb(&mode);
 
@@ -387,7 +360,7 @@ pub fn process_table(dbpath: &str, test_file: Option<PathBuf>) {
         writeln!(output_destination, "table {}", &t).unwrap();
         match dump_table(&*jdb, t) {
             Ok(opt) => match opt {
-                Some((cols, rows)) => print_table(&cols, &rows, output_destination),
+                Some((cols, rows)) => print_table(&cols, &rows, &mut output_destination),
                 None => writeln!(output_destination, "table {} is empty.", &t).unwrap()
             },
             Err(e) => writeln!(output_destination, "table {}: {}", &t, e).unwrap(),
