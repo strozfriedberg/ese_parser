@@ -64,5 +64,5 @@ fn main() {
     }
     let dbpath = args.concat();
 
-    process_table(dbpath);
+    process_table(dbpath, None);
 }

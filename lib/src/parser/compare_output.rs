@@ -1,19 +1,9 @@
-//#![cfg(test)]
+#![cfg(test)]
 
 use md5;
 use std::path::PathBuf;
 use std::fs;
 use crate::process_tables::*;
-use std::process::Command;
-use std::fs::File;
-use std::io::{self, Error, Write};
-use filepath::FilePath;
-use std::env;
-use std::fs::OpenOptions;
-
-// #[cfg(target_os = "windows")]
-// use crate::parser::reader::gen_db::*;
-
 
 pub fn get_path(filename: &str) -> PathBuf {
     let mut dst_path = PathBuf::from("testdata").canonicalize().unwrap();
@@ -36,10 +26,15 @@ fn md5_digest(input: Vec<u8>) -> String {
     format!("{:x}",digest)
 }
 
-fn get_file_contents(filename: &str) -> Vec<u8> {
-    let mut dst_path = PathBuf::from("testdata").canonicalize().unwrap();
-    dst_path.push(filename);
-    let contents = fs::read(dst_path).unwrap();
+fn get_file_contents(filename: &str, dbname: &str) -> Vec<u8> {
+    let mut file_path = PathBuf::from("testdata").canonicalize().unwrap();
+    let mut db_path = PathBuf::from("testdata").canonicalize().unwrap();
+    file_path.push(filename);
+    //let test_file = File::open(file_path).unwrap();
+    db_path.push(dbname);
+    process_table(db_path.to_str().unwrap(), Some(file_path));
+    
+    let contents = fs::read(file_path).unwrap();
     contents
 }
 
