@@ -1,4 +1,3 @@
-#![cfg(target_os = "windows")]
 use crate::{ese_parser::*, ese_trait::*, vartime::*};
 use simple_error::SimpleError;
 use std::mem::size_of;
@@ -7,7 +6,9 @@ use widestring::U16String;
 use std::fs::File;
 use std::io::{self, Error, Write};
 use std::path::PathBuf;
+#[cfg(target_os = "windows")]
 use crate::parser::ese_both::*;
+
 
 #[derive(Debug)]
 struct Args {
@@ -320,7 +321,7 @@ fn print_table(cols: &[ColumnInfo], rows: &[Vec<String>], output_destination: &m
         nrow = format!("{}|{:2$}", nrow, col.name, col_sp[i]);
     }
     writeln!(output_destination, "{}|", nrow).unwrap();
-    
+
 
     for r in rows.iter() {
         let mut row = String::new();
@@ -346,7 +347,7 @@ pub fn resolve_path(test_file: Option<PathBuf>) -> Result<Box<dyn Write>, Error>
 }
 
 pub fn process_table(dbpath: &str, test_file: Option<PathBuf>, mode: Mode, table: String) {
-    
+
     let mut output_destination = resolve_path(test_file).unwrap();
     let mut jdb = alloc_jdb(&mode);
 
