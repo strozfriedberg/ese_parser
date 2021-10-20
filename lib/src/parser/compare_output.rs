@@ -6,22 +6,6 @@ use std::fs;
 use crate::process_tables::*;
 use std::string::String;
 
-pub fn get_path(filename: &str) -> PathBuf {
-    let mut dst_path = PathBuf::from("testdata").canonicalize().unwrap();
-    dst_path.push(filename);
-    dst_path
-}
-
-    // let mut f = OpenOptions::new()
-    //     .read(true)
-    //     .write(true)
-    //     .open("parseroutput.txt")
-    //     .unwrap();
-    
-    // //let path = f.path().unwrap();
-    // process_table(dbpath);
-    // dst_path
-
 fn md5_digest(input: Vec<u8>) -> String {
     let digest = md5::compute(input);
     format!("{:x}",digest)
@@ -45,7 +29,7 @@ fn get_file_contents(filename: &str, dbname: &str) -> Vec<u8> {
 fn test_compare_output() {
     
     let mut esent_file_path = PathBuf::from("testdata").canonicalize().unwrap();
-    let db_name = "test.edb";
+    let db_name = "decompress_test.edb";
     let esent_file_name = "esentoutput.txt"; //should remain static
     esent_file_path.push(esent_file_name);
     //let esent_file = get_file_contents(esent_file_name,db_name);
