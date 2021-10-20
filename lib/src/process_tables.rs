@@ -1,3 +1,4 @@
+#![cfg(target_os = "windows")]
 use crate::{ese_parser::*, ese_trait::*, vartime::*};
 use simple_error::SimpleError;
 use std::mem::size_of;
