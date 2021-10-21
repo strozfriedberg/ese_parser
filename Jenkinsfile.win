@@ -6,7 +6,7 @@ pipeline {
         }
     }
     stages {
-        stage('building library and running tests') {
+        stage('update rust') {
             steps {
                 dir("lib") {
                     bat "rustup update"
