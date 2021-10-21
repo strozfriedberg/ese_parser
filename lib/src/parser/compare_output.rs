@@ -22,7 +22,7 @@ mod tests {
     #[test]
     fn test_compare_output() {
         let mut esent_file_path = PathBuf::from("testdata").canonicalize().unwrap();
-        esent_file_path.push("esentoutput.txt");
+        esent_file_path.push("esentoutput2.txt");
         let mut parser_output_path = PathBuf::from("testdata").canonicalize().unwrap();
         parser_output_path.push("parseroutput.txt");
         let mut db_path = PathBuf::from("testdata").canonicalize().unwrap();
