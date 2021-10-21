@@ -9,6 +9,13 @@ pipeline {
         stage('building library and running tests') {
             steps {
                 dir("lib") {
+                    bat "rustup update"
+                }
+            }
+		}
+        stage('building library and running tests') {
+            steps {
+                dir("lib") {
                     bat "cargo test --target x86_64-pc-windows-msvc"
                 }
             }
