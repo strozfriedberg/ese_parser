@@ -106,8 +106,8 @@ impl EseDb for EseAPI {
             Ok(i) => i,
             Err(e) => return Some(e)
         };
-        EseAPI::set_system_parameter_l(JET_paramDatabasePageSize, (dbinfo.cbPageSize as u64).into());
-        EseAPI::set_system_parameter_l(JET_paramDisableCallbacks, (true as u64).into());
+        EseAPI::set_system_parameter_l(JET_paramDatabasePageSize, dbinfo.cbPageSize as u64);
+        EseAPI::set_system_parameter_l(JET_paramDisableCallbacks, true as u64);
         EseAPI::set_system_parameter_sz(JET_paramRecovery, "Off");
 
         let mut instance : JET_INSTANCE = 0;
@@ -166,7 +166,7 @@ impl EseDb for EseAPI {
         v.resize(256, 0);
         unsafe {
             let res = JetGetSystemParameterA(self.instance, self.sesid, JET_paramErrorToString,
-                (err as *mut u64).into(), v.as_mut_ptr() as *mut i8, v.len() as c_ulong);
+                err as *mut u64, v.as_mut_ptr() as *mut i8, v.len() as c_ulong);
             if res != 0 {
                 std::str::from_utf8(&v).unwrap().to_string()
             } else {

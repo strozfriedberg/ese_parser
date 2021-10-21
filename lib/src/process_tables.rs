@@ -289,7 +289,7 @@ fn alloc_jdb(m: &Mode) -> Box<dyn EseDb> {
     } else if *m == Mode::EseParser {
         return Box::new(EseParser::init(CACHE_SIZE_ENTRIES));
     }
-    return Box::new(EseBoth::init());
+    Box::new(EseBoth::init())
 }
 
 #[cfg(any(target_os = "linux", target_os = "macos"))]
@@ -352,7 +352,7 @@ pub fn process_table(dbpath: &str, test_file: Option<PathBuf>, mode: Mode, table
     let mut jdb = alloc_jdb(&mode);
 
     println!("mode {:?}, path: {}", &mode, dbpath);
-    if let Some(load_error) = jdb.load(&dbpath) {
+    if let Some(load_error) = jdb.load(dbpath) {
         println!("Error: {:?}", load_error);
         return;
     }
