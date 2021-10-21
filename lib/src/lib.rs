@@ -21,7 +21,7 @@ fn test_edb_table_all_values() {
     }
 
     let expected_tables = vec!["MSysObjects", "MSysObjectsShadow", "MSysObjids", "MSysLocales", "TestTable"];
-    
+
     let tables = jdb.get_tables().unwrap();
     assert_eq!(tables.len(), expected_tables.len());
     for i in 0..tables.len() {
@@ -43,7 +43,8 @@ fn test_edb_table_all_values() {
     assert_eq!(jdb.get_fixed_column::<u8>(table_id, unsigned_byte.id).unwrap(), Some(255));
 
     let short = columns.iter().find(|x| x.name == "Short" ).unwrap();
-    assert_eq!(jdb.get_fixed_column::<i16>(table_id, short.id).unwrap(), Some(0));
+    //assert_eq!(jdb.get_fixed_column::<i16>(table_id, short.id).unwrap(), Some(0));
+    assert_eq!(jdb.get_fixed_column::<i16>(table_id, short.id).unwrap(), None);
 
     let long = columns.iter().find(|x| x.name == "Long" ).unwrap();
     assert_eq!(jdb.get_fixed_column::<i32>(table_id, long.id).unwrap(), Some(-2147483648));

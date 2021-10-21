@@ -20,6 +20,7 @@ pub type FormatVersion = u32;
 pub type FormatRevision = u32;
 
 bitflags! {
+    #[derive(Default)]
     pub struct PageFlags: uint32_t {
         const UNKNOWN_8000          = 0b1000000000000000;
         const IS_SCRUBBED           = 0b0100000000000000;
@@ -186,7 +187,7 @@ impl fmt::Display for DbTime {
     }
 }
 
-#[derive(Copy, Clone, Default, Debug)]
+#[derive(Copy, Clone, Default, Debug, Eq, PartialEq)]
 #[repr(C)]
 pub struct DateTime {
     pub seconds: uint8_t,
@@ -198,70 +199,6 @@ pub struct DateTime {
     pub time_is_utc: uint8_t,
     pub os_snapshot: uint8_t,
 }
-
-/*impl fmt::Display for DateTime {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        use chrono::naive::NaiveDate;
-        use chrono::{Local,TimeZone, Utc};
-        if self.year > 0 {
-            let ndt =
-                NaiveDate::from_ymd(self.year as i32 + 1900, self.month as u32, self.day as u32)
-                    .and_hms(self.hours as u32, self.minutes as u32, self.seconds as u32);
-
-            let offset = if self.time_is_utc == 0 {
-                Local.timestamp(0, 0).offset().local_minus_utc()
-            } else {
-                0
-            };
-
-           /* let dt = if self.time_is_utc == 0 {
-                let offset = Local.timestamp(0, 0).offset().local_minus_utc()
-                /*chrono::DateTime::<Utc>::from(
-                    chrono::FixedOffset::east(offset)
-                        .from_local_datetime(&ndt)
-                        .unwrap(),
-                );*/
-                chrono::DateTime::<Utc>::from()  ndt, chrono::FixedOffset::east(offset))
-                chrono::DateTime::<Local>::from
-            } else {
-                //chrono::DateTime::<Utc>::from_utc(NaiveDateTime::from_timestamp(61, 0), Utc)
-                chrono::DateTime::<Utc>::from_utc(ndt, Utc)
-            };*/
-
-            let dt = chrono::DateTime::<Utc>::from(
-                chrono::FixedOffset::east(offset)
-                    .from_local_datetime(&ndt)
-                    .unwrap(),
-            );
-
-            write!(f, "{}", dt)
-        } else {
-            write!(f, "")
-        }
-    }
-}*/
-
-/*#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn test_date_time_display() {
-        let date_time = DateTime {
-            seconds: 4,
-            minutes: 5,
-            hours: 6,
-            day: 7,
-            month: 8,
-            year: 121,
-            time_is_utc: 0,
-            os_snapshot: 0,
-        };
-
-        let s = format!("{}", date_time);
-        let t=3;
-    }
-}*/
 
 #[derive(Copy, Clone, Default, Debug)]
 #[repr(C)]
@@ -303,7 +240,8 @@ pub struct DbPage {
 
 impl DbPage {
     pub fn new(reader: &Reader, page_number: uint32_t) -> Result<DbPage, SimpleError> {
-        let page_header = reader::load_page_header(reader, page_number)?;
+       // let page_header = reader::load_page_header(reader, page_number)?;
+        let page_header = reader.load_page_header(page_number)?;
         let mut db_page = DbPage {
             page_number,
             page_size: reader.page_size(),

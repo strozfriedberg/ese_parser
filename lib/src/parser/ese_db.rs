@@ -97,7 +97,7 @@ pub struct PageHeader0x11 {
 }
 
 #[repr(packed)]
-#[derive(Copy, Clone, Debug)]
+#[derive(Copy, Clone, Debug, Eq, PartialEq)]
 pub struct PageHeaderCommon {
     pub database_modification_time: jet::DateTime,
     pub previous_page: uint32_t,

@@ -1,8 +1,13 @@
 //reader.rs
 use std::{fs, io, io::{Seek, Read}, mem, path::Path, slice, convert::TryInto, cell::RefCell};
 use std::collections::{BTreeSet, HashMap, hash_map::Entry};
+use std::array::TryFromSliceError;
 use simple_error::SimpleError;
 use cache_2q::Cache;
+use nom::number::complete::{
+    le_u8, le_u16, le_u32, le_u64
+};
+use nom::IResult;
 
 use crate::parser::ese_db;
 use crate::parser::ese_db::*;
@@ -22,6 +27,7 @@ pub struct Reader {
     page_size: u32,
 }
 
+// Looks like we need this; the zerocopy crate's AsBytes trait doesn't work for ese_db::FileHeader
 #[allow(clippy::mut_from_ref)]
 unsafe fn _any_as_slice<'a, U: Sized, T: Sized>(p: &'a &T) -> &'a [U] {
     slice::from_raw_parts(
@@ -30,20 +36,8 @@ unsafe fn _any_as_slice<'a, U: Sized, T: Sized>(p: &'a &T) -> &'a [U] {
     )
 }
 
-// enum SimpleError {
-//     UnsignedError(std::num::TryFromIntError),
-// }
-
-// impl TryFrom<std::num::TryFromIntError> for simple_error::SimpleError {
-//     fn try_from(error: std::num::TryFromIntError) -> Self {
-//         simple_error::SimpleError::UnsignedError(error)
-//     }
-// }
-
 impl Reader {
-
     fn load_db_file_header(&mut self) -> Result<ese_db::FileHeader, SimpleError> {
-
         let mut db_file_header =
             self.read_struct::<ese_db::FileHeader>(0)?;
 
@@ -180,39 +174,139 @@ impl Reader {
     pub fn page_size(&self) -> u32 {
         self.page_size
     }
+
+    pub(crate) fn load_page_header(
+        &self,
+        page_number: u32,
+    ) -> Result<PageHeader, SimpleError> {
+        let page_offset = (page_number + 1) as u64 * (self.page_size) as u64;
+
+        if self.format_revision < ESEDB_FORMAT_REVISION_NEW_RECORD_FORMAT {
+            let header = self.read_page_header_old(page_offset)?;
+            let common = self.read_page_header_common(page_offset)?;
+
+            //let TODO_checksum = 0;
+            Ok(PageHeader::old(header, common))
+        } else if self.format_revision < ESEDB_FORMAT_REVISION_EXTENDED_PAGE_HEADER {
+            let header = self.read_page_header_0x0b(page_offset)?;
+            let common = self.read_page_header_common(page_offset + mem::size_of_val(&header) as u64)?;
+
+            //TODO: verify checksum
+            Ok(PageHeader::x0b(header, common))
+        } else {
+            let header = self.read_page_header_0x11(page_offset)?;
+            let common = self.read_page_header_common(page_offset + mem::size_of_val(&header) as u64)?;
+
+            //TODO: verify checksum
+            if self.page_size > 8 * 1024 {
+                let offs = mem::size_of_val(&header) + mem::size_of_val(&common);
+                let ext = self.read_struct::<PageHeaderExt0x11>(page_offset + offs as u64)?;
+
+                Ok(PageHeader::x11_ext(header, common, ext))
+            } else {
+                Ok(PageHeader::x11(header, common))
+            }
+        }
+    }
 }
 
-pub fn load_page_header(
-    reader: &Reader,
-    page_number: u32,
-) -> Result<PageHeader, SimpleError> {
-    let page_offset = (page_number + 1) as u64 * (reader.page_size) as u64;
+impl Reader {
+    fn nom_err() -> impl Fn(nom::Err<nom::error::Error<&[u8]>>) -> SimpleError {
+        |e: nom::Err<nom::error::Error<&[u8]>>| SimpleError::new(e.to_string())
+    }
 
-    if reader.format_revision < ESEDB_FORMAT_REVISION_NEW_RECORD_FORMAT {
-        let header = reader.read_struct::<PageHeaderOld>(page_offset)?;
-        let common = reader.read_struct::<PageHeaderCommon>(page_offset + mem::size_of_val(&header) as u64)?;
+    fn read_page_header_0x0b(&self, page_offset: u64) -> Result<PageHeader0x0b, SimpleError> {
+        let struct_size = mem::size_of::<PageHeader0x0b>();
+        let mut buffer: Vec<u8> = vec![0; struct_size];
+        self.read(page_offset, &mut buffer)?;
 
-        //let TODO_checksum = 0;
-        Ok(PageHeader::old(header, common))
-    } else if reader.format_revision < ESEDB_FORMAT_REVISION_EXTENDED_PAGE_HEADER {
-        let header = reader.read_struct::<PageHeader0x0b>(page_offset)?;
-        let common = reader.read_struct::<PageHeaderCommon>(page_offset + mem::size_of_val(&header) as u64)?;
+        let input = &buffer[..];
+        let (input, xor_checksum) = le_u32(input).map_err(Self::nom_err())?;
+        let (_, ecc_checksum) = le_u32(input).map_err(Self::nom_err())?;
 
-        //TODO: verify checksum
-        Ok(PageHeader::x0b(header, common))
-    } else {
-        let header = reader.read_struct::<PageHeader0x11>(page_offset)?;
-        let common = reader.read_struct::<PageHeaderCommon>(page_offset + mem::size_of_val(&header) as u64)?;
+        Ok( PageHeader0x0b {
+            xor_checksum,
+            ecc_checksum
+        })
+    }
 
-        //TODO: verify checksum
-        if reader.page_size > 8 * 1024 {
-            let offs = mem::size_of_val(&header) + mem::size_of_val(&common);
-            let ext = reader.read_struct::<PageHeaderExt0x11>(page_offset + offs as u64)?;
+    fn read_page_header_0x11(&self, page_offset: u64) -> Result<PageHeader0x11, SimpleError> {
+        let struct_size = mem::size_of::<PageHeader0x11>();
+        let mut buffer: Vec<u8> = vec![0; struct_size];
+        self.read(page_offset, &mut buffer)?;
 
-            Ok(PageHeader::x11_ext(header, common, ext))
-        } else {
-            Ok(PageHeader::x11(header, common))
-        }
+        let input = &buffer[..];
+        let (_, checksum) = le_u64(input).map_err(Self::nom_err())?;
+
+        Ok( PageHeader0x11 {
+            checksum,
+        })
+    }
+
+    fn read_page_header_old(&self, page_offset: u64) -> Result<PageHeaderOld, SimpleError> {
+        let struct_size = mem::size_of::<PageHeaderOld>();
+        let mut buffer: Vec<u8> = vec![0; struct_size];
+        self.read(page_offset, &mut buffer)?;
+
+        let input = &buffer[..];
+        let (input, xor_checksum) = le_u32(input).map_err(Self::nom_err())?;
+        let (_, page_number) = le_u32(input).map_err(Self::nom_err())?;
+
+        Ok( PageHeaderOld {
+            xor_checksum,
+            page_number
+        })
+    }
+
+    fn read_page_header_common(&self, page_offset: u64) -> Result<PageHeaderCommon, SimpleError> {
+        let struct_size = mem::size_of::<PageHeaderCommon>();
+        let mut buffer: Vec<u8> = vec![0; struct_size];
+        self.read(page_offset, &mut buffer)?;
+
+        let input = &buffer[..];
+        let (input, database_modification_time) = Self::read_jet_date_time(input).map_err(Self::nom_err())?;
+        let (input, previous_page) = le_u32(input).map_err(Self::nom_err())?;
+        let (input, next_page) = le_u32(input).map_err(Self::nom_err())?;
+        let (input, father_data_page_object_identifier) = le_u32(input).map_err(Self::nom_err())?;
+        let (input, available_data_size) = le_u16(input).map_err(Self::nom_err())?;
+        let (input, available_uncommitted_data_size) = le_u16(input).map_err(Self::nom_err())?;
+        let (input, available_data_offset) = le_u16(input).map_err(Self::nom_err())?;
+        let (input, available_page_tag) = le_u16(input).map_err(Self::nom_err())?;
+        let (_, page_flags) = le_u32(input).map_err(Self::nom_err())?;
+
+        Ok( PageHeaderCommon {
+            database_modification_time,
+            previous_page,
+            next_page,
+            father_data_page_object_identifier,
+            available_data_size,
+            available_uncommitted_data_size,
+            available_data_offset,
+            available_page_tag,
+            page_flags: jet::PageFlags::from_bits_truncate(page_flags)
+        })
+    }
+
+    fn read_jet_date_time(input: &[u8]) -> IResult<&[u8], jet::DateTime> {
+        let (input, seconds) = le_u8(input)?;
+        let (input, minutes) = le_u8(input)?;
+        let (input, hours) = le_u8(input)?;
+        let (input, day) = le_u8(input)?;
+        let (input, month) = le_u8(input)?;
+        let (input, year) = le_u8(input)?;
+        let (input, time_is_utc) = le_u8(input)?;
+        let (input, os_snapshot) = le_u8(input)?;
+
+        Ok((input, jet::DateTime {
+            seconds,
+            minutes,
+            hours,
+            day,
+            month,
+            year,
+            time_is_utc,
+            os_snapshot,
+        }))
     }
 }
 
@@ -284,7 +378,7 @@ pub fn page_tag_get_branch_child_page_number(
 ) -> Result<u32, SimpleError> {
     let mut offset = page_tag.offset(db_page);
 
-    if page_tag.flags().intersects(jet::PageTagFlags::FLAG_HAS_COMMON_KEY_SIZE) {
+    if page_tag.flags().intersects(jet::PageTagFlags::FLAG_HAS_COMMON_KEY_SIZE) { // Why is this intersect vs contains?
         offset += 2;
     }
     let local_page_key_size : u16 = reader.read_struct(offset)?;
@@ -301,8 +395,8 @@ pub fn load_catalog(
     let db_page = jet::DbPage::new(reader, jet::FixedPageNumber::Catalog as u32)?;
     let pg_tags = &db_page.page_tags;
 
-    let is_root = db_page.flags().contains(jet::PageFlags::IS_ROOT);
 
+    let is_root = db_page.flags().contains(jet::PageFlags::IS_ROOT);
     if is_root {
         let _root_page_header = load_root_page_header(reader, &db_page, &pg_tags[0])?;
     }
@@ -974,23 +1068,17 @@ pub fn load_lv_tag(
             page_key = res.common_page_key.clone();
         }
 
-        let skey = unsafe {
-            match page_key[0..4].try_into() {
-                Ok(pk) => std::mem::transmute::<[u8; 4], u32>(pk),
-                Err(e) => return Err(SimpleError::new(format!("can't convert page_key {:?} into slice [0..4], error: {}",
-                    page_key, e)))
-            }
-        }.to_be();
+        let skey = u32::from_le_bytes(page_key[0..4]
+                .try_into()
+                .map_err(|e: TryFromSliceError| SimpleError::new(format!("can't convert page_key {:?} into slice [0..4], error: {}", page_key, e)))?
+        ).to_be();
 
 		let mut seg_offset = 0;
 
         if page_key.len() == 8 {
-            // let segment_offset = unsafe {
-            //     std::mem::transmute::<[u8; 4], u32>(page_key[4..8].try_into().unwrap())
-            // }.to_be();
             let segment_offset = u32::from_le_bytes(page_key[4..8]
                     .try_into()
-                    .map_err(|e: std::array::TryFromSliceError| SimpleError::new(e.to_string()))?
+                    .map_err(|e: TryFromSliceError| SimpleError::new(e.to_string()))?
             ).to_be();
             seg_offset = segment_offset;
         }
