@@ -2,4 +2,4 @@
 * text=auto
 
 # We hash this file in a unit test comparison; line ending changes break it
-lib/testdata/esentoutput.txt binary
+esentoutput.txt binary
