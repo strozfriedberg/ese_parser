@@ -23,6 +23,7 @@ docker run --rm \
 	cd ese_parser
 
 	pushd lib
+	rustc --version
 	cargo test
 	popd
 

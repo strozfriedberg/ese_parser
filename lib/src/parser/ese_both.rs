@@ -7,9 +7,12 @@
     clippy::cast_ptr_alignment
 )]
 
-use ese_parser_lib::{ese_parser::*, ese_trait::*, esent::ese_api::*};
+//use ese_parser_lib::{ese_parser::*, ese_trait::*, esent::ese_api::*};
 use simple_error::SimpleError;
 use std::cell::RefCell;
+use crate::ese_parser::*;
+use crate::ese_trait::*;
+use crate::esent::ese_api::*;
 
 const CACHE_SIZE_ENTRIES: usize = 10;
 

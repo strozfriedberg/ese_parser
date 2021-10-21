@@ -1,0 +1,5 @@
+# Set the default behavior, in case people don't have core.autocrlf set.
+* text=auto
+
+# We hash this file in a unit test comparison; line ending changes break it
+esentoutput*.txt binary
