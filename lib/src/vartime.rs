@@ -4,7 +4,7 @@
 // implementation is taken from ReacOS: dll/win32/oleaut32/variant.c
 
 #[repr(C)]
-#[derive(PartialEq, Debug, Copy, Clone)]
+#[derive(PartialEq, Debug, Copy, Clone, Default)]
 pub struct SYSTEMTIME {
     pub wYear: u16,
     pub wMonth: u16,

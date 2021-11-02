@@ -3,31 +3,57 @@
 
 use crate::parser::jet;
 use crate::parser::jet::*;
+use nom_derive::*;
+use nom::number::complete::{
+    le_u8, le_u16, le_u32, le_u64
+};
+use nom::IResult;
+use nom::bytes::complete::take;
+use nom::combinator::map_res;
+use nom::error::{Error, FromExternalError, ParseError};
 
 pub const ESEDB_FILE_SIGNATURE: uint32_t = 0x89abcdef;
 pub const ESEDB_FORMAT_REVISION_NEW_RECORD_FORMAT: uint32_t = 0x0b;
 pub const ESEDB_FORMAT_REVISION_EXTENDED_PAGE_HEADER: uint32_t = 0x11;
 
-#[derive(Copy, Clone, Default, Debug)]
+type testtype = u32;
+
+#[derive(Copy, Clone, Default, Debug, Nom)]
 #[repr(C)]
 pub struct FileHeader {
     pub checksum: uint32_t,
     pub signature: uint32_t,
+    test_format_version : testtype,
+    #[nom(Parse="{ |i| jet::FormatVersion::parse_le(i) }")]
     pub format_version: jet::FormatVersion,
+    #[nom(Parse="{ |i| jet::FileType::parse_le(i) }")]
     pub file_type: jet::FileType,
+    #[nom(Parse="{ |i| jet::DbTime::parse_le(i) }")]
     pub database_time: jet::DbTime,
+    #[nom(Parse="{ |i| jet::Signature::parse_le(i) }")]
     pub database_signature: jet::Signature,
+    #[nom(Parse="{ |i| jet::DbState::parse_le(i) }")]
     pub database_state: jet::DbState,
+    #[nom(Parse="{ |i| jet::LgPos::parse_le(i) }")]
     pub consistent_postition: jet::LgPos,
+    #[nom(Parse="{ |i| jet::DateTime::parse_le(i) }")]
     pub consistent_time: jet::DateTime,
+    #[nom(Parse="{ |i| jet::DateTime::parse_le(i) }")]
     pub attach_time: jet::DateTime,
+    #[nom(Parse="{ |i| jet::LgPos::parse_le(i) }")]
     pub attach_postition: jet::LgPos,
+    #[nom(Parse="{ |i| jet::DateTime::parse_le(i) }")]
     pub detach_time: jet::DateTime,
+    #[nom(Parse="{ |i| jet::LgPos::parse_le(i) }")]
     pub detach_postition: jet::LgPos,
     pub dbid: uint32_t,
+    #[nom(Parse="{ |i| jet::Signature::parse_le(i) }")]
     pub log_signature: jet::Signature,
+    #[nom(Parse="{ |i| jet::BackupInfo::parse_le(i) }")]
     pub previous_full_backup: jet::BackupInfo,
+    #[nom(Parse="{ |i| jet::BackupInfo::parse_le(i) }")]
     pub previous_incremental_backup: jet::BackupInfo,
+    #[nom(Parse="{ |i| jet::BackupInfo::parse_le(i) }")]
     pub current_full_backup: jet::BackupInfo,
     pub shadowing_disabled: uint32_t,
     pub last_object_identifier: uint32_t,
@@ -35,33 +61,44 @@ pub struct FileHeader {
     pub index_update_minor_version: uint32_t,
     pub index_update_build_number: uint32_t,
     pub index_update_service_pack_number: uint32_t,
+    #[nom(Parse = "le_u32")]
     pub format_revision: jet::FormatRevision,
     pub page_size: uint32_t,
     pub repair_count: uint32_t,
+    #[nom(Parse="{ |i| jet::DateTime::parse_le(i) }")]
     pub repair_time: jet::DateTime,
+    #[nom(Parse="{ |i| jet::Signature::parse_le(i) }")]
     pub unknown2: jet::Signature,
+    #[nom(Parse="{ |i| jet::DateTime::parse_le(i) }")]
     pub scrub_database_time: jet::DateTime,
+    #[nom(Parse="{ |i| jet::DateTime::parse_le(i) }")]
     pub scrub_time: jet::DateTime,
     pub required_log: [uint8_t; 8],
     pub upgrade_exchange5_format: uint32_t,
     pub upgrade_free_pages: uint32_t,
     pub upgrade_space_map_pages: uint32_t,
+    #[nom(Parse="{ |i| jet::BackupInfo::parse_le(i) }")]
     pub current_shadow_volume_backup: jet::BackupInfo,
     pub creation_format_version: uint32_t,
     pub creation_format_revision: uint32_t,
     pub unknown3: [uint8_t; 16],
     pub old_repair_count: uint32_t,
     pub ecc_fix_success_count: uint32_t,
+    #[nom(Parse="{ |i| jet::DateTime::parse_le(i) }")]
     pub ecc_fix_success_time: jet::DateTime,
     pub old_ecc_fix_success_count: uint32_t,
     pub ecc_fix_error_count: uint32_t,
+    #[nom(Parse="{ |i| jet::DateTime::parse_le(i) }")]
     pub ecc_fix_error_time: jet::DateTime,
     pub old_ecc_fix_error_count: uint32_t,
     pub bad_checksum_error_count: uint32_t,
+    #[nom(Parse="{ |i| jet::DateTime::parse_le(i) }")]
     pub bad_checksum_error_time: jet::DateTime,
     pub old_bad_checksum_error_count: uint32_t,
     pub committed_log: uint32_t,
+    #[nom(Parse="{ |i| jet::BackupInfo::parse_le(i) }")]
     pub previous_shadow_volume_backup: jet::BackupInfo,
+    #[nom(Parse="{ |i| jet::BackupInfo::parse_le(i) }")]
     pub previous_differential_backup: jet::BackupInfo,
     pub unknown4_1: [uint8_t; 20],
     pub unknown4_2: [uint8_t; 40 - 20],
@@ -111,7 +148,7 @@ pub struct PageHeaderCommon {
 }
 
 #[repr(packed)]
-#[derive(Copy, Clone, Debug)]
+#[derive(Copy, Clone, Debug, Nom)]
 pub struct PageHeaderExt0x11 {
     pub checksum1: uint64_t,
     pub checksum2: uint64_t,
@@ -137,7 +174,7 @@ pub struct PageTag {
 }
 
 #[repr(packed)]
-#[derive(Copy, Clone, Debug)]
+#[derive(Copy, Clone, Debug, Nom)]
 pub struct RootPageHeader16 {
     pub initial_number_of_pages: uint32_t,
     pub parent_fdp: uint32_t,
@@ -146,7 +183,7 @@ pub struct RootPageHeader16 {
 }
 
 #[repr(packed)]
-#[derive(Copy, Clone, Debug)]
+#[derive(Copy, Clone, Debug, Nom)]
 pub struct RootPageHeader25 {
     pub initial_number_of_pages: uint32_t,
     pub unknown1: uint8_t,
@@ -183,7 +220,7 @@ pub struct LeafPageEntry {
 }
 
 #[repr(packed)]
-#[derive(Copy, Clone, Debug, Default)]
+#[derive(Copy, Clone, Debug, Default, Nom)]
 pub struct DataDefinitionHeader {
     pub last_fixed_size_data_type: uint8_t,
     pub last_variable_size_data_type: uint8_t,
@@ -191,29 +228,48 @@ pub struct DataDefinitionHeader {
 }
 
 // Data type identifier: 4 (ColtypOrPgnoFDP)
-#[derive(Copy, Clone)]
+#[derive(Copy, Clone,Nom)]
 #[repr(packed)]
-pub union ColtypOrPgnoFDP {
+pub struct ColtypOrPgnoFDP {
+    fdpn_or_ct : uint32_t,
     pub father_data_page_number: uint32_t,
     pub column_type: uint32_t,
 }
-
-// Data type identifier: 7 (PagesOrLocale)
-#[derive(Copy, Clone)]
-#[repr(packed)]
-pub union PagesOrLocale {
-    // The (initial) number of pages
-    pub number_of_pages : uint32_t,
-
-    // The codepage
-    pub codepage : uint32_t,
-
-    // The locale identifier
-    pub locale_identifier : uint32_t
+impl ColtypOrPgnoFDP {
+    pub fn father_data_page_number(&self) -> uint32_t {
+        self.fdpn_or_ct
+    }
+    pub fn column_type(&self) -> uint32_t {
+        self.fdpn_or_ct
+    }
 }
 
+// Data type identifier: 7 (PagesOrLocale)
+#[derive(Copy, Clone,Nom)]
 #[repr(packed)]
-#[derive(Copy, Clone)]
+pub struct PagesOrLocale {
+    nop_or_cp_or_li : uint32_t,
+    pub number_of_pages : uint32_t,
+
+    pub codepage : uint32_t,
+
+    pub locale_identifier : uint32_t
+}
+impl PagesOrLocale {
+    pub fn number_of_pages(&self) -> uint32_t {
+        self.nop_or_cp_or_li
+    }
+    pub fn codepage(&self) -> uint32_t {
+        self.nop_or_cp_or_li
+    }
+    pub fn locale_identifier(&self) -> uint32_t {
+        self.nop_or_cp_or_li
+    }
+}
+
+
+#[repr(packed)]
+#[derive(Copy, Clone, Nom)]
 pub struct DataDefinition
 {
 	// Data type identifier: 1 (ObjidTable)
@@ -229,6 +285,7 @@ pub struct DataDefinition
 	pub identifier : uint32_t,
 
 	// Data type identifier: 4 (ColtypOrPgnoFDP)
+    #[nom(Parse="{ |i| ColtypOrPgnoFDP::parse_le(i) }")]
     pub coltyp_or_fdp: ColtypOrPgnoFDP,
 
 	// Data type identifier: 5 (SpaceUsage)
@@ -238,7 +295,7 @@ pub struct DataDefinition
 	// Data type identifier: 6 (Flags)
 	// Flags
 	pub flags : uint32_t,
-
+    #[nom(Parse="{ |i| PagesOrLocale::parse_le(i) }")]
     pub pages_or_locale: PagesOrLocale,
 
 	// Data type identifier: 8 (RootFlag)

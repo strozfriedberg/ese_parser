@@ -1,4 +1,6 @@
 use simple_error::SimpleError;
+use byteorder::*;
+use std::mem; 
 
 #[derive(Debug)]
 pub struct ColumnInfo {
@@ -75,8 +77,9 @@ pub trait EseDb {
 		let r = self.get_column(table, column)?;
 		if let Some(v) = r {
 			if ESE_CP::try_from(cp).expect("Failed to get ESE cp") == ESE_CP::Unicode {
-				let buf = unsafe { std::slice::from_raw_parts(v.as_ptr() as *const u16, v.len() / 2) };
-				match String::from_utf16(buf) {
+                let mut vec16: Vec<u16> = vec![0;v.len()/mem::size_of::<u16>()];
+                LittleEndian::read_u16_into(&v, &mut vec16);
+				match String::from_utf16(&vec16[..]) {
 					Ok(s) => return Ok(Some(s)),
 					Err(e) => return Err(SimpleError::new(format!("String::from_utf16 failed: {}", e)))
 				}
@@ -89,4 +92,50 @@ pub trait EseDb {
 		}
 		Err(SimpleError::new(format!("can't decode string from {:?}", r)))
 	}
+}
+
+use std::convert::TryInto;
+
+pub trait FromBytes {
+    fn from_bytes(bytes: &[u8]) -> Self;
+}
+
+impl FromBytes for i8 {
+    fn from_bytes(bytes: &[u8]) -> Self  { i8::from_le_bytes(bytes.try_into().unwrap()) }
+}
+
+impl FromBytes for u8 {
+    fn from_bytes(bytes: &[u8]) -> Self  { u8::from_le_bytes(bytes.try_into().unwrap()) }
+}
+
+impl FromBytes for i16 {
+    fn from_bytes(bytes: &[u8]) -> Self  { i16::from_le_bytes(bytes.try_into().unwrap()) }
+}
+
+impl FromBytes for u16 {
+    fn from_bytes(bytes: &[u8]) -> Self  { u16::from_le_bytes(bytes.try_into().unwrap()) }
+}
+
+impl FromBytes for i32 {
+    fn from_bytes(bytes: &[u8]) -> Self  { i32::from_le_bytes(bytes.try_into().unwrap()) }
+}
+
+impl FromBytes for u32 {
+    fn from_bytes(bytes: &[u8]) -> Self  { u32::from_le_bytes(bytes.try_into().unwrap()) }
+}
+
+impl FromBytes for i64 {
+    fn from_bytes(bytes: &[u8]) -> Self  { i64::from_le_bytes(bytes.try_into().unwrap()) }
+}
+
+impl FromBytes for u64 {
+    fn from_bytes(bytes: &[u8]) -> Self  { u64::from_le_bytes(bytes.try_into().unwrap()) }
+}
+
+impl FromBytes for f32 {
+    fn from_bytes(bytes: &[u8]) -> Self  { f32::from_le_bytes(bytes.try_into().unwrap()) }
+}
+
+impl FromBytes for f64 {
+    fn from_bytes(bytes: &[u8]) -> Self  { f64::from_le_bytes(bytes.try_into().unwrap()) }
 }

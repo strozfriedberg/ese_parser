@@ -157,16 +157,23 @@ fn test_edb_table_all_values() {
 
         let lt = jdb.get_column(table_id, long_text.id).unwrap().unwrap();
         let s = lt.as_slice();
-
-        unsafe {
-            let (_, v16, _) = s.align_to::<u16>();
-            let ws = widestring::U16String::from_ptr(v16.as_ptr(), v16.len()).to_string_lossy();
-            for i in 0..ws.len() {
-                let l = ws.chars().nth(i).unwrap();
-                let r = abc.as_bytes()[i % abc.len()] as char;
-                assert_eq!(l, r);
-            }
+        let v16 = u16::from_bytes(&s);
+        let ws = widestring::U16String::from_vec(v16);
+        for i in 0..ws.len() {
+            let l = ws.chars().nth(i).unwrap();
+            let r = abc.as_bytes()[i % abc.len()] as char;
+            assert_eq!(l, r);
         }
+
+        // unsafe {
+        //     let (_, v16, _) = s.align_to::<u16>();
+        //     let ws = widestring::U16String::from_ptr(v16.as_ptr(), v16.len()).to_string_lossy();
+        //     for i in 0..ws.len() {
+        //         let l = ws.chars().nth(i).unwrap();
+        //         let r = abc.as_bytes()[i % abc.len()] as char;
+        //         assert_eq!(l, r);
+        //     }
+        // }
     }
 
     // Default value

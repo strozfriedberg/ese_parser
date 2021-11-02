@@ -8,6 +8,8 @@ use nom::number::complete::{
     le_u8, le_u16, le_u32, le_u64
 };
 use nom::IResult;
+use nom_derive::*;
+use byteorder::*;
 
 use crate::parser::ese_db;
 use crate::parser::ese_db::*;
@@ -35,6 +37,7 @@ unsafe fn _any_as_slice<'a, U: Sized, T: Sized>(p: &'a &T) -> &'a [U] {
         mem::size_of::<T>() / mem::size_of::<U>(),
     )
 }
+//read bytes, get the crc, and then read the struct from the bytes 
 
 impl Reader {
     fn load_db_file_header(&mut self) -> Result<ese_db::FileHeader, SimpleError> {
@@ -45,17 +48,17 @@ impl Reader {
             return Err(SimpleError::new("bad file_header.signature"));
         }
 
-        fn calc_crc32(file_header: &ese_db::FileHeader) -> u32 {
-            let vec32: &[u32] = unsafe { _any_as_slice::<u32, ese_db::FileHeader>(&file_header) };
-            vec32.iter().skip(1).fold(0x89abcdef, |crc, &val| crc ^ val)
+        fn calc_crc32(buffer: &Vec<u8>) -> u32 {
+            let mut buf32: Vec<u32> = vec![0;buffer.len()/mem::size_of::<u32>()];
+            LittleEndian::read_u32_into(&buffer, &mut buf32);
+            buf32.iter().skip(1).fold(0x89abcdef, |crc, &val| crc ^ val)
         }
 
         let stored_checksum = db_file_header.checksum;
-        let checksum = calc_crc32(&db_file_header);
+        let checksum = 0;//calc_crc32(&buffer);
         if stored_checksum != checksum {
             return Err(SimpleError::new(format!("wrong checksum: {}, calculated {}", stored_checksum, checksum)));
         }
-
         let backup_file_header = self.read_struct::<ese_db::FileHeader>(db_file_header.page_size as u64)?;
 
         if db_file_header.format_revision == 0 {
@@ -143,16 +146,6 @@ impl Reader {
         Ok(())
     }
 
-    pub fn read_struct<T>(&self, offset: u64) -> Result<T, SimpleError> {
-        let struct_size = mem::size_of::<T>();
-        let mut rec: T = unsafe { mem::zeroed() };
-        unsafe {
-            let buffer = slice::from_raw_parts_mut(&mut rec as *mut _ as *mut u8, struct_size);
-            self.read(offset, buffer)?;
-        }
-        Ok(rec)
-    }
-
     pub fn read_bytes(&self, offset: u64, size: usize) -> Result<Vec<u8>, SimpleError> {
         let mut buf = vec!(0u8; size);
         self.read(offset, &mut buf)?;
@@ -163,6 +156,7 @@ impl Reader {
         let v = self.read_bytes(offset, size)?;
         match std::str::from_utf8(&v) {
             Ok(s) => Ok(s.to_string()),
+
             Err(e) => Err(SimpleError::new(format!("from_utf8 failed: error_len() is {:?}", e.error_len())))
         }
     }
@@ -210,7 +204,7 @@ impl Reader {
     }
 }
 
-impl Reader {
+impl<'a> Reader {
     fn nom_err() -> impl Fn(nom::Err<nom::error::Error<&[u8]>>) -> SimpleError {
         |e: nom::Err<nom::error::Error<&[u8]>>| SimpleError::new(e.to_string())
     }
@@ -229,6 +223,23 @@ impl Reader {
             ecc_checksum
         })
     }
+    fn read_struct<T: Parse<&'a[u8]>>(&'a self, page_offset: u64) -> Result<T, SimpleError> {
+        let struct_size = mem::size_of::<T>();
+        let mut buffer: Vec<u8> = vec![0; struct_size];
+        self.read(page_offset, &mut buffer)?;
+        let (_, ret) = T::parse_le(&buffer[..]).map_err(Self::nom_err())?;
+        Ok(ret)
+        // let (ret, _) = self.read_struct_and_buf(page_offset)?;
+        // Ok(ret)
+    }
+    // fn read_struct_and_buf<'a, T: Parse<&'a[u8]>>(&'a self, page_offset: u64) -> Result<(T, Vec<u8>), SimpleError> {
+    //     let struct_size = mem::size_of::<T>();
+    //     let mut buffer: Vec<u8> = vec![0; struct_size];
+    //     self.read(page_offset, &mut buffer)?;
+    //     let (_, ret) = T::parse_le(&buffer[..]).map_err(Self::nom_err())?;
+    //     Ok((ret, buffer))
+    // }
+    //genericize with memsize T and then buffer of vec<u8> and then parse() to return the result
 
     fn read_page_header_0x11(&self, page_offset: u64) -> Result<PageHeader0x11, SimpleError> {
         let struct_size = mem::size_of::<PageHeader0x11>();
@@ -509,14 +520,14 @@ pub fn load_catalog_item(
     cat_def.cat_type = data_def.data_type;
     cat_def.identifier = data_def.identifier;
     if cat_def.cat_type == jet::CatalogType::Column as u16 {
-        cat_def.column_type = unsafe { data_def.coltyp_or_fdp.column_type };
+        cat_def.column_type = data_def.coltyp_or_fdp.column_type;
     } else {
-        cat_def.father_data_page_number = unsafe { data_def.coltyp_or_fdp.father_data_page_number };
+        cat_def.father_data_page_number = data_def.coltyp_or_fdp.father_data_page_number;
     }
     cat_def.size = data_def.space_usage;
     cat_def.flags = data_def.flags;
     if cat_def.cat_type == jet::CatalogType::Column as u16 {
-        cat_def.codepage = unsafe { data_def.pages_or_locale.codepage };
+        cat_def.codepage = data_def.pages_or_locale.codepage;
     }
     if ddh.last_fixed_size_data_type >= 10 {
         cat_def.lcmap_flags = data_def.lc_map_flags;
@@ -1227,4 +1238,48 @@ pub fn load_lv_data(
     } else {
         Err(SimpleError::new(format!("LV key {} not found", long_value_key)))
     }
+}
+
+pub trait FromBytes {
+    fn from_bytes(bytes: &[u8]) -> Self;
+}
+
+impl FromBytes for i8 {
+    fn from_bytes(bytes: &[u8]) -> Self  { i8::from_le_bytes(bytes.try_into().unwrap()) }
+}
+
+impl FromBytes for u8 {
+    fn from_bytes(bytes: &[u8]) -> Self  { u8::from_le_bytes(bytes.try_into().unwrap()) }
+}
+
+impl FromBytes for i16 {
+    fn from_bytes(bytes: &[u8]) -> Self  { i16::from_le_bytes(bytes.try_into().unwrap()) }
+}
+
+impl FromBytes for u16 {
+    fn from_bytes(bytes: &[u8]) -> Self  { u16::from_le_bytes(bytes.try_into().unwrap()) }
+}
+
+impl FromBytes for i32 {
+    fn from_bytes(bytes: &[u8]) -> Self  { i32::from_le_bytes(bytes.try_into().unwrap()) }
+}
+
+impl FromBytes for u32 {
+    fn from_bytes(bytes: &[u8]) -> Self  { u32::from_le_bytes(bytes.try_into().unwrap()) }
+}
+
+impl FromBytes for i64 {
+    fn from_bytes(bytes: &[u8]) -> Self  { i64::from_le_bytes(bytes.try_into().unwrap()) }
+}
+
+impl FromBytes for u64 {
+    fn from_bytes(bytes: &[u8]) -> Self  { u64::from_le_bytes(bytes.try_into().unwrap()) }
+}
+
+impl FromBytes for f32 {
+    fn from_bytes(bytes: &[u8]) -> Self  { f32::from_le_bytes(bytes.try_into().unwrap()) }
+}
+
+impl FromBytes for f64 {
+    fn from_bytes(bytes: &[u8]) -> Self  { f64::from_le_bytes(bytes.try_into().unwrap()) }
 }

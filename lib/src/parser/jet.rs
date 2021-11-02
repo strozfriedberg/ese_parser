@@ -5,7 +5,14 @@ use chrono::naive::NaiveTime;
 use std::{fmt, mem};
 use strum::Display;
 use simple_error::SimpleError;
-
+use nom_derive::*;
+use nom::number::complete::{
+    le_u8, le_u16, le_u32, le_u64
+};
+use nom::IResult;
+use nom::bytes::complete::take;
+use nom::combinator::map_res;
+use nom::error::{Error, FromExternalError, ParseError};
 use crate::parser::ese_db;
 use crate::parser::ese_db::*;
 use crate::parser::reader;
@@ -136,7 +143,7 @@ bitflags! {
     }
 }
 
-#[derive(Copy, Clone, Display, Debug)]
+#[derive(Copy, Clone, Display, Debug, Nom)]
 #[repr(u32)]
 pub enum DbState {
     impossible = 0,
@@ -153,7 +160,7 @@ impl Default for DbState {
     }
 }
 
-#[derive(Copy, Clone, Display, Debug)]
+#[derive(Copy, Clone, Display, Debug, Nom)]
 #[repr(u32)]
 pub enum FileType {
     Database = 0,
@@ -166,7 +173,7 @@ impl Default for FileType {
     }
 }
 
-#[derive(Copy, Clone, Default, Debug)]
+#[derive(Copy, Clone, Default, Debug, Nom)]
 #[repr(C)]
 pub struct DbTime {
     pub hours: uint16_t,
@@ -187,7 +194,7 @@ impl fmt::Display for DbTime {
     }
 }
 
-#[derive(Copy, Clone, Default, Debug, Eq, PartialEq)]
+#[derive(Copy, Clone, Default, Debug, Eq, PartialEq, Nom)]
 #[repr(C)]
 pub struct DateTime {
     pub seconds: uint8_t,
@@ -200,7 +207,7 @@ pub struct DateTime {
     pub os_snapshot: uint8_t,
 }
 
-#[derive(Copy, Clone, Default, Debug)]
+#[derive(Copy, Clone, Default, Debug, Nom)]
 #[repr(C)]
 pub struct Signature {
     pub random: uint32_t,
@@ -209,7 +216,7 @@ pub struct Signature {
 }
 
 #[repr(C, packed)]
-#[derive(Debug, Copy, Default, Clone)]
+#[derive(Debug, Copy, Default, Clone, Nom)]
 pub struct LgPos {
     pub ib: uint16_t,
     pub isec: uint16_t,
@@ -217,11 +224,13 @@ pub struct LgPos {
 }
 
 #[repr(C, packed)]
-#[derive(Debug, Copy, Default, Clone)]
+#[derive(Debug, Copy, Default, Clone, Nom)]
 pub struct BackupInfo {
     pub lg_pos_mark: LgPos,
     pub bk_logtime_mark: DateTime,
+    //#[nom(Parse = "le_u32")]
     pub gen_low: uint32_t,
+    //#[nom(Parse = "le_u32")]
     pub gen_high: uint32_t,
 }
 
