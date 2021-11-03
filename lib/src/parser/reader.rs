@@ -4,11 +4,6 @@ use std::collections::{BTreeSet, HashMap, hash_map::Entry};
 use std::array::TryFromSliceError;
 use simple_error::SimpleError;
 use cache_2q::Cache;
-use nom::number::complete::{
-    le_u8, le_u16, le_u32, le_u64
-};
-use nom::IResult;
-use nom_derive::*;
 use byteorder::*;
 
 use crate::parser::ese_db;
@@ -37,29 +32,27 @@ unsafe fn _any_as_slice<'a, U: Sized, T: Sized>(p: &'a &T) -> &'a [U] {
         mem::size_of::<T>() / mem::size_of::<U>(),
     )
 }
-//read bytes, get the crc, and then read the struct from the bytes 
 
 impl Reader {
     fn load_db_file_header(&mut self) -> Result<ese_db::FileHeader, SimpleError> {
-        let mut db_file_header =
-            self.read_struct::<ese_db::FileHeader>(0)?;
-
-        if db_file_header.signature != ESEDB_FILE_SIGNATURE {
-            return Err(SimpleError::new("bad file_header.signature"));
-        }
-
         fn calc_crc32(buffer: &Vec<u8>) -> u32 {
             let mut buf32: Vec<u32> = vec![0;buffer.len()/mem::size_of::<u32>()];
             LittleEndian::read_u32_into(&buffer, &mut buf32);
             buf32.iter().skip(1).fold(0x89abcdef, |crc, &val| crc ^ val)
         }
 
+        let (mut db_file_header, buffer) = ese_db::FileHeader::read(self, 0)?;
+
+        if db_file_header.signature != ESEDB_FILE_SIGNATURE {
+            return Err(SimpleError::new("bad file_header.signature"));
+        }
+
         let stored_checksum = db_file_header.checksum;
-        let checksum = 0;//calc_crc32(&buffer);
+        let checksum = calc_crc32(&buffer);
         if stored_checksum != checksum {
             return Err(SimpleError::new(format!("wrong checksum: {}, calculated {}", stored_checksum, checksum)));
         }
-        let backup_file_header = self.read_struct::<ese_db::FileHeader>(db_file_header.page_size as u64)?;
+        let (backup_file_header, _) = ese_db::FileHeader::read(self, db_file_header.page_size as u64)?;
 
         if db_file_header.format_revision == 0 {
             db_file_header.format_revision = backup_file_header.format_revision;
@@ -176,25 +169,25 @@ impl Reader {
         let page_offset = (page_number + 1) as u64 * (self.page_size) as u64;
 
         if self.format_revision < ESEDB_FORMAT_REVISION_NEW_RECORD_FORMAT {
-            let header = self.read_page_header_old(page_offset)?;
-            let common = self.read_page_header_common(page_offset)?;
+            let header = PageHeaderOld::read(self, page_offset)?;
+            let common = PageHeaderCommon::read(self, page_offset)?;
 
             //let TODO_checksum = 0;
             Ok(PageHeader::old(header, common))
         } else if self.format_revision < ESEDB_FORMAT_REVISION_EXTENDED_PAGE_HEADER {
-            let header = self.read_page_header_0x0b(page_offset)?;
-            let common = self.read_page_header_common(page_offset + mem::size_of_val(&header) as u64)?;
+            let header = PageHeader0x0b::read(self, page_offset)?;
+            let common = PageHeaderCommon::read(self, page_offset + mem::size_of_val(&header) as u64)?;
 
             //TODO: verify checksum
             Ok(PageHeader::x0b(header, common))
         } else {
-            let header = self.read_page_header_0x11(page_offset)?;
-            let common = self.read_page_header_common(page_offset + mem::size_of_val(&header) as u64)?;
+            let header = PageHeader0x11::read(self, page_offset)?;
+            let common = PageHeaderCommon::read(self, page_offset + mem::size_of_val(&header) as u64)?;
 
             //TODO: verify checksum
             if self.page_size > 8 * 1024 {
                 let offs = mem::size_of_val(&header) + mem::size_of_val(&common);
-                let ext = self.read_struct::<PageHeaderExt0x11>(page_offset + offs as u64)?;
+                let ext = PageHeaderExt0x11::read(self, page_offset + offs as u64)?;
 
                 Ok(PageHeader::x11_ext(header, common, ext))
             } else {
@@ -204,122 +197,48 @@ impl Reader {
     }
 }
 
-impl<'a> Reader {
-    fn nom_err() -> impl Fn(nom::Err<nom::error::Error<&[u8]>>) -> SimpleError {
-        |e: nom::Err<nom::error::Error<&[u8]>>| SimpleError::new(e.to_string())
-    }
-
-    fn read_page_header_0x0b(&self, page_offset: u64) -> Result<PageHeader0x0b, SimpleError> {
-        let struct_size = mem::size_of::<PageHeader0x0b>();
-        let mut buffer: Vec<u8> = vec![0; struct_size];
-        self.read(page_offset, &mut buffer)?;
-
-        let input = &buffer[..];
-        let (input, xor_checksum) = le_u32(input).map_err(Self::nom_err())?;
-        let (_, ecc_checksum) = le_u32(input).map_err(Self::nom_err())?;
-
-        Ok( PageHeader0x0b {
-            xor_checksum,
-            ecc_checksum
-        })
-    }
-    fn read_struct<T: Parse<&'a[u8]>>(&'a self, page_offset: u64) -> Result<T, SimpleError> {
-        let struct_size = mem::size_of::<T>();
-        let mut buffer: Vec<u8> = vec![0; struct_size];
-        self.read(page_offset, &mut buffer)?;
-        let (_, ret) = T::parse_le(&buffer[..]).map_err(Self::nom_err())?;
-        Ok(ret)
-        // let (ret, _) = self.read_struct_and_buf(page_offset)?;
-        // Ok(ret)
-    }
-    // fn read_struct_and_buf<'a, T: Parse<&'a[u8]>>(&'a self, page_offset: u64) -> Result<(T, Vec<u8>), SimpleError> {
-    //     let struct_size = mem::size_of::<T>();
-    //     let mut buffer: Vec<u8> = vec![0; struct_size];
-    //     self.read(page_offset, &mut buffer)?;
-    //     let (_, ret) = T::parse_le(&buffer[..]).map_err(Self::nom_err())?;
-    //     Ok((ret, buffer))
-    // }
-    //genericize with memsize T and then buffer of vec<u8> and then parse() to return the result
-
-    fn read_page_header_0x11(&self, page_offset: u64) -> Result<PageHeader0x11, SimpleError> {
-        let struct_size = mem::size_of::<PageHeader0x11>();
-        let mut buffer: Vec<u8> = vec![0; struct_size];
-        self.read(page_offset, &mut buffer)?;
-
-        let input = &buffer[..];
-        let (_, checksum) = le_u64(input).map_err(Self::nom_err())?;
-
-        Ok( PageHeader0x11 {
-            checksum,
-        })
-    }
-
-    fn read_page_header_old(&self, page_offset: u64) -> Result<PageHeaderOld, SimpleError> {
-        let struct_size = mem::size_of::<PageHeaderOld>();
-        let mut buffer: Vec<u8> = vec![0; struct_size];
-        self.read(page_offset, &mut buffer)?;
-
-        let input = &buffer[..];
-        let (input, xor_checksum) = le_u32(input).map_err(Self::nom_err())?;
-        let (_, page_number) = le_u32(input).map_err(Self::nom_err())?;
-
-        Ok( PageHeaderOld {
-            xor_checksum,
-            page_number
-        })
-    }
-
-    fn read_page_header_common(&self, page_offset: u64) -> Result<PageHeaderCommon, SimpleError> {
-        let struct_size = mem::size_of::<PageHeaderCommon>();
-        let mut buffer: Vec<u8> = vec![0; struct_size];
-        self.read(page_offset, &mut buffer)?;
-
-        let input = &buffer[..];
-        let (input, database_modification_time) = Self::read_jet_date_time(input).map_err(Self::nom_err())?;
-        let (input, previous_page) = le_u32(input).map_err(Self::nom_err())?;
-        let (input, next_page) = le_u32(input).map_err(Self::nom_err())?;
-        let (input, father_data_page_object_identifier) = le_u32(input).map_err(Self::nom_err())?;
-        let (input, available_data_size) = le_u16(input).map_err(Self::nom_err())?;
-        let (input, available_uncommitted_data_size) = le_u16(input).map_err(Self::nom_err())?;
-        let (input, available_data_offset) = le_u16(input).map_err(Self::nom_err())?;
-        let (input, available_page_tag) = le_u16(input).map_err(Self::nom_err())?;
-        let (_, page_flags) = le_u32(input).map_err(Self::nom_err())?;
-
-        Ok( PageHeaderCommon {
-            database_modification_time,
-            previous_page,
-            next_page,
-            father_data_page_object_identifier,
-            available_data_size,
-            available_uncommitted_data_size,
-            available_data_offset,
-            available_page_tag,
-            page_flags: jet::PageFlags::from_bits_truncate(page_flags)
-        })
-    }
-
-    fn read_jet_date_time(input: &[u8]) -> IResult<&[u8], jet::DateTime> {
-        let (input, seconds) = le_u8(input)?;
-        let (input, minutes) = le_u8(input)?;
-        let (input, hours) = le_u8(input)?;
-        let (input, day) = le_u8(input)?;
-        let (input, month) = le_u8(input)?;
-        let (input, year) = le_u8(input)?;
-        let (input, time_is_utc) = le_u8(input)?;
-        let (input, os_snapshot) = le_u8(input)?;
-
-        Ok((input, jet::DateTime {
-            seconds,
-            minutes,
-            hours,
-            day,
-            month,
-            year,
-            time_is_utc,
-            os_snapshot,
-        }))
-    }
+#[macro_export]
+macro_rules! impl_read_struct {
+    ($struct_type: ident) => {
+        impl $struct_type {
+            pub(crate) fn read(reader: &crate::parser::reader::Reader, page_offset: u64) -> Result<Self, simple_error::SimpleError> {
+                let buffer = reader.read_bytes(page_offset, std::mem::size_of::<$struct_type>())?;
+                let (_, ret) = $struct_type::parse_le(&buffer[..]).map_err(|e: nom::Err<nom::error::Error<&[u8]>>| simple_error::SimpleError::new(e.to_string()))?;
+                Ok(ret)
+            }
+        }
+    };
 }
+
+#[macro_export]
+macro_rules! impl_read_struct_buffer {
+    ($struct_type: ident) => {
+        impl $struct_type {
+            pub(crate) fn read(reader: &crate::parser::reader::Reader, page_offset: u64) -> Result<(Self, Vec<u8>), simple_error::SimpleError> {
+                let buffer = reader.read_bytes(page_offset, std::mem::size_of::<$struct_type>())?;
+                let (_, ret) = $struct_type::parse_le(&buffer[..]).map_err(|e: nom::Err<nom::error::Error<&[u8]>>| simple_error::SimpleError::new(e.to_string()))?;
+                Ok((ret, buffer))
+            }
+        }
+    };
+}
+
+#[macro_export]
+macro_rules! impl_read_primitive {
+    ($primitive_type: ident) => {
+        paste::item! {
+            pub(crate) fn [<read_ $primitive_type>](reader: &crate::parser::reader::Reader, page_offset: u64) -> Result<$primitive_type, simple_error::SimpleError> {
+                let size = std::mem::size_of::<$primitive_type>();
+                let buffer = reader.read_bytes(page_offset, size)?;
+                let arr = buffer[..].try_into().map_err(|e: std::array::TryFromSliceError| simple_error::SimpleError::new(e.to_string()))?;
+                Ok($primitive_type::from_le_bytes(arr))
+            }
+        }
+    };
+}
+impl_read_primitive!(u8);
+impl_read_primitive!(u16);
+impl_read_primitive!(u32);
 
 pub fn load_page_tags(
     reader: &Reader,
@@ -332,9 +251,9 @@ pub fn load_page_tags(
 
     for _i in 0..tags_cnt {
         tags_offset -= 2;
-        let page_tag_offset : u16 = reader.read_struct(tags_offset)?;
+        let page_tag_offset = read_u16(reader, tags_offset)?;
         tags_offset -= 2;
-        let page_tag_size : u16 = reader.read_struct(tags_offset)?;
+        let page_tag_size = read_u16(reader, tags_offset)?;
 
         let flags : u8;
 		let offset : u16;
@@ -348,7 +267,7 @@ pub fn load_page_tags(
             //if db_page.flags().contains(jet::PageFlags::IS_LEAF)
             {
                 let flags_offset = page_offset + db_page.size() as u64 + offset as u64;
-                let f : u16 = reader.read_struct(flags_offset)?;
+                let f : u16 = read_u16(reader, flags_offset)?;
                 flags = (f >> 13) as u8;
             }
         } else {
@@ -372,10 +291,10 @@ pub fn load_root_page_header(
     // TODO Seen in format version 0x620 revision 0x14
     // check format and revision
     if page_tag.size == 16 {
-        let root_page_header = reader.read_struct::<ese_db::RootPageHeader16>(root_page_offset)?;
+        let root_page_header = ese_db::RootPageHeader16::read(reader, root_page_offset)?;
         return Ok(RootPageHeader::xf(root_page_header));
     } else if page_tag.size == 25 {
-        let root_page_header = reader.read_struct::<ese_db::RootPageHeader25>(root_page_offset)?;
+        let root_page_header = ese_db::RootPageHeader25::read(reader, root_page_offset)?;
         return Ok(RootPageHeader::x19(root_page_header));
     }
 
@@ -392,11 +311,11 @@ pub fn page_tag_get_branch_child_page_number(
     if page_tag.flags().intersects(jet::PageTagFlags::FLAG_HAS_COMMON_KEY_SIZE) { // Why is this intersect vs contains?
         offset += 2;
     }
-    let local_page_key_size : u16 = reader.read_struct(offset)?;
+    let local_page_key_size : u16 = read_u16(reader, offset)?;
     offset += 2;
     offset += local_page_key_size as u64;
 
-    let child_page_number : u32 = reader.read_struct(offset)?;
+    let child_page_number : u32 = read_u32(reader, offset)?;
     Ok(child_page_number)
 }
 
@@ -494,7 +413,7 @@ pub fn load_catalog_item(
         first_word_read = true;
         offset += 2;
     }
-    let mut local_page_key_size : u16 = reader.read_struct(offset)?;
+    let mut local_page_key_size : u16 = read_u16(reader, offset)?;
     if !first_word_read {
         local_page_key_size = clean_pgtag_flag(reader, db_page, local_page_key_size);
     }
@@ -502,7 +421,7 @@ pub fn load_catalog_item(
     offset += local_page_key_size as u64;
 
     let offset_ddh = offset;
-    let ddh = reader.read_struct::<ese_db::DataDefinitionHeader>(offset_ddh)?;
+    let ddh = ese_db::DataDefinitionHeader::read(reader, offset_ddh)?;
     offset += mem::size_of::<ese_db::DataDefinitionHeader>() as u64;
 
     let number_of_variable_size_data_types : u32;
@@ -514,20 +433,20 @@ pub fn load_catalog_item(
 
     let cat_def_zero = std::mem::MaybeUninit::<jet::CatalogDefinition>::zeroed();
     let mut cat_def = unsafe { cat_def_zero.assume_init() };
-    let data_def = reader.read_struct::<ese_db::DataDefinition>(offset)?;
+    let data_def = ese_db::DataDefinition::read(reader, offset)?;
 
     cat_def.father_data_page_object_identifier = data_def.father_data_page_object_identifier;
     cat_def.cat_type = data_def.data_type;
     cat_def.identifier = data_def.identifier;
     if cat_def.cat_type == jet::CatalogType::Column as u16 {
-        cat_def.column_type = data_def.coltyp_or_fdp.column_type;
+        cat_def.column_type = data_def.coltyp_or_fdp.column_type();
     } else {
-        cat_def.father_data_page_number = data_def.coltyp_or_fdp.father_data_page_number;
+        cat_def.father_data_page_number = data_def.coltyp_or_fdp.father_data_page_number();
     }
     cat_def.size = data_def.space_usage;
     cat_def.flags = data_def.flags;
     if cat_def.cat_type == jet::CatalogType::Column as u16 {
-        cat_def.codepage = data_def.pages_or_locale.codepage;
+        cat_def.codepage = data_def.pages_or_locale.codepage();
     }
     if ddh.last_fixed_size_data_type >= 10 {
         cat_def.lcmap_flags = data_def.lc_map_flags;
@@ -540,7 +459,7 @@ pub fn load_catalog_item(
         let mut data_type_number : u16 = 128;
         for _ in 0..number_of_variable_size_data_types {
             offset += ddh.variable_size_data_types_offset as u64;
-            let variable_size_data_type_size : u16 = reader.read_struct(offset_ddh + variable_size_data_types_offset as u64)?;
+            let variable_size_data_type_size : u16 = read_u16(reader, offset_ddh + variable_size_data_types_offset as u64)?;
             variable_size_data_types_offset += 2;
 
             let data_type_size : u16;
@@ -697,7 +616,7 @@ pub fn load_data(
 			first_word_read = true;
 			lls.offset += 2;
 		}
-		let mut local_page_key_size : u16 = reader.read_struct(lls.offset)?;
+		let mut local_page_key_size : u16 = read_u16(reader, lls.offset)?;
 		if !first_word_read {
 			local_page_key_size = clean_pgtag_flag(reader, db_page, local_page_key_size);
 		}
@@ -707,7 +626,7 @@ pub fn load_data(
 		lls.record_data_size = page_tag.size as u64 - (lls.offset - offset_start);
 
 		lls.offset_ddh = lls.offset;
-		lls.ddh = reader.read_struct::<ese_db::DataDefinitionHeader>(lls.offset_ddh)?;
+		lls.ddh = ese_db::DataDefinitionHeader::read(reader, lls.offset_ddh)?;
 		lls.offset += mem::size_of::<ese_db::DataDefinitionHeader>() as u64;
 
 		// read fixed data bits mask, located at the end of fixed columns
@@ -759,7 +678,7 @@ pub fn load_data(
         } else if lls.var_state.current_type < lls.ddh.last_variable_size_data_type as u32 {
             // variable size
             while lls.var_state.current_type < col.identifier {
-                let variable_size_data_type_size : u16 = reader.read_struct(lls.offset_ddh + lls.var_state.type_offset as u64)?;
+                let variable_size_data_type_size : u16 = read_u16(reader, lls.offset_ddh + lls.var_state.type_offset as u64)?;
                 lls.var_state.type_offset += 2;
                 lls.var_state.current_type += 1;
                 if lls.var_state.current_type == col.identifier && (variable_size_data_type_size & 0x8000) == 0 {
@@ -826,10 +745,10 @@ fn init_tag_state(
     *offset = offset_ddh + tag_state.types_offset as u64;
 
     if tag_state.remaining_definition_data_size > 0 {
-        tag_state.identifier = reader.read_struct::<u16>(*offset)?;
+        tag_state.identifier = read_u16(reader, *offset)?;
         *offset += 2;
 
-        tag_state.type_offset = reader.read_struct::<u16>(*offset)?;
+        tag_state.type_offset = read_u16(reader, *offset)?;
         *offset += 2;
 
         if tag_state.type_offset == 0 {
@@ -859,10 +778,10 @@ fn load_tagged_data_linear(
     if tag_state.remaining_definition_data_size > 0 && col.identifier == tag_state.identifier as u32 {
         let previous_tagged_data_type_offset = tag_state.type_offset;
         if tag_state.offset_data_size > 0 {
-            tag_state.identifier = reader.read_struct::<u16>(*offset)?;
+            tag_state.identifier = read_u16(reader, *offset)?;
             *offset += 2;
 
-            tag_state.type_offset = reader.read_struct::<u16>(*offset)?;
+            tag_state.type_offset = read_u16(reader, *offset)?;
             *offset += 2;
 
             tag_state.offset_data_size               -= 4;
@@ -891,7 +810,7 @@ fn load_tagged_data_linear(
             if (reader.format_revision >= ESEDB_FORMAT_REVISION_EXTENDED_PAGE_HEADER &&
                 reader.page_size >= 16384) || (previous_tagged_data_type_offset & 0x4000 ) != 0
             {
-                data_type_flags = reader.read_struct(offset_ddh + tagged_data_type_value_offset as u64)?;
+                data_type_flags = read_u8(reader, offset_ddh + tagged_data_type_value_offset as u64)?;
 
                 tagged_data_type_value_offset	+= 1;
                 tag_state.tagged_data_type_size -= 1;
@@ -931,7 +850,7 @@ fn load_tagged_column(
     let compressed = col_flag.intersects(ColumnFlags::Compressed);
     let dtf = TaggedDataTypeFlag::from_bits_truncate(data_type_flags as u16);
     if dtf.intersects(TaggedDataTypeFlag::LONG_VALUE) {
-        let key = reader.read_struct::<u32>(offset)?;
+        let key = read_u32(reader, offset)?;
         v = load_lv_data(reader, lv_tags, key, compressed)?;
     } else if dtf.intersects(TaggedDataTypeFlag::MULTI_VALUE | TaggedDataTypeFlag::MULTI_VALUE_OFFSET) {
         let mv = read_multi_value(
@@ -969,7 +888,7 @@ fn read_multi_value(
         // The first byte contain the offset
         // [13, ...]
         let offset_mv_list = offset;
-        let value : u16 = reader.read_struct::<u8>(offset_mv_list)? as u16;
+        let value : u16 = read_u8(reader, offset_mv_list)? as u16;
 
         mv_indexes.push((1, (false, value)));
         mv_indexes.push((value+1, (false, tagged_data_type_size - value - 1)));
@@ -979,7 +898,7 @@ fn read_multi_value(
         // therefore first offset / 2 = the number of value entries
         // [8, 0, 7, 130, 11, 2, 10, 131, ...]
         let mut offset_mv_list = offset;
-        let mut value = reader.read_struct::<u16>(offset_mv_list)?;
+        let mut value = read_u16(reader, offset_mv_list)?;
         offset_mv_list += 2;
 
         let mut value_entry_size : u16;
@@ -988,7 +907,7 @@ fn read_multi_value(
         let number_of_value_entries = value_entry_offset / 2;
 
         for _ in 1..number_of_value_entries {
-            value = reader.read_struct::<u16>(offset_mv_list)?;
+            value = read_u16(reader, offset_mv_list)?;
             offset_mv_list += 2;
             value_entry_size = (value & 0x7fff) - value_entry_offset;
             mv_indexes.push((value_entry_offset, (entry_lvbit, value_entry_size)));
@@ -1009,7 +928,7 @@ fn read_multi_value(
         let (shift, (lv, size)) = mv_indexes[mv_index];
         let v;
         if lv {
-            let key = reader.read_struct::<u32>(offset + shift as u64)?;
+            let key = read_u32(reader, offset + shift as u64)?;
             v = load_lv_data(reader, lv_tags, key, compressed)?;
         } else {
             v = reader.read_bytes(offset + shift as u64, size as usize)?;
@@ -1040,7 +959,7 @@ pub fn load_lv_tag(
     let mut first_word_read = false;
     let mut common_page_key_size : u16 = 0;
     if page_tag.flags().intersects(jet::PageTagFlags::FLAG_HAS_COMMON_KEY_SIZE) {
-        common_page_key_size = clean_pgtag_flag(reader, db_page, reader.read_struct::<u16>(offset)?);
+        common_page_key_size = clean_pgtag_flag(reader, db_page, read_u16(reader, offset)?);
         first_word_read = true;
         offset += 2;
 
@@ -1051,7 +970,7 @@ pub fn load_lv_tag(
         }
     }
 
-    let mut local_page_key_size : u16 = reader.read_struct(offset)?;
+    let mut local_page_key_size : u16 = read_u16(reader, offset)?;
     if !first_word_read {
         local_page_key_size = clean_pgtag_flag(reader, db_page, local_page_key_size);
     }

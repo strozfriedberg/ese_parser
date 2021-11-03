@@ -11,8 +11,8 @@ pub mod process_tables;
 
 #[test]
 fn test_edb_table_all_values() {
-
     use ese_trait::*;
+    use byteorder::*;
     let mut jdb : ese_parser::EseParser = ese_parser::EseParser::init(5);
 
     match jdb.load("testdata/test.edb") {
@@ -157,10 +157,12 @@ fn test_edb_table_all_values() {
 
         let lt = jdb.get_column(table_id, long_text.id).unwrap().unwrap();
         let s = lt.as_slice();
-        let v16 = u16::from_bytes(&s);
+
+        let mut v16: Vec<u16> = vec![0;s.len()/std::mem::size_of::<u16>()];
+        LittleEndian::read_u16_into(&s, &mut v16);
         let ws = widestring::U16String::from_vec(v16);
         for i in 0..ws.len() {
-            let l = ws.chars().nth(i).unwrap();
+            let l = ws.chars().nth(i).unwrap().unwrap();
             let r = abc.as_bytes()[i % abc.len()] as char;
             assert_eq!(l, r);
         }

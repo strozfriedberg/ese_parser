@@ -3,27 +3,20 @@
 
 use crate::parser::jet;
 use crate::parser::jet::*;
+use crate::impl_read_struct;
+use crate::impl_read_struct_buffer;
 use nom_derive::*;
-use nom::number::complete::{
-    le_u8, le_u16, le_u32, le_u64
-};
-use nom::IResult;
-use nom::bytes::complete::take;
-use nom::combinator::map_res;
-use nom::error::{Error, FromExternalError, ParseError};
+use nom::number::complete::le_u32;
 
 pub const ESEDB_FILE_SIGNATURE: uint32_t = 0x89abcdef;
 pub const ESEDB_FORMAT_REVISION_NEW_RECORD_FORMAT: uint32_t = 0x0b;
 pub const ESEDB_FORMAT_REVISION_EXTENDED_PAGE_HEADER: uint32_t = 0x11;
-
-type testtype = u32;
 
 #[derive(Copy, Clone, Default, Debug, Nom)]
 #[repr(C)]
 pub struct FileHeader {
     pub checksum: uint32_t,
     pub signature: uint32_t,
-    test_format_version : testtype,
     #[nom(Parse="{ |i| jet::FormatVersion::parse_le(i) }")]
     pub format_version: jet::FormatVersion,
     #[nom(Parse="{ |i| jet::FileType::parse_le(i) }")]
@@ -112,30 +105,35 @@ pub struct FileHeader {
     pub unknown_flags: uint32_t,
     pub unknown_val: uint32_t,
 }
+impl_read_struct_buffer!(FileHeader);
 
 #[repr(packed)]
-#[derive(Copy, Clone, Debug)]
+#[derive(Copy, Clone, Debug, Nom)]
 pub struct PageHeaderOld {
     pub xor_checksum: uint32_t,
     pub page_number: uint32_t,
 }
+impl_read_struct!(PageHeaderOld);
 
 #[repr(packed)]
-#[derive(Copy, Clone, Debug)]
+#[derive(Copy, Clone, Debug, Nom)]
 pub struct PageHeader0x0b {
     pub xor_checksum: uint32_t,
     pub ecc_checksum: uint32_t,
 }
+impl_read_struct!(PageHeader0x0b);
 
 #[repr(packed)]
-#[derive(Copy, Clone, Debug)]
+#[derive(Copy, Clone, Debug, Nom)]
 pub struct PageHeader0x11 {
     pub checksum: uint64_t,
 }
+impl_read_struct!(PageHeader0x11);
 
 #[repr(packed)]
-#[derive(Copy, Clone, Debug, Eq, PartialEq)]
+#[derive(Copy, Clone, Debug, Eq, PartialEq, Nom)]
 pub struct PageHeaderCommon {
+    #[nom(Parse="{ |i| jet::DateTime::parse_le(i) }")]
     pub database_modification_time: jet::DateTime,
     pub previous_page: uint32_t,
     pub next_page: uint32_t,
@@ -144,8 +142,10 @@ pub struct PageHeaderCommon {
     pub available_uncommitted_data_size: uint16_t,
     pub available_data_offset: uint16_t,
     pub available_page_tag: uint16_t,
+    #[nom(Parse="{ |i| jet::PageFlags::parse_le(i) }")]
     pub page_flags: PageFlags,
 }
+impl_read_struct!(PageHeaderCommon);
 
 #[repr(packed)]
 #[derive(Copy, Clone, Debug, Nom)]
@@ -156,6 +156,7 @@ pub struct PageHeaderExt0x11 {
     pub page_number: uint64_t,
     pub unknown: uint64_t,
 }
+impl_read_struct!(PageHeaderExt0x11);
 
 #[repr(C)]
 #[derive(Debug, Copy, Clone)]
@@ -181,6 +182,7 @@ pub struct RootPageHeader16 {
     pub extent_space: uint32_t,
     pub space_tree_page_number: uint32_t,
 }
+impl_read_struct!(RootPageHeader16);
 
 #[repr(packed)]
 #[derive(Copy, Clone, Debug, Nom)]
@@ -193,6 +195,7 @@ pub struct RootPageHeader25 {
     pub unknown2: uint32_t,
     pub unknown3: uint32_t,
 }
+impl_read_struct!(RootPageHeader25);
 
 #[repr(C)]
 #[derive(Debug)]
@@ -226,15 +229,15 @@ pub struct DataDefinitionHeader {
     pub last_variable_size_data_type: uint8_t,
     pub variable_size_data_types_offset: uint16_t,
 }
+impl_read_struct!(DataDefinitionHeader);
 
 // Data type identifier: 4 (ColtypOrPgnoFDP)
 #[derive(Copy, Clone,Nom)]
 #[repr(packed)]
 pub struct ColtypOrPgnoFDP {
-    fdpn_or_ct : uint32_t,
-    pub father_data_page_number: uint32_t,
-    pub column_type: uint32_t,
+    fdpn_or_ct : uint32_t
 }
+
 impl ColtypOrPgnoFDP {
     pub fn father_data_page_number(&self) -> uint32_t {
         self.fdpn_or_ct
@@ -248,13 +251,9 @@ impl ColtypOrPgnoFDP {
 #[derive(Copy, Clone,Nom)]
 #[repr(packed)]
 pub struct PagesOrLocale {
-    nop_or_cp_or_li : uint32_t,
-    pub number_of_pages : uint32_t,
-
-    pub codepage : uint32_t,
-
-    pub locale_identifier : uint32_t
+    nop_or_cp_or_li : uint32_t
 }
+
 impl PagesOrLocale {
     pub fn number_of_pages(&self) -> uint32_t {
         self.nop_or_cp_or_li
@@ -350,3 +349,4 @@ pub struct DataDefinition
 	/* Data type identifier: 257 (CallbackDependencies)
 	 */
 }
+impl_read_struct!(DataDefinition);

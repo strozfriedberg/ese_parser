@@ -6,13 +6,7 @@ use std::{fmt, mem};
 use strum::Display;
 use simple_error::SimpleError;
 use nom_derive::*;
-use nom::number::complete::{
-    le_u8, le_u16, le_u32, le_u64
-};
-use nom::IResult;
-use nom::bytes::complete::take;
-use nom::combinator::map_res;
-use nom::error::{Error, FromExternalError, ParseError};
+use crate::impl_read_struct;
 use crate::parser::ese_db;
 use crate::parser::ese_db::*;
 use crate::parser::reader;
@@ -45,6 +39,13 @@ bitflags! {
         const IS_PARENT             = 0b0000000000000100;
         const IS_LEAF               = 0b0000000000000010;
         const IS_ROOT               = 0b0000000000000001;
+    }
+}
+
+impl<'a> Parse<&'a [u8]> for PageFlags {
+    fn parse(i: &'a [u8]) -> nom::IResult<&'a [u8], Self> {
+        let (i, page_flags) = nom::number::complete::le_u32(i)?;
+        Ok((i, Self{ bits: page_flags }))
     }
 }
 
@@ -153,6 +154,7 @@ pub enum DbState {
     BeingConverted = 4,
     ForceDetach = 5,
 }
+impl_read_struct!(DbState);
 
 impl Default for DbState {
     fn default() -> Self {
@@ -166,6 +168,7 @@ pub enum FileType {
     Database = 0,
     StreamingFile = 1,
 }
+impl_read_struct!(FileType);
 
 impl Default for FileType {
     fn default() -> Self {
@@ -181,6 +184,7 @@ pub struct DbTime {
     pub seconds: uint16_t,
     pub padding: uint16_t,
 }
+impl_read_struct!(DbTime);
 
 impl fmt::Display for DbTime {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
@@ -206,6 +210,7 @@ pub struct DateTime {
     pub time_is_utc: uint8_t,
     pub os_snapshot: uint8_t,
 }
+impl_read_struct!(DateTime);
 
 #[derive(Copy, Clone, Default, Debug, Nom)]
 #[repr(C)]
@@ -214,6 +219,7 @@ pub struct Signature {
     pub logtime_create: DateTime,
     pub computer_name: [uint8_t; 16],
 }
+impl_read_struct!(Signature);
 
 #[repr(C, packed)]
 #[derive(Debug, Copy, Default, Clone, Nom)]
@@ -222,17 +228,17 @@ pub struct LgPos {
     pub isec: uint16_t,
     pub l_generation: uint32_t,
 }
+impl_read_struct!(LgPos);
 
 #[repr(C, packed)]
 #[derive(Debug, Copy, Default, Clone, Nom)]
 pub struct BackupInfo {
     pub lg_pos_mark: LgPos,
     pub bk_logtime_mark: DateTime,
-    //#[nom(Parse = "le_u32")]
     pub gen_low: uint32_t,
-    //#[nom(Parse = "le_u32")]
     pub gen_high: uint32_t,
 }
+impl_read_struct!(BackupInfo);
 
 #[derive(Debug)]
 pub struct DbFile {
