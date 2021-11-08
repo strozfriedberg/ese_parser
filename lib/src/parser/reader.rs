@@ -25,13 +25,13 @@ pub struct Reader {
 }
 
 // Looks like we need this; the zerocopy crate's AsBytes trait doesn't work for ese_db::FileHeader
-#[allow(clippy::mut_from_ref)]
+/*#[allow(clippy::mut_from_ref)]
 unsafe fn _any_as_slice<'a, U: Sized, T: Sized>(p: &'a &T) -> &'a [U] {
     slice::from_raw_parts(
         (*p as *const T) as *const U,
         mem::size_of::<T>() / mem::size_of::<U>(),
     )
-}
+}*/
 
 impl Reader {
     fn load_db_file_header(&mut self) -> Result<ese_db::FileHeader, SimpleError> {

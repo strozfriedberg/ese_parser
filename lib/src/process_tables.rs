@@ -26,7 +26,7 @@ fn truncate(s: &str, max_chars: usize) -> &str {
 
 fn get_column<T: FromBytes>(jdb: &dyn EseDb, table: u64, column: u32) -> Result<Option<T>, SimpleError> {
     let size = size_of::<T>();
-    let mut dst = std::mem::MaybeUninit::<T>::zeroed();
+    let dst = std::mem::MaybeUninit::<T>::zeroed();
 
     let vo = jdb.get_column(table, column)?;
 
@@ -222,8 +222,7 @@ fn get_column_val(
             assert!(c.cbmax as usize == size_of::<f64>());
             match get_column::<f64>(jdb, table_id, c.id)? {
                 Some(v) => {
-                    let mut st =
-                        unsafe { std::mem::MaybeUninit::<SYSTEMTIME>::zeroed().assume_init() };
+                    let mut st = SYSTEMTIME::default();
                     if VariantTimeToSystemTime(v, &mut st) {
                         val = format!(
                             "{}.{}.{} {}:{}:{}",
