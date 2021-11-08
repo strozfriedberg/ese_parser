@@ -4,7 +4,7 @@
 use pyo3::prelude::*;
 use pyo3::exceptions;
 
-use ese_parser_lib::{ese_trait::*, ese_parser::*, vartime::*};
+use ese_parser_lib::{ese_trait::*, ese_parser::*, ese_parser::FromBytes, vartime::*};
 use widestring::U16String;
 use std::convert::TryFrom;
 
@@ -90,7 +90,7 @@ impl PyEseDb {
             Some(x) => Some(x.as_str().to_string()),
             None => None
         }
-    } 
+    }
 
     fn open_table(&self, table: &str) -> PyResult<u64> {
         match self.jdb.open_table(table) {
@@ -163,7 +163,7 @@ impl PyEseDb {
         let gil = Python::acquire_gil();
         let py = gil.python();
 
-        fn get<T>(s : &PyEseDb, table: u64, column: &PyColumnInfo) -> PyResult<Option<T>> {
+        fn get<T: FromBytes>(s : &PyEseDb, table: u64, column: &PyColumnInfo) -> PyResult<Option<T>> {
             match s.jdb.get_fixed_column::<T>(table, column.id) {
                 Ok(ov) => {
                     match ov {
@@ -290,7 +290,7 @@ impl PyEseDb {
                 let ov = get::<f64>(self, table, column)?;
                 match ov {
                     Some(v) => {
-                        let mut st = unsafe { std::mem::zeroed::<SYSTEMTIME>() };
+                        let mut st = SYSTEMTIME::default();
                         if VariantTimeToSystemTime(v, &mut st) {
                             let myft = SystemTimeToFileTime(&st);
                             // January 1, 1970 (start of Unix epoch) in "ticks"

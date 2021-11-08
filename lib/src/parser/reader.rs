@@ -431,8 +431,7 @@ pub fn load_catalog_item(
         number_of_variable_size_data_types = 0;
     }
 
-    let cat_def_zero = std::mem::MaybeUninit::<jet::CatalogDefinition>::zeroed();
-    let mut cat_def = unsafe { cat_def_zero.assume_init() };
+    let mut cat_def = jet::CatalogDefinition::default();
     let data_def = ese_db::DataDefinition::read(reader, offset)?;
 
     cat_def.father_data_page_object_identifier = data_def.father_data_page_object_identifier;
