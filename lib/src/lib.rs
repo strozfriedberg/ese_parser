@@ -43,7 +43,6 @@ fn test_edb_table_all_values() {
     assert_eq!(jdb.get_fixed_column::<u8>(table_id, unsigned_byte.id).unwrap(), Some(255));
 
     let short = columns.iter().find(|x| x.name == "Short" ).unwrap();
-    //assert_eq!(jdb.get_fixed_column::<i16>(table_id, short.id).unwrap(), Some(0));
     assert_eq!(jdb.get_fixed_column::<i16>(table_id, short.id).unwrap(), None);
 
     let long = columns.iter().find(|x| x.name == "Long" ).unwrap();

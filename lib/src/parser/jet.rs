@@ -255,7 +255,6 @@ pub struct DbPage {
 
 impl DbPage {
     pub fn new(reader: &Reader, page_number: uint32_t) -> Result<DbPage, SimpleError> {
-       // let page_header = reader::load_page_header(reader, page_number)?;
         let page_header = reader.load_page_header(page_number)?;
         let mut db_page = DbPage {
             page_number,
