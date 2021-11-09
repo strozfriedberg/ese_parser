@@ -26,11 +26,6 @@ fn truncate(s: &str, max_chars: usize) -> &str {
 }
 
 fn get_column<T: FromBytes>(jdb: &dyn EseDb, table: u64, column: u32) -> Result<Option<T>, SimpleError> {
-    // let size = size_of::<T>();
-    // let dst = std::mem::MaybeUninit::<T>::zeroed();
-
-    //let vo = jdb.get_column(table, column)?;
-
     match jdb.get_column(table, column)?
     {
         Some(v) => Ok(Some(T::from_bytes(&v))),
@@ -160,7 +155,7 @@ fn get_column_val(
                     let ws = U16Str.to_string_lossy();
                     if ws.len() > 32 { 
                         val = format!(
-                            "{:4} bytes: {}...",
+                            "{:4} bytes: {}...", //maybe don't truncate this, or have an option that doesn't 
                             ws.len(),
                             truncate(&ws, 32).to_string()
                         );
