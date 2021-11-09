@@ -1,15 +1,16 @@
 use crate::{ese_parser::*, ese_trait::*, vartime::*};
 use simple_error::SimpleError;
 use std::mem::size_of;
+use std::mem;
 use std::convert::TryFrom;
 use widestring::U16String;
 use std::fs::File;
 use std::io::{self, Error, Write};
 use std::path::PathBuf;
 use std::result::Result;
+use byteorder::*;
 #[cfg(target_os = "windows")]
 use crate::parser::ese_both::*;
-
 
 #[derive(Debug)]
 struct Args {
@@ -25,10 +26,10 @@ fn truncate(s: &str, max_chars: usize) -> &str {
 }
 
 fn get_column<T: FromBytes>(jdb: &dyn EseDb, table: u64, column: u32) -> Result<Option<T>, SimpleError> {
-    let size = size_of::<T>();
-    let dst = std::mem::MaybeUninit::<T>::zeroed();
+    // let size = size_of::<T>();
+    // let dst = std::mem::MaybeUninit::<T>::zeroed();
 
-    let vo = jdb.get_column(table, column)?;
+    //let vo = jdb.get_column(table, column)?;
 
     match jdb.get_column(table, column)?
     {
@@ -152,10 +153,12 @@ fn get_column_val(
         ESE_coltypLongText => match jdb.get_column(table_id, c.id)? {
             Some(v) => {
                 if ESE_CP::try_from(c.cp) == Ok(ESE_CP::Unicode) {
-                    let t = u16::from_bytes(&v);
-                    let U16Str = U16String::from_str(&t.to_string());
-                    let ws : String = U16Str.to_string().map_err(|e: std::string::FromUtf16Error| SimpleError::new(e.to_string()))?;
-                    if ws.len() > 32 {
+                    let mut vec16: Vec<u16> = vec![0;v.len()/mem::size_of::<u16>()];
+                    LittleEndian::read_u16_into(&v, &mut vec16);
+                    let s16 = String::from_utf16(&vec16[..]).unwrap();
+                    let U16Str = U16String::from_str(&s16);
+                    let ws = U16Str.to_string_lossy();
+                    if ws.len() > 32 { 
                         val = format!(
                             "{:4} bytes: {}...",
                             ws.len(),
@@ -164,23 +167,6 @@ fn get_column_val(
                     } else {
                         val = ws;
                     }
-
-
-                    // let t = v.as_slice();
-                    // unsafe {
-                    //     let (_, v16, _) = t.align_to::<u16>();
-                    //     let U16Str = U16String::from_ptr(v16.as_ptr(), v16.len());
-                    //     let ws = U16Str.to_string_lossy();
-                    //     if ws.len() > 32 {
-                    //         val = format!(
-                    //             "{:4} bytes: {}...",
-                    //             ws.len(),
-                    //             truncate(&ws, 32).to_string()
-                    //         );
-                    //     } else {
-                    //         val = ws;
-                    //     }
-                    // }
                 } else {
                     match std::str::from_utf8(&v) {
                         Ok(s) => val = s.to_string(),

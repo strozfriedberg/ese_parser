@@ -166,9 +166,9 @@ pub fn ms_impl_decompress_size(
     v: &[u8]
 ) -> usize {
     const JET_wrnBufferTruncated: u32 = 1006;
-	let res = u32::from_bytes(v);
+	//let res = u32::from_bytes(v);
     let mut decompressed: u32 = 0;
-    //let res = unsafe { decompress(v.as_ptr(), v.len() as u32, std::ptr::null_mut(), 0, &mut decompressed) };
+    let res = unsafe { decompress(v.as_ptr(), v.len() as u32, std::ptr::null_mut(), 0, &mut decompressed) };
 
     if res == JET_wrnBufferTruncated && decompressed as usize > v.len() {
         return decompressed as usize;
@@ -178,16 +178,15 @@ pub fn ms_impl_decompress_size(
 
 #[allow(dead_code)]
 #[cfg(target_os = "windows")]
-pub fn ms_impl_decompress_buf<T: FromBytes>(
+pub fn ms_impl_decompress_buf(
     v: &[u8],
     decompressed_size: usize
 ) -> Result<Vec<u8>, SimpleError> {
     const JET_errSuccess: u32 = 0;
-    // let mut buf = Vec::<u8>::with_capacity(decompressed_size);
-    // unsafe { buf.set_len(buf.capacity()); }
+    let mut buf = Vec::<u8>::with_capacity(decompressed_size);
+    unsafe { buf.set_len(buf.capacity()); }
     let mut decompressed : u32 = 0;
-	let buf = vec!(u8::from_bytes(v));
-     let res = unsafe { decompress(v.as_ptr(), v.len() as u32, buf.as_mut_ptr(), buf.len() as u32, &mut decompressed) };
+    let res = unsafe { decompress(v.as_ptr(), v.len() as u32, buf.as_mut_ptr(), buf.len() as u32, &mut decompressed) };
     debug_assert!(decompressed_size == decompressed as usize && decompressed as usize == buf.len());
     if res != JET_errSuccess {
         return Err(SimpleError::new(format!("Decompress failed. Err {}", res)));
@@ -362,3 +361,5 @@ impl FromBytes for f32 {
 impl FromBytes for f64 {
     fn from_bytes(bytes: &[u8]) -> Self  { f64::from_le_bytes(bytes.try_into().unwrap()) }
 }
+
+
