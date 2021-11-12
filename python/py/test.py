@@ -20,7 +20,7 @@ class TestEseDbMethods(unittest.TestCase):
 		
 		self.assertEqual(edb.get_row(tbl, edb.get_column(t, "Bit")), 0)
 		self.assertEqual(edb.get_row(tbl, edb.get_column(t, "UnsignedByte")), 255)
-		self.assertEqual(edb.get_row(tbl, edb.get_column(t, "Short")), 0)
+		self.assertEqual(edb.get_row(tbl, edb.get_column(t, "Short")), None)
 		self.assertEqual(edb.get_row(tbl, edb.get_column(t, "Long")), -2147483648)
 		self.assertEqual(edb.get_row(tbl, edb.get_column(t, "Currency")), 350050)
 		self.assertEqual(edb.get_row(tbl, edb.get_column(t, "IEEESingle")), 3.141592025756836)
