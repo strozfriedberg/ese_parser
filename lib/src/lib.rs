@@ -21,18 +21,20 @@ fn init_tests(cache_size: usize, db: Option<&str>) -> ese_parser::EseParser{
     jdb
 }
 
-#[test]
-fn test_edb_table_default() {
-    let jdb = init_tests(5, None); // None means default db is used: test.db
-
-    let expected_tables = vec!["MSysObjects", "MSysObjectsShadow", "MSysObjids", "MSysLocales", "TestTable"];
-    
+fn check_table_names(expected_tables:Vec<&str>, jdb: ese_parser::EseParser) {
     let tables = jdb.get_tables().unwrap();
     assert_eq!(tables.len(), expected_tables.len());
     for i in 0..tables.len() {
         assert_eq!(tables[i], expected_tables[i]);
     }
+}
 
+#[test]
+fn test_edb_table_default() {
+    let jdb = init_tests(5, None); // None means default db is used: test.db
+
+    let expected_tables = vec!["MSysObjects", "MSysObjectsShadow", "MSysObjids", "MSysLocales", "TestTable"];
+    check_table_names(expected_tables, jdb);
 }
 
 #[test]
@@ -40,13 +42,7 @@ fn test_edb_table_decompress() {
     let jdb = init_tests(5, Some("decompress_test.edb")); // None means default db is used: test.db
 
     let expected_tables = vec!["MSysObjects", "MSysObjectsShadow", "MSysObjids", "MSysLocales", "test_table"];
-    
-    let tables = jdb.get_tables().unwrap();
-    assert_eq!(tables.len(), expected_tables.len());
-    for i in 0..tables.len() {
-        assert_eq!(tables[i], expected_tables[i]);
-    }
-
+    check_table_names(expected_tables, jdb);
 }
 
 #[test]
