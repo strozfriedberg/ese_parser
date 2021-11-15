@@ -28,7 +28,6 @@ fn test_edb_table_default() {
     let expected_tables = vec!["MSysObjects", "MSysObjectsShadow", "MSysObjids", "MSysLocales", "TestTable"];
     
     let tables = jdb.get_tables().unwrap();
-    println!("Tables: {:?}", tables);
     assert_eq!(tables.len(), expected_tables.len());
     for i in 0..tables.len() {
         assert_eq!(tables[i], expected_tables[i]);
@@ -43,7 +42,6 @@ fn test_edb_table_decompress() {
     let expected_tables = vec!["MSysObjects", "MSysObjectsShadow", "MSysObjids", "MSysLocales", "test_table"];
     
     let tables = jdb.get_tables().unwrap();
-    println!("Tables: {:?}", tables);
     assert_eq!(tables.len(), expected_tables.len());
     for i in 0..tables.len() {
         assert_eq!(tables[i], expected_tables[i]);
