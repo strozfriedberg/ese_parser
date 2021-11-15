@@ -36,6 +36,9 @@ fn test_edb_table_all_values() {
     let table_id = jdb.open_table(table).unwrap();
     assert!(jdb.move_row(table_id, ESE_MoveFirst), "{}", true);
 
+    let auto_inc = columns.iter().find(|x| x.name == "AutoInc" ).unwrap();
+    assert_eq!(jdb.get_fixed_column::<i8>(table_id, auto_inc.id).unwrap(), Some(1));
+
     let bit = columns.iter().find(|x| x.name == "Bit" ).unwrap();
     assert_eq!(jdb.get_fixed_column::<i8>(table_id, bit.id).unwrap(), Some(0));
 
@@ -182,4 +185,10 @@ fn test_edb_table_all_values() {
     }
 
     jdb.close_table(table_id);
+}
+
+
+#[test]
+fn test_something(){
+
 }
