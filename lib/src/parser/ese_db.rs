@@ -255,15 +255,15 @@ pub struct PagesOrLocale {
 }
 
 impl PagesOrLocale {
-    pub fn number_of_pages(&self) -> uint32_t {
-        self.nop_or_cp_or_li
-    }
+    // pub fn number_of_pages(&self) -> uint32_t {
+        // self.nop_or_cp_or_li
+    // }
     pub fn codepage(&self) -> uint32_t {
         self.nop_or_cp_or_li
     }
-    pub fn locale_identifier(&self) -> uint32_t {
-        self.nop_or_cp_or_li
-    }
+    // pub fn locale_identifier(&self) -> uint32_t {
+        // self.nop_or_cp_or_li
+    // }
 }
 
 
