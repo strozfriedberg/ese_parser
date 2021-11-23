@@ -14,7 +14,6 @@ mod tests {
 
     fn get_file_contents(file_path: &PathBuf, db_path: &PathBuf) -> Vec<u8> {
         process_table(db_path.to_str().unwrap(), Some(file_path.clone()), Mode::EseParser, String::new());
-
         let contents = fs::read(file_path).unwrap();
         contents
     }
