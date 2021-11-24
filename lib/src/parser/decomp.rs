@@ -25,11 +25,9 @@ fn seven_bit_decompress_buf(
 	}
 
 	let mut uncompressed_data = Vec::<u8>::with_capacity(decompressed_size as usize);
-    unsafe { uncompressed_data.set_len(uncompressed_data.capacity()); }
-
 	let mut compressed_index = 1usize;
 	let mut compressed_bit = 0u8;
-	for i in &mut uncompressed_data {
+	for _ in 0..decompressed_size {
 		let byte;
 		if compressed_bit <= 1 {
 			byte = (compressed_data[compressed_index] >> compressed_bit) & 0x7f;
@@ -38,7 +36,7 @@ fn seven_bit_decompress_buf(
 				compressed_data[compressed_index+1]]) as u32;
 			byte = ((compressed_word >> compressed_bit) & 0x7f) as u8;
 		}
-		*i = byte;
+		uncompressed_data.push(byte);
 		compressed_bit += 7;
 		if compressed_bit >= 8 {
 			compressed_bit %= 8;
@@ -129,12 +127,9 @@ pub fn decompress_buf(
 		2 => { // 7bit UNICODE
 			let decompressed_buf = seven_bit_decompress_buf(compressed_data)?;
 			let mut buf = Vec::<u8>::with_capacity(decompressed_buf.len() * 2);
-    		unsafe { buf.set_len(buf.capacity()); }
-			let mut i = 0;
 			for c in decompressed_buf {
-				buf[i] = c;
-				buf[i+1] = 0;
-				i += 2;
+				buf.push(c);
+				buf.push(0);
 			}
 			Ok(buf)
 		},
@@ -171,7 +166,7 @@ pub fn ms_impl_decompress_size(
     v: &[u8]
 ) -> usize {
     const JET_wrnBufferTruncated: u32 = 1006;
-
+	//let res = u32::from_bytes(v);
     let mut decompressed: u32 = 0;
     let res = unsafe { decompress(v.as_ptr(), v.len() as u32, std::ptr::null_mut(), 0, &mut decompressed) };
 
@@ -217,15 +212,12 @@ fn lz77_decompress(
 	decompress_size: usize
 ) -> Result<Vec<u8>, SimpleError>
 {
-	let mut out_i:      usize = 0;
-    let mut out_pos:    usize = 0;
     let mut in_pos:     usize = 0;
     let mut last_len:   usize = 0;
     let mut flags:      u32   = 0;
     let mut flag_count: u32   = 0;
 
     let mut out_buf = Vec::<u8>::with_capacity(decompress_size);
-	unsafe { out_buf.set_len(out_buf.capacity()); }
 
     while in_pos < in_buf.len() {
         if flag_count == 0 {
@@ -244,11 +236,9 @@ fn lz77_decompress(
             if in_pos >= in_buf.len() {
                 return Err(SimpleError::new("index out of bounds"));
             }
-            out_buf[out_i] = in_buf[in_pos];
-			out_i += 1;
+            out_buf.push(in_buf[in_pos]);
 
             in_pos += 1;
-            out_pos += 1;
         } else {
 			if in_pos == in_buf.len() {
 				break;
@@ -314,16 +304,62 @@ fn lz77_decompress(
             length += 3;
 
             for _ in 0..length {
-                if offset > out_pos {
+                if offset > out_buf.len() {
                     return Err(SimpleError::new("corrupted data"));
                 }
 
-                out_buf[out_i] = out_buf[out_pos - offset];
-				out_i += 1;
-                out_pos += 1;
+                out_buf.push(out_buf[out_buf.len() - offset]);
             }
         }
     }
 
     Ok(out_buf)
 }
+
+use std::convert::TryInto;
+
+pub trait FromBytes {
+    fn from_bytes(bytes: &[u8]) -> Self;
+}
+
+impl FromBytes for i8 {
+    fn from_bytes(bytes: &[u8]) -> Self  { i8::from_le_bytes(bytes.try_into().unwrap()) }
+}
+
+impl FromBytes for u8 {
+    fn from_bytes(bytes: &[u8]) -> Self  { u8::from_le_bytes(bytes.try_into().unwrap()) }
+}
+
+impl FromBytes for i16 {
+    fn from_bytes(bytes: &[u8]) -> Self  { i16::from_le_bytes(bytes.try_into().unwrap()) }
+}
+
+impl FromBytes for u16 {
+    fn from_bytes(bytes: &[u8]) -> Self  { u16::from_le_bytes(bytes.try_into().unwrap()) }
+}
+
+impl FromBytes for i32 {
+    fn from_bytes(bytes: &[u8]) -> Self  { i32::from_le_bytes(bytes.try_into().unwrap()) }
+}
+
+impl FromBytes for u32 {
+    fn from_bytes(bytes: &[u8]) -> Self  { u32::from_le_bytes(bytes.try_into().unwrap()) }
+}
+
+impl FromBytes for i64 {
+    fn from_bytes(bytes: &[u8]) -> Self  { i64::from_le_bytes(bytes.try_into().unwrap()) }
+}
+
+impl FromBytes for u64 {
+    fn from_bytes(bytes: &[u8]) -> Self  { u64::from_le_bytes(bytes.try_into().unwrap()) }
+}
+
+impl FromBytes for f32 {
+    fn from_bytes(bytes: &[u8]) -> Self  { f32::from_le_bytes(bytes.try_into().unwrap()) }
+}
+
+impl FromBytes for f64 {
+    fn from_bytes(bytes: &[u8]) -> Self  { f64::from_le_bytes(bytes.try_into().unwrap()) }
+}
+
+

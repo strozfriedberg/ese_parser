@@ -1,14 +1,16 @@
 use crate::{ese_parser::*, ese_trait::*, vartime::*};
 use simple_error::SimpleError;
 use std::mem::size_of;
+use std::mem;
 use std::convert::TryFrom;
 use widestring::U16String;
 use std::fs::File;
 use std::io::{self, Error, Write};
 use std::path::PathBuf;
+use std::result::Result;
+use byteorder::*;
 #[cfg(target_os = "windows")]
 use crate::parser::ese_both::*;
-
 
 #[derive(Debug)]
 struct Args {
@@ -23,18 +25,11 @@ fn truncate(s: &str, max_chars: usize) -> &str {
     }
 }
 
-fn get_column<T>(jdb: &dyn EseDb, table: u64, column: u32) -> Result<Option<T>, SimpleError> {
-    let size = size_of::<T>();
-    let mut dst = std::mem::MaybeUninit::<T>::zeroed();
-
-    let vo = jdb.get_column(table, column)?;
-
-    unsafe {
-        if let Some(v) = vo {
-            std::ptr::copy_nonoverlapping(v.as_ptr(), dst.as_mut_ptr() as *mut u8, size);
-            return Ok(Some(dst.assume_init()));
-        }
-        Ok(None)
+fn get_column<T: FromBytes>(jdb: &dyn EseDb, table: u64, column: u32) -> Result<Option<T>, SimpleError> {
+    match jdb.get_column(table, column)?
+    {
+        Some(v) => Ok(Some(T::from_bytes(&v))),
+        None => Ok(None)
     }
 }
 
@@ -137,12 +132,8 @@ fn get_column_val(
         ESE_coltypText => match jdb.get_column(table_id, c.id)? {
             Some(v) => {
                 if ESE_CP::try_from(c.cp) == Ok(ESE_CP::Unicode) {
-                    let t = v.as_slice();
-                    unsafe {
-                        let (_, v16, _) = t.align_to::<u16>();
-                        let U16Str = U16String::from_ptr(v16.as_ptr(), v16.len());
-                        val = U16Str.to_string_lossy();
-                    }
+                    let t = u8::from_bytes(&v);
+                    val = t.to_string();
                 } else {
                     match std::str::from_utf8(&v) {
                         Ok(s) => val = s.to_string(),
@@ -157,20 +148,19 @@ fn get_column_val(
         ESE_coltypLongText => match jdb.get_column(table_id, c.id)? {
             Some(v) => {
                 if ESE_CP::try_from(c.cp) == Ok(ESE_CP::Unicode) {
-                    let t = v.as_slice();
-                    unsafe {
-                        let (_, v16, _) = t.align_to::<u16>();
-                        let U16Str = U16String::from_ptr(v16.as_ptr(), v16.len());
-                        let ws = U16Str.to_string_lossy();
-                        if ws.len() > 32 {
-                            val = format!(
-                                "{:4} bytes: {}...",
-                                ws.len(),
-                                truncate(&ws, 32).to_string()
-                            );
-                        } else {
-                            val = ws;
-                        }
+                    let mut vec16: Vec<u16> = vec![0;v.len()/mem::size_of::<u16>()];
+                    LittleEndian::read_u16_into(&v, &mut vec16);
+                    let s16 = String::from_utf16(&vec16[..]).unwrap();
+                    let U16Str = U16String::from_str(&s16);
+                    let ws = U16Str.to_string_lossy();
+                    if ws.len() > 32 { 
+                        val = format!(
+                            "{:4} bytes: {}...", //maybe don't truncate this, or have an option that doesn't 
+                            ws.len(),
+                            truncate(&ws, 32).to_string()
+                        );
+                    } else {
+                        val = ws;
                     }
                 } else {
                     match std::str::from_utf8(&v) {
@@ -213,8 +203,7 @@ fn get_column_val(
             assert!(c.cbmax as usize == size_of::<f64>());
             match get_column::<f64>(jdb, table_id, c.id)? {
                 Some(v) => {
-                    let mut st =
-                        unsafe { std::mem::MaybeUninit::<SYSTEMTIME>::zeroed().assume_init() };
+                    let mut st = SYSTEMTIME::default();
                     if VariantTimeToSystemTime(v, &mut st) {
                         val = format!(
                             "{}.{}.{} {}:{}:{}",
@@ -376,4 +365,50 @@ pub fn process_table(dbpath: &str, test_file: Option<PathBuf>, mode: Mode, table
     } else {
         handle_table(&table);
     }
+}
+
+use std::convert::TryInto;
+
+pub trait FromBytes {
+    fn from_bytes(bytes: &[u8]) -> Self;
+}
+
+impl FromBytes for i8 {
+    fn from_bytes(bytes: &[u8]) -> Self  { i8::from_le_bytes(bytes.try_into().unwrap()) }
+}
+
+impl FromBytes for u8 {
+    fn from_bytes(bytes: &[u8]) -> Self  { u8::from_le_bytes(bytes.try_into().unwrap()) }
+}
+
+impl FromBytes for i16 {
+    fn from_bytes(bytes: &[u8]) -> Self  { i16::from_le_bytes(bytes.try_into().unwrap()) }
+}
+
+impl FromBytes for u16 {
+    fn from_bytes(bytes: &[u8]) -> Self  { u16::from_le_bytes(bytes.try_into().unwrap()) }
+}
+
+impl FromBytes for i32 {
+    fn from_bytes(bytes: &[u8]) -> Self  { i32::from_le_bytes(bytes.try_into().unwrap()) }
+}
+
+impl FromBytes for u32 {
+    fn from_bytes(bytes: &[u8]) -> Self  { u32::from_le_bytes(bytes.try_into().unwrap()) }
+}
+
+impl FromBytes for i64 {
+    fn from_bytes(bytes: &[u8]) -> Self  { i64::from_le_bytes(bytes.try_into().unwrap()) }
+}
+
+impl FromBytes for u64 {
+    fn from_bytes(bytes: &[u8]) -> Self  { u64::from_le_bytes(bytes.try_into().unwrap()) }
+}
+
+impl FromBytes for f32 {
+    fn from_bytes(bytes: &[u8]) -> Self  { f32::from_le_bytes(bytes.try_into().unwrap()) }
+}
+
+impl FromBytes for f64 {
+    fn from_bytes(bytes: &[u8]) -> Self  { f64::from_le_bytes(bytes.try_into().unwrap()) }
 }

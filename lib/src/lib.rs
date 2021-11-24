@@ -11,8 +11,8 @@ pub mod process_tables;
 
 #[test]
 fn test_edb_table_all_values() {
-
     use ese_trait::*;
+    use byteorder::*;
     let mut jdb : ese_parser::EseParser = ese_parser::EseParser::init(5);
 
     match jdb.load("testdata/test.edb") {
@@ -21,7 +21,7 @@ fn test_edb_table_all_values() {
     }
 
     let expected_tables = vec!["MSysObjects", "MSysObjectsShadow", "MSysObjids", "MSysLocales", "TestTable"];
-    
+
     let tables = jdb.get_tables().unwrap();
     assert_eq!(tables.len(), expected_tables.len());
     for i in 0..tables.len() {
@@ -43,7 +43,7 @@ fn test_edb_table_all_values() {
     assert_eq!(jdb.get_fixed_column::<u8>(table_id, unsigned_byte.id).unwrap(), Some(255));
 
     let short = columns.iter().find(|x| x.name == "Short" ).unwrap();
-    assert_eq!(jdb.get_fixed_column::<i16>(table_id, short.id).unwrap(), Some(0));
+    assert_eq!(jdb.get_fixed_column::<i16>(table_id, short.id).unwrap(), None);
 
     let long = columns.iter().find(|x| x.name == "Long" ).unwrap();
     assert_eq!(jdb.get_fixed_column::<i32>(table_id, long.id).unwrap(), Some(-2147483648));
@@ -157,14 +157,13 @@ fn test_edb_table_all_values() {
         let lt = jdb.get_column(table_id, long_text.id).unwrap().unwrap();
         let s = lt.as_slice();
 
-        unsafe {
-            let (_, v16, _) = s.align_to::<u16>();
-            let ws = widestring::U16String::from_ptr(v16.as_ptr(), v16.len()).to_string_lossy();
-            for i in 0..ws.len() {
-                let l = ws.chars().nth(i).unwrap();
-                let r = abc.as_bytes()[i % abc.len()] as char;
-                assert_eq!(l, r);
-            }
+        let mut v16: Vec<u16> = vec![0;s.len()/std::mem::size_of::<u16>()];
+        LittleEndian::read_u16_into(&s, &mut v16);
+        let ws = widestring::U16String::from_vec(v16);
+        for i in 0..ws.len() {
+            let l = ws.chars().nth(i).unwrap().unwrap();
+            let r = abc.as_bytes()[i % abc.len()] as char;
+            assert_eq!(l, r);
         }
     }
 
