@@ -5,7 +5,8 @@ use chrono::naive::NaiveTime;
 use std::{fmt, mem};
 use strum::Display;
 use simple_error::SimpleError;
-
+use nom_derive::*;
+use crate::impl_read_struct;
 use crate::parser::ese_db;
 use crate::parser::ese_db::*;
 use crate::parser::reader;
@@ -20,6 +21,7 @@ pub type FormatVersion = u32;
 pub type FormatRevision = u32;
 
 bitflags! {
+    #[derive(Default)]
     pub struct PageFlags: uint32_t {
         const UNKNOWN_8000          = 0b1000000000000000;
         const IS_SCRUBBED           = 0b0100000000000000;
@@ -37,6 +39,13 @@ bitflags! {
         const IS_PARENT             = 0b0000000000000100;
         const IS_LEAF               = 0b0000000000000010;
         const IS_ROOT               = 0b0000000000000001;
+    }
+}
+
+impl<'a> Parse<&'a [u8]> for PageFlags {
+    fn parse(i: &'a [u8]) -> nom::IResult<&'a [u8], Self> {
+        let (i, page_flags) = nom::number::complete::le_u32(i)?;
+        Ok((i, Self{ bits: page_flags }))
     }
 }
 
@@ -135,7 +144,7 @@ bitflags! {
     }
 }
 
-#[derive(Copy, Clone, Display, Debug)]
+#[derive(Copy, Clone, Display, Debug, Nom)]
 #[repr(u32)]
 pub enum DbState {
     impossible = 0,
@@ -145,6 +154,7 @@ pub enum DbState {
     BeingConverted = 4,
     ForceDetach = 5,
 }
+impl_read_struct!(DbState);
 
 impl Default for DbState {
     fn default() -> Self {
@@ -152,12 +162,13 @@ impl Default for DbState {
     }
 }
 
-#[derive(Copy, Clone, Display, Debug)]
+#[derive(Copy, Clone, Display, Debug, Nom)]
 #[repr(u32)]
 pub enum FileType {
     Database = 0,
     StreamingFile = 1,
 }
+impl_read_struct!(FileType);
 
 impl Default for FileType {
     fn default() -> Self {
@@ -165,7 +176,7 @@ impl Default for FileType {
     }
 }
 
-#[derive(Copy, Clone, Default, Debug)]
+#[derive(Copy, Clone, Default, Debug, Nom)]
 #[repr(C)]
 pub struct DbTime {
     pub hours: uint16_t,
@@ -173,6 +184,7 @@ pub struct DbTime {
     pub seconds: uint16_t,
     pub padding: uint16_t,
 }
+impl_read_struct!(DbTime);
 
 impl fmt::Display for DbTime {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
@@ -186,7 +198,7 @@ impl fmt::Display for DbTime {
     }
 }
 
-#[derive(Copy, Clone, Default, Debug)]
+#[derive(Copy, Clone, Default, Debug, Eq, PartialEq, Nom)]
 #[repr(C)]
 pub struct DateTime {
     pub seconds: uint8_t,
@@ -198,95 +210,35 @@ pub struct DateTime {
     pub time_is_utc: uint8_t,
     pub os_snapshot: uint8_t,
 }
+impl_read_struct!(DateTime);
 
-/*impl fmt::Display for DateTime {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        use chrono::naive::NaiveDate;
-        use chrono::{Local,TimeZone, Utc};
-        if self.year > 0 {
-            let ndt =
-                NaiveDate::from_ymd(self.year as i32 + 1900, self.month as u32, self.day as u32)
-                    .and_hms(self.hours as u32, self.minutes as u32, self.seconds as u32);
-
-            let offset = if self.time_is_utc == 0 {
-                Local.timestamp(0, 0).offset().local_minus_utc()
-            } else {
-                0
-            };
-
-           /* let dt = if self.time_is_utc == 0 {
-                let offset = Local.timestamp(0, 0).offset().local_minus_utc()
-                /*chrono::DateTime::<Utc>::from(
-                    chrono::FixedOffset::east(offset)
-                        .from_local_datetime(&ndt)
-                        .unwrap(),
-                );*/
-                chrono::DateTime::<Utc>::from()  ndt, chrono::FixedOffset::east(offset))
-                chrono::DateTime::<Local>::from
-            } else {
-                //chrono::DateTime::<Utc>::from_utc(NaiveDateTime::from_timestamp(61, 0), Utc)
-                chrono::DateTime::<Utc>::from_utc(ndt, Utc)
-            };*/
-
-            let dt = chrono::DateTime::<Utc>::from(
-                chrono::FixedOffset::east(offset)
-                    .from_local_datetime(&ndt)
-                    .unwrap(),
-            );
-
-            write!(f, "{}", dt)
-        } else {
-            write!(f, "")
-        }
-    }
-}*/
-
-/*#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn test_date_time_display() {
-        let date_time = DateTime {
-            seconds: 4,
-            minutes: 5,
-            hours: 6,
-            day: 7,
-            month: 8,
-            year: 121,
-            time_is_utc: 0,
-            os_snapshot: 0,
-        };
-
-        let s = format!("{}", date_time);
-        let t=3;
-    }
-}*/
-
-#[derive(Copy, Clone, Default, Debug)]
+#[derive(Copy, Clone, Default, Debug, Nom)]
 #[repr(C)]
 pub struct Signature {
     pub random: uint32_t,
     pub logtime_create: DateTime,
     pub computer_name: [uint8_t; 16],
 }
+impl_read_struct!(Signature);
 
 #[repr(C, packed)]
-#[derive(Debug, Copy, Default, Clone)]
+#[derive(Debug, Copy, Default, Clone, Nom)]
 pub struct LgPos {
     pub ib: uint16_t,
     pub isec: uint16_t,
     pub l_generation: uint32_t,
 }
+impl_read_struct!(LgPos);
 
 #[repr(C, packed)]
-#[derive(Debug, Copy, Default, Clone)]
+#[derive(Debug, Copy, Default, Clone, Nom)]
 pub struct BackupInfo {
     pub lg_pos_mark: LgPos,
     pub bk_logtime_mark: DateTime,
     pub gen_low: uint32_t,
     pub gen_high: uint32_t,
 }
+impl_read_struct!(BackupInfo);
 
 #[derive(Debug)]
 pub struct DbFile {
@@ -303,7 +255,7 @@ pub struct DbPage {
 
 impl DbPage {
     pub fn new(reader: &Reader, page_number: uint32_t) -> Result<DbPage, SimpleError> {
-        let page_header = reader::load_page_header(reader, page_number)?;
+        let page_header = reader.load_page_header(page_number)?;
         let mut db_page = DbPage {
             page_number,
             page_size: reader.page_size(),
@@ -407,7 +359,7 @@ impl PageTag {
     }
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Default)]
 #[repr(C)]
 pub struct CatalogDefinition {
     pub father_data_page_object_identifier: uint32_t,
