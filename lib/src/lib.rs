@@ -10,9 +10,9 @@ pub mod vartime;
 pub mod process_tables;
 
 use ese_trait::*;
+use byteorder::*;
 #[cfg(test)]
 fn init_tests(cache_size: usize, db: Option<&str>) -> ese_parser::EseParser{
-    use ese_trait::*;
     let mut jdb = ese_parser::EseParser::init(cache_size);
     match jdb.load(&["testdata", db.unwrap_or("test.edb")].join("/")) {
         Some(e) => panic!("Error: {}", e),
@@ -54,9 +54,6 @@ fn test_columns() {
 
     let table_id = jdb.open_table(table).unwrap();
     assert!(jdb.move_row(table_id, ESE_MoveFirst), "{}", true);
-
-    let auto_inc = columns.iter().find(|x| x.name == "AutoInc" ).unwrap();
-    assert_eq!(jdb.get_fixed_column::<i8>(table_id, auto_inc.id).unwrap(), Some(1));
 
     let bit = columns.iter().find(|x| x.name == "Bit" ).unwrap();
     assert_eq!(jdb.get_fixed_column::<i8>(table_id, bit.id).unwrap(), Some(0));
@@ -203,10 +200,4 @@ fn test_columns() {
     }
 
     jdb.close_table(table_id);
-}
-
-
-#[test]
-fn test_something(){
-
 }
