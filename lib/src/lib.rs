@@ -9,28 +9,47 @@ pub mod ese_parser;
 pub mod vartime;
 pub mod process_tables;
 
-#[test]
-fn test_edb_table_all_values() {
-    use ese_trait::*;
-    use byteorder::*;
-    let mut jdb : ese_parser::EseParser = ese_parser::EseParser::init(5);
-
-    match jdb.load("testdata/test.edb") {
+use ese_trait::*;
+use byteorder::*;
+#[cfg(test)]
+fn init_tests(cache_size: usize, db: Option<&str>) -> ese_parser::EseParser{
+    let mut jdb = ese_parser::EseParser::init(cache_size);
+    match jdb.load(&["testdata", db.unwrap_or("test.edb")].join("/")) {
         Some(e) => panic!("Error: {}", e),
         None => println!("Loaded.")
-    }
+        }
+    jdb
+}
 
-    let expected_tables = vec!["MSysObjects", "MSysObjectsShadow", "MSysObjids", "MSysLocales", "TestTable"];
-
+fn check_table_names(expected_tables:Vec<&str>, jdb: ese_parser::EseParser) {
     let tables = jdb.get_tables().unwrap();
     assert_eq!(tables.len(), expected_tables.len());
     for i in 0..tables.len() {
         assert_eq!(tables[i], expected_tables[i]);
     }
+}
 
+#[test]
+fn test_edb_table_default() {
+    let jdb = init_tests(5, None); // None means default db is used: test.db
+
+    let expected_tables = vec!["MSysObjects", "MSysObjectsShadow", "MSysObjids", "MSysLocales", "TestTable"];
+    check_table_names(expected_tables, jdb);
+}
+
+#[test]
+fn test_edb_table_decompress() {
+    let jdb = init_tests(5, Some("decompress_test.edb")); // None means default db is used: test.db
+
+    let expected_tables = vec!["MSysObjects", "MSysObjectsShadow", "MSysObjids", "MSysLocales", "test_table"];
+    check_table_names(expected_tables, jdb);
+}
+
+#[test]
+fn test_columns() {
+    let jdb = init_tests(5, None);
     let table = "TestTable";
     println!("table {}", table);
-
     let columns = jdb.get_columns(table).unwrap();
 
     let table_id = jdb.open_table(table).unwrap();

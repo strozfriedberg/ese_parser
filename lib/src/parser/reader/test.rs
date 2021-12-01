@@ -15,8 +15,6 @@ pub fn prepare_db(filename: &str, _table: &str, _pg_size: usize, _record_size: u
     dst_path
 }
 
-pub fn clean_db(_dst_path: &Path) {
-}
 
 #[test]
 pub fn caching_test() -> Result<(), SimpleError> {
@@ -56,7 +54,6 @@ pub fn caching_test() -> Result<(), SimpleError> {
             }
         }
     }
-    clean_db(&path);
     Ok(())
 }
 
@@ -158,6 +155,5 @@ pub fn run_decompress_test(filename: &str, record_size : usize) -> Result<(), Si
 			break;
 		}
     }
-    clean_db(&path);
     Ok(())
 }
