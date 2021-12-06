@@ -201,17 +201,13 @@ fn get_column_val(
         }
         ESE_coltypDateTime => {
             assert!(c.cbmax as usize == size_of::<f64>());
-            match get_column::<f64>(jdb, table_id, c.id)? {
-                Some(v) => {
-                    let mut st = SYSTEMTIME::default();
-                    if VariantTimeToSystemTime(v, &mut st) {
-                        val = format!(
-                            "{}.{}.{} {}:{}:{}",
-                            st.wDay, st.wMonth, st.wYear, st.wHour, st.wMinute, st.wSecond
-                        );
-                    } else {
-                        return Err(SimpleError::new(("VariantTimeToSystemTime failed").to_string()));
-                    }
+            match get_column::<u64>(jdb, table_id, c.id)? {
+                Some(filetime) => {
+                    let datetime = get_date_time_from_filetime(filetime);
+                    val = format!(
+                        "{}",
+                        datetime
+                    );
                 }
                 None => val = (" ").to_string(),
             }
