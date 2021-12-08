@@ -417,3 +417,15 @@ pub fn revision_to_string(version: FormatVersion, revision: FormatRevision) -> S
                 };
     format!("{:#x}, {:#x}: {}", version, revision, s)
 }
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_read_impl(){
+        assert_eq!(DateTime::parse_le(&[5, 10, 5 , 10, 5, 21, 1, 0]).unwrap().1,
+        DateTime { seconds: 5, minutes: 10, hours: 5, day: 10, month: 5, year: 21, time_is_utc: 1, os_snapshot: 0 });
+        assert_eq!(DateTime::parse_le(&[0, 0, 0 , 0, 0, 0, 0, 0]).unwrap().1,
+        DateTime { seconds: 0, minutes: 0, hours: 0, day: 0, month: 0, year: 0, time_is_utc: 0, os_snapshot: 0 });
+    }
+}
