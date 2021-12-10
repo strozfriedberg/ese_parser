@@ -1,4 +1,4 @@
-FROM rust:1.55
+FROM rust:1.57
 
 ARG USER_ID
 ARG GROUP_ID
