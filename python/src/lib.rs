@@ -2,11 +2,13 @@
 #![allow(non_snake_case)]
 
 use pyo3::prelude::*;
-use pyo3::exceptions;
+use pyo3::{exceptions, wrap_pyfunction};
+use pyo3::callback::convert;
 
 use ese_parser_lib::{ese_trait::*, ese_parser::*, ese_parser::FromBytes, vartime::*};
 use widestring::U16String;
-use std::convert::TryFrom;
+use std::convert::{TryFrom, TryInto};
+use chrono::{DateTime, Utc};
 
 #[pyclass]
 pub struct PyEseDb {
@@ -74,6 +76,25 @@ fn SystemTimeToFileTime(st: &SYSTEMTIME) -> i64 {
     t *= TICKSPERSEC;
     t += st.wMilliseconds as i64 * TICKSPERMSEC;
     t
+}
+
+#[pyfunction]
+pub fn wrap_date_time_from_filetime(column_contents: Vec<u8>) -> String {
+    let datetime = format!("{}", get_date_time_from_filetime(u64::from_le_bytes(column_contents.try_into().unwrap())));
+    datetime
+}
+
+pub fn get_date_time_from_filetime(filetime: u64) -> DateTime<Utc> {
+    const UNIX_EPOCH_SECONDS_SINCE_WINDOWS_EPOCH: i128 = 11644473600;
+    const UNIX_EPOCH_NANOS: i128 = UNIX_EPOCH_SECONDS_SINCE_WINDOWS_EPOCH * 1_000_000_000;
+    let filetime_nanos: i128 = filetime as i128 * 100;
+
+    // Add nanoseconds to timestamp via Duration
+    DateTime::<Utc>::from_utc(
+        chrono::NaiveDate::from_ymd(1970, 1, 1).and_hms_nano(0, 0, 0, 0)
+            + chrono::Duration::nanoseconds((filetime_nanos - UNIX_EPOCH_NANOS) as i64),
+        Utc,
+    )
 }
 
 #[pymethods]
@@ -286,6 +307,17 @@ impl PyEseDb {
                     Err(e) => return Err(PyErr::new::<exceptions::PyTypeError, _>(e.as_str().to_string()))
                 }
             },
+                        assert!(c.cbmax as usize == size_of::<f64>());
+            match get_column::<u64>(jdb, table_id, c.id)? {
+                Some(filetime) => {
+                    let datetime = get_date_time_from_filetime(filetime);
+                    val = format!(
+                        "{}",
+                        datetime
+                    );
+                }
+                None => val = (" ").to_string(),
+            }
             ESE_coltypDateTime => {
                 let ov = get::<f64>(self, table, column)?;
                 match ov {
@@ -316,6 +348,7 @@ impl PyEseDb {
 
 #[pymodule]
 fn ese_parser(_py: Python<'_>, m: &PyModule) -> PyResult<()> {
-    m.add_class::<PyEseDb>()?;
+    m.add_class::<PyEseDb>();
+    m.add_function(wrap_pyfunction!(wrap_date_time_from_filetime, m)?)?;
     Ok(())
 }

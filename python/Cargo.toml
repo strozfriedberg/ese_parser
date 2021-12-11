@@ -11,6 +11,7 @@ name = "ese_parser"
 crate-type = ["cdylib"]
 
 [dependencies]
+chrono = "*"
 ese_parser_lib = { path = "../lib" }
 simple-error = "*"
 widestring = "*"
