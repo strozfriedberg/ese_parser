@@ -1,6 +1,8 @@
 #![allow(non_upper_case_globals)]
 #![allow(non_snake_case)]
 
+use chrono::{DateTime, Utc};
+
 // implementation is taken from ReacOS: dll/win32/oleaut32/variant.c
 
 #[repr(C)]
@@ -110,6 +112,20 @@ fn VARIANT_RollUdate(st: &mut SYSTEMTIME)
 	st.wHour = iHour as u16;
 	st.wMinute = iMinute as u16;
 	st.wSecond = iSecond as u16;
+}
+
+/// Converts a u64 filetime to a DateTime<Utc>
+pub fn get_date_time_from_filetime(filetime: u64) -> DateTime<Utc> {
+    const UNIX_EPOCH_SECONDS_SINCE_WINDOWS_EPOCH: i128 = 11644473600;
+    const UNIX_EPOCH_NANOS: i128 = UNIX_EPOCH_SECONDS_SINCE_WINDOWS_EPOCH * 1_000_000_000;
+    let filetime_nanos: i128 = filetime as i128 * 100;
+
+    // Add nanoseconds to timestamp via Duration
+    DateTime::<Utc>::from_utc(
+        chrono::NaiveDate::from_ymd(1970, 1, 1).and_hms_nano(0, 0, 0, 0)
+            + chrono::Duration::nanoseconds((filetime_nanos - UNIX_EPOCH_NANOS) as i64),
+        Utc,
+    )
 }
 
 pub fn VariantTimeToSystemTime(dateIn: f64, st: &mut SYSTEMTIME) -> bool {

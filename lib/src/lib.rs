@@ -9,8 +9,12 @@ pub mod ese_parser;
 pub mod vartime;
 pub mod process_tables;
 
-use ese_trait::*;
+
 use byteorder::*;
+use ese_trait::*;
+use crate::vartime::*;
+use std::convert::TryInto;
+
 #[cfg(test)]
 fn init_tests(cache_size: usize, db: Option<&str>) -> ese_parser::EseParser{
     let mut jdb = ese_parser::EseParser::init(cache_size);
@@ -43,6 +47,22 @@ fn test_edb_table_decompress() {
 
     let expected_tables = vec!["MSysObjects", "MSysObjectsShadow", "MSysObjids", "MSysLocales", "test_table"];
     check_table_names(expected_tables, jdb);
+}
+
+#[test]
+fn test_datetimes() {
+    let jdb = init_tests(5, Some("Current.mdb"));
+    let columns = jdb.get_columns("CLIENTS").unwrap();
+    let table_id = jdb.open_table("CLIENTS").unwrap();
+    let insert_date = columns.iter().find(|x| x.name == "InsertDate" ).unwrap();
+    let dates = vec!["2021-06-12 23:47:21.232323500 UTC",
+                     "2021-06-12 23:48:45.468902200 UTC"];
+    for expected_datetime in dates.into_iter() {
+        let column_contents = jdb.get_column(table_id, insert_date.id).unwrap().unwrap();
+        let datetime = format!("{}", get_date_time_from_filetime(u64::from_le_bytes(column_contents.try_into().unwrap())));
+        assert_eq!(datetime, expected_datetime.to_string());
+        jdb.move_row(table_id, ESE_MoveNext);
+    }
 }
 
 #[test]
