@@ -307,32 +307,16 @@ impl PyEseDb {
                     Err(e) => return Err(PyErr::new::<exceptions::PyTypeError, _>(e.as_str().to_string()))
                 }
             },
-                        assert!(c.cbmax as usize == size_of::<f64>());
-            match get_column::<u64>(jdb, table_id, c.id)? {
-                Some(filetime) => {
+            ESE_coltypDateTime => {
+                let ov = get::<f64>(self, table, column)?;
+                match ov {
+                    Some(filetime) => {
                     let datetime = get_date_time_from_filetime(filetime);
                     val = format!(
                         "{}",
                         datetime
-                    );
-                }
-                None => val = (" ").to_string(),
-            }
-            ESE_coltypDateTime => {
-                let ov = get::<f64>(self, table, column)?;
-                match ov {
-                    Some(v) => {
-                        let mut st = SYSTEMTIME::default();
-                        if VariantTimeToSystemTime(v, &mut st) {
-                            let myft = SystemTimeToFileTime(&st);
-                            // January 1, 1970 (start of Unix epoch) in "ticks"
-                            const UNIX_TIME_START : i64 = 0x019DB1DED53E8000;
-                            // a tick is 100ns
-                            const TICKS_PER_SECOND : i64 = 10000000;
-                            let unix_timestamp = (myft - UNIX_TIME_START) / TICKS_PER_SECOND;
-                            return Ok(Some(unix_timestamp.to_object(py)));
-                        }
-                        return Err(PyErr::new::<exceptions::PyTypeError, _>("VariantTimeToSystemTime failed"));
+                        );
+                        return Ok(datetime);
                     },
                     None => return Ok(None)
                 }
