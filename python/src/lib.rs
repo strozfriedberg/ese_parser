@@ -84,19 +84,6 @@ pub fn wrap_date_time_from_filetime(column_contents: Vec<u8>) -> String {
     datetime
 }
 
-pub fn get_date_time_from_filetime(filetime: u64) -> DateTime<Utc> {
-    const UNIX_EPOCH_SECONDS_SINCE_WINDOWS_EPOCH: i128 = 11644473600;
-    const UNIX_EPOCH_NANOS: i128 = UNIX_EPOCH_SECONDS_SINCE_WINDOWS_EPOCH * 1_000_000_000;
-    let filetime_nanos: i128 = filetime as i128 * 100;
-
-    // Add nanoseconds to timestamp via Duration
-    DateTime::<Utc>::from_utc(
-        chrono::NaiveDate::from_ymd(1970, 1, 1).and_hms_nano(0, 0, 0, 0)
-            + chrono::Duration::nanoseconds((filetime_nanos - UNIX_EPOCH_NANOS) as i64),
-        Utc,
-    )
-}
-
 #[pymethods]
 impl PyEseDb {
     #[new]
@@ -308,15 +295,15 @@ impl PyEseDb {
                 }
             },
             ESE_coltypDateTime => {
-                let ov = get::<f64>(self, table, column)?;
+                let ov = get::<u64>(self, table, column)?;
                 match ov {
                     Some(filetime) => {
                     let datetime = get_date_time_from_filetime(filetime);
-                    val = format!(
+                    let val = format!(
                         "{}",
                         datetime
                         );
-                        return Ok(datetime);
+                        return Ok(Some(val.to_object(py)));
                     },
                     None => return Ok(None)
                 }
