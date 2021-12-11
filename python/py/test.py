@@ -66,7 +66,6 @@ class TestEseDbMethods(unittest.TestCase):
 
 		edb.close_table(tbl)
 
-
 	def test_datetimes(self):
 		edb = ese_parser.PyEseDb()
 		edb.load("../lib/testdata/Current.mdb")
