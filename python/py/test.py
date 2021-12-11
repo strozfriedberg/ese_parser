@@ -11,7 +11,6 @@ class TestEseDbMethods(unittest.TestCase):
 		edb.load("../lib/testdata/test.edb")
 		tables = edb.get_tables()
 		self.assertEqual(tables, ['MSysObjects', 'MSysObjectsShadow', 'MSysObjids', 'MSysLocales', 'TestTable'])
-
 		t = "TestTable"
 		tbl = edb.open_table(t)
 		self.assertTrue(tbl > 0)
@@ -66,6 +65,22 @@ class TestEseDbMethods(unittest.TestCase):
 				ind += 1
 
 		edb.close_table(tbl)
+
+
+	def test_datetimes(self):
+		edb = ese_parser.PyEseDb()
+		edb.load("../lib/testdata/Current.mdb")
+		t = "CLIENTS"
+		# columns = edb.get_columns("CLIENTS")
+		tbl = edb.open_table(t)
+		d1 = edb.get_row(tbl, edb.get_column(t, "InsertDate"))
+		print(f"dir edb: {dir(edb)}")
+		print(f"dir ese parser: {dir(ese_parser)}")
+		print(f"b: {datetime.utcfromtimestamp((d1))}")
+		d2 = edb.get_row_mv(tbl, edb.get_column(t, "InsertDate"), 2)
+		print(f"wrap: {ese_parser.wrap_date_time_from_filetime(d2)}")
+		# print(f"d2: {datetime.utcfromtimestamp(d2)}")
+		
 
 if __name__ == '__main__':
     unittest.main()
