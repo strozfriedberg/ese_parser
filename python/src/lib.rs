@@ -295,20 +295,33 @@ impl PyEseDb {
                 }
             },
             ESE_coltypDateTime => {
-                let ov = get::<u64>(self, table, column)?;
+                let ov = get::<f64>(self, table, column)?;
                 match ov {
-                    Some(filetime) => {
-                    let datetime = get_date_time_from_filetime(filetime);
-                    let val = format!(
-                        "{}",
-                        datetime
-                        );
-                        return Ok(Some(val.to_object(py)));
+                    Some(timestamp) => {
+                        let mut st = SYSTEMTIME::default();
+                        if VariantTimeToSystemTime(timestamp, &mut st) {
+                            let myft = SystemTimeToFileTime(&st);
+                            // January 1, 1970 (start of Unix epoch) in "ticks"
+                            const UNIX_TIME_START : i64 = 0x019DB1DED53E8000;
+                            // a tick is 100ns
+                            const TICKS_PER_SECOND : i64 = 10000000;
+                            let unix_timestamp = (myft - UNIX_TIME_START) / TICKS_PER_SECOND;
+                            return Ok(Some(unix_timestamp.to_object(py)));
+                        }
+                        else {
+                            let datetime = get_date_time_from_filetime(timestamp as u64);
+                            let val = format!(
+                                "{}",
+                                datetime
+                            );
+                            return Ok(Some(val.to_object(py)));
+                        }
+                        return Err(PyErr::new::<exceptions::PyTypeError, _>("Time conversion functions failed"));
                     },
-                    None => return Ok(None)
-                }
-            },
-            _ => {
+                        None => return Ok(None)
+                    }
+                },
+                _ => {
                 return Err(PyErr::new::<exceptions::PyTypeError, _>(
                     format!("Unknown type {}, column: {}, id: {}, cbmax: {}, cp: {}",
                         column.typ, column.name, column.id, column.cbmax, column.cp)))
