@@ -71,13 +71,12 @@ class TestEseDbMethods(unittest.TestCase):
 		edb.load("../lib/testdata/Current.mdb")
 		t = "CLIENTS"
 		tbl = edb.open_table(t)
-		d1 = edb.get_row(tbl, edb.get_column(t, "InsertDate"))
 		# Wrong format. Negative value due to bad data for timestamp (column header),
 		# i.e. -2209161600 is converted to 1899-12-30 etc.
-		self.assertEqual(datetime.utcfromtimestamp(d1), datetime(1899, 12, 30, 0, 0))
+		self.assertEqual(edb.get_row(tbl, edb.get_column(t, "InsertDate")), -2209161600)  # negative timestamp cannot be converted on Windows
 		# Move to the row with actual timestamp
-		d2 = edb.get_row_mv(tbl, edb.get_column(t, "InsertDate"), 2)
-		self.assertEqual(ese_parser.wrap_date_time_from_filetime(d2), "2021-06-12 23:47:21.232323500 UTC")
+		ts = edb.get_row_mv(tbl, edb.get_column(t, "InsertDate"), 2)
+		self.assertEqual(ese_parser.wrap_date_time_from_filetime(ts), "2021-06-12 23:47:21.232323500 UTC")
 		
 
 if __name__ == '__main__':
