@@ -81,10 +81,17 @@ class TestEseDbMethods(unittest.TestCase):
 		edb.move_row(tbl, 1)  # move one row down
 		d3 = edb.get_row_mv(tbl, edb.get_column(t, "InsertDate"), 2)
 		self.assertEqual(ese_parser.wrap_date_time_from_filetime(d3), "2021-06-12 23:48:45.468902200 UTC")
-		edb.move_row(tbl, 100)  # move to the last row
-		d100 = edb.get_row_mv(tbl, edb.get_column(t, "InsertDate"), 2)
-		self.assertEqual(ese_parser.wrap_date_time_from_filetime(d100), "2021-06-20 20:48:48.366866900 UTC")
-		
+		edb.move_row(tbl, 2147483647)  # move to the last row
+		d_last = edb.get_row_mv(tbl, edb.get_column(t, "InsertDate"), 2)
+		self.assertEqual(ese_parser.wrap_date_time_from_filetime(d_last), "2021-06-20 20:48:48.366866900 UTC")
+
+		# Move to the first row again
+		edb.move_row(tbl, -2147483648)
+		total_access = edb.get_row(tbl, edb.get_column(t, "TotalAccesses"))  # for this column type get_row fetches data fine
+		self.assertEqual(total_access, 310)
+		edb.move_row(tbl, 1)  # move to the second row
+		total_access = edb.get_row(tbl, edb.get_column(t, "TotalAccesses"))
+		self.assertEqual(total_access, 101)
 
 if __name__ == '__main__':
     unittest.main()
