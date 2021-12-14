@@ -75,9 +75,15 @@ class TestEseDbMethods(unittest.TestCase):
 		# Wrong format. Negative value due to bad data for timestamp (column header),
 		# i.e. -2209161600 is converted to 1899-12-30 etc.
 		self.assertEqual(datetime.utcfromtimestamp(d1), datetime(1899, 12, 30, 0, 0))
-		# Move to the row with actual timestamp
+		# Move to the row with the actual timestamp
 		d2 = edb.get_row_mv(tbl, edb.get_column(t, "InsertDate"), 2)
 		self.assertEqual(ese_parser.wrap_date_time_from_filetime(d2), "2021-06-12 23:47:21.232323500 UTC")
+		edb.move_row(tbl, 1)  # move one row down
+		d3 = edb.get_row_mv(tbl, edb.get_column(t, "InsertDate"), 2)
+		self.assertEqual(ese_parser.wrap_date_time_from_filetime(d3), "2021-06-12 23:48:45.468902200 UTC")
+		edb.move_row(tbl, 100)  # move 100 rows down
+		d100 = edb.get_row_mv(tbl, edb.get_column(t, "InsertDate"), 2)
+		self.assertEqual(ese_parser.wrap_date_time_from_filetime(d100), "2021-06-20 20:48:48.366866900 UTC")
 		
 
 if __name__ == '__main__':
