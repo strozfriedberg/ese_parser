@@ -81,7 +81,7 @@ class TestEseDbMethods(unittest.TestCase):
 		edb.move_row(tbl, 1)  # move one row down
 		d3 = edb.get_row_mv(tbl, edb.get_column(t, "InsertDate"), 2)
 		self.assertEqual(ese_parser.wrap_date_time_from_filetime(d3), "2021-06-12 23:48:45.468902200 UTC")
-		edb.move_row(tbl, 100)  # move 100 rows down
+		edb.move_row(tbl, 100)  # move to the last row
 		d100 = edb.get_row_mv(tbl, edb.get_column(t, "InsertDate"), 2)
 		self.assertEqual(ese_parser.wrap_date_time_from_filetime(d100), "2021-06-20 20:48:48.366866900 UTC")
 		
