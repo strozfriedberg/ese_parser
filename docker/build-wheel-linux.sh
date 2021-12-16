@@ -36,9 +36,9 @@ docker run --rm \
 	maturin build --release
 
 	virtualenv test
-	./test/bin/pip install --force-reinstall target/wheels/ese_parser-0.1.0-cp36-abi3-manylinux*_x86_64.whl
+	./test/bin/pip install --force-reinstall target/wheels/ese_parser-0.1.0-cp39-cp39-manylinux*_x86_64.whl
 	./test/bin/python py/test.py
 
-	cp target/wheels/ese_parser-0.1.0-cp36-abi3-manylinux*_x86_64.whl /builds
+	cp target/wheels/ese_parser-0.1.0-cp39-cp39-manylinux*_x86_64.whl /builds
 	popd
 '
