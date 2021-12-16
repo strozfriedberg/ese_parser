@@ -325,6 +325,11 @@ impl PyEseDb {
                     Err(e) => return Err(PyErr::new::<exceptions::PyTypeError, _>(e.as_str().to_string()))
                 }
             },
+            _ => {
+                return Err(PyErr::new::<exceptions::PyTypeError, _>(
+                    format!("Unknown type {}, column: {}, id: {}, cbmax: {}, cp: {}",
+                        column.typ, column.name, column.id, column.cbmax, column.cp)))
+            },
             ESE_coltypDateTime => {
                 match self.jdb.get_column_date(table, column.id) {
                     Ok(ov) => {
