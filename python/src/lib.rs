@@ -1,14 +1,16 @@
 #![allow(non_upper_case_globals)]
 #![allow(non_snake_case)]
 
+use chrono::{DateTime, Datelike, Timelike, Utc};
 use pyo3::prelude::*;
 use pyo3::{exceptions, wrap_pyfunction};
 use pyo3::callback::convert;
+use pyo3::types::PyDateTime;
 
 use ese_parser_lib::{ese_trait::*, ese_parser::*, ese_parser::FromBytes, vartime::*};
 use widestring::U16String;
 use std::convert::{TryFrom, TryInto};
-use chrono::{DateTime, Utc};
+use std::cmp::Ordering;
 
 #[pyclass]
 pub struct PyEseDb {
@@ -39,6 +41,35 @@ fn bytes_to_string(v: Vec<u8>, wide: bool) -> Option<String> {
     } else {
         std::str::from_utf8(&v).map(|s| s.to_string()).ok()
     }
+}
+
+fn nanos_to_micros_round_half_even(nanos: u32) -> u32 {
+    let nanos_e7 = (nanos % 1000) / 100;
+    let nanos_e6 = (nanos % 10000) / 1000;
+    let mut micros = (nanos / 10000) * 10;
+    match nanos_e7.cmp(&5) {
+        Ordering::Greater => micros += nanos_e6 + 1,
+        Ordering::Less => micros += nanos_e6,
+        Ordering::Equal => micros += nanos_e6 + (nanos_e6 % 2),
+    }
+    micros
+}
+
+pub fn date_to_pyobject(date: &DateTime<Utc>) -> PyResult<PyObject> {
+    let gil = Python::acquire_gil();
+    let py = gil.python();
+    PyDateTime::new(
+        py,
+        date.year(),
+        date.month() as u8,
+        date.day() as u8,
+        date.hour() as u8,
+        date.minute() as u8,
+        date.second() as u8,
+        nanos_to_micros_round_half_even(date.timestamp_subsec_nanos()),
+        None,
+    )
+    .map(|dt| dt.to_object(py))
 }
 
 fn SystemTimeToFileTime(st: &SYSTEMTIME) -> i64 {
@@ -295,36 +326,17 @@ impl PyEseDb {
                 }
             },
             ESE_coltypDateTime => {
-                let ov = get::<f64>(self, table, column)?;
-                match ov {
-                    Some(timestamp) => {
-                        let mut st = SYSTEMTIME::default();
-                        if VariantTimeToSystemTime(timestamp, &mut st) {
-                            let myft = SystemTimeToFileTime(&st);
-                            // January 1, 1970 (start of Unix epoch) in "ticks"
-                            const UNIX_TIME_START : i64 = 0x019DB1DED53E8000;
-                            // a tick is 100ns
-                            const TICKS_PER_SECOND : i64 = 10000000;
-                            let unix_timestamp = (myft - UNIX_TIME_START) / TICKS_PER_SECOND;
-                            return Ok(Some(unix_timestamp.to_object(py)));
+                match self.jdb.get_column_date(table, column.id) {
+                    Ok(ov) => {
+                        match ov {
+                            Some(v) => {
+                                return Ok(Some(date_to_pyobject(&v)?));
+                            }
+                            None => return Ok(None)
                         }
-                        else {
-                            let datetime = get_date_time_from_filetime(timestamp as u64);
-                            let val = format!(
-                                "{}",
-                                datetime
-                            );
-                            return Ok(Some(val.to_object(py)));
-                        }
-                        return Err(PyErr::new::<exceptions::PyTypeError, _>("Time conversion functions failed"));
                     },
-                        None => return Ok(None)
-                    }
-                },
-                _ => {
-                return Err(PyErr::new::<exceptions::PyTypeError, _>(
-                    format!("Unknown type {}, column: {}, id: {}, cbmax: {}, cp: {}",
-                        column.typ, column.name, column.id, column.cbmax, column.cp)))
+                    Err(e) => return Err(PyErr::new::<exceptions::PyTypeError, _>(e.as_str().to_string()))
+                }
             }
         }
     }
