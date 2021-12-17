@@ -1,5 +1,5 @@
 import ese_parser
-import unittest, datetime
+import unittest
 import platform
 
 from datetime import datetime
@@ -27,7 +27,7 @@ class TestEseDbMethods(unittest.TestCase):
 		self.assertEqual(edb.get_row(tbl, edb.get_column(t, "UnsignedLong")), 4294967295)
 		self.assertEqual(edb.get_row(tbl, edb.get_column(t, "LongLong")), 9223372036854775807)
 		self.assertEqual(edb.get_row(tbl, edb.get_column(t, "UnsignedShort")), 65535)
-		self.assertEqual(datetime.utcfromtimestamp(edb.get_row(tbl, edb.get_column(t, "DateTime"))), datetime(2021, 3, 29, 11, 49, 47))
+		self.assertEqual(edb.get_row(tbl, edb.get_column_date(t, "DateTime")), datetime(2021, 3, 29, 11, 49, 47))
 		self.assertEqual(edb.get_row(tbl, edb.get_column(t, "GUID")), "{4D36E96E-E325-11CE-BFC1-08002BE10318}")
 
 		b = edb.get_row(tbl, edb.get_column(t, "Binary"))
@@ -72,18 +72,16 @@ class TestEseDbMethods(unittest.TestCase):
 		t = "CLIENTS"
 		tbl = edb.open_table(t)
 		d1 = edb.get_row(tbl, edb.get_column(t, "InsertDate"))
-		# Wrong format. Negative value due to bad data for timestamp (column header),
-		# i.e. -2209161600 is converted to 1899-12-30 etc.
-		self.assertEqual(datetime.utcfromtimestamp(d1), datetime(1899, 12, 30, 0, 0))
-		# Move to the row with the actual timestamp
-		d2 = edb.get_row_mv(tbl, edb.get_column(t, "InsertDate"), 2)
-		self.assertEqual(ese_parser.wrap_date_time_from_filetime(d2), "2021-06-12 23:47:21.232323500 UTC")
-		edb.move_row(tbl, 1)  # move one row down
-		d3 = edb.get_row_mv(tbl, edb.get_column(t, "InsertDate"), 2)
-		self.assertEqual(ese_parser.wrap_date_time_from_filetime(d3), "2021-06-12 23:48:45.468902200 UTC")
+		self.assertEqual(d1, datetime(2021, 6, 12, 23, 47, 21, 232324))
+		edb.move_row(tbl, 1)
+		d2 = edb.get_row(tbl, edb.get_column(t, "InsertDate"))
+		self.assertEqual(d2, datetime(2021, 6, 12, 23, 48, 45, 468902))
+		edb.move_row(tbl, 1)
+		d3 = edb.get_row(tbl, edb.get_column(t, "InsertDate"))
+		self.assertEqual(d3, datetime(2021, 6, 12, 23, 49, 44, 255548))
 		edb.move_row(tbl, 2147483647)  # move to the last row
-		d_last = edb.get_row_mv(tbl, edb.get_column(t, "InsertDate"), 2)
-		self.assertEqual(ese_parser.wrap_date_time_from_filetime(d_last), "2021-06-20 20:48:48.366866900 UTC")
+		d_last = edb.get_row(tbl, edb.get_column(t, "InsertDate"))
+		self.assertEqual(d_last, datetime(2021, 6, 20, 20, 48, 48, 366867))
 
 		# Move to the first row again
 		edb.move_row(tbl, -2147483648)
