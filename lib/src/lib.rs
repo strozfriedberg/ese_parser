@@ -58,9 +58,8 @@ fn test_datetimes() {
     let dates = vec!["2021-06-12 23:47:21.232323500 UTC",
                      "2021-06-12 23:48:45.468902200 UTC"];
     for expected_datetime in dates.into_iter() {
-        let column_contents = jdb.get_column(table_id, insert_date.id).unwrap().unwrap();
-        let datetime = format!("{}", get_date_time_from_filetime(u64::from_le_bytes(column_contents.try_into().unwrap())));
-        assert_eq!(datetime, expected_datetime.to_string());
+        let column_contents = jdb.get_column_date(table_id, insert_date.id).unwrap().unwrap();
+        assert_eq!(column_contents.format("%Y-%m-%d %H:%M:%S.%f %Z").to_string(), expected_datetime.to_string());
         jdb.move_row(table_id, ESE_MoveNext);
     }
 }
