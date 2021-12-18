@@ -78,14 +78,15 @@ pub trait EseDb {
     fn get_column_date(&self, table: u64, column: u32) -> Result<Option<DateTime<Utc>>, SimpleError> {
 		let r = self.get_column(table, column)?;
 		if let Some(v) = r {
-            let float = u64::from_le_bytes(v.try_into().unwrap());
+            let vartime = f64::from_le_bytes(v.clone().try_into().unwrap());
             let mut st = SYSTEMTIME::default();
-            if VariantTimeToSystemTime(float as f64, &mut st) {
-                let datetime = Utc.ymd(st.wYear as i32, st.wMonth as u32, st.wDay as u32).and_hms(0, 1, 1); // this is obviously not the right function! I didn't know what the right one was off the top of my head. We need to include the time component. also needs to be something that returns a DateTime.
+            if VariantTimeToSystemTime(vartime as f64, &mut st) {
+                let datetime = Utc.ymd(st.wYear as i32, st.wMonth as u32, st.wDay as u32).and_hms(st.wHour as u32, st.wMinute as u32, st.wSecond as u32); // this is obviously not the right function! I didn't know what the right one was off the top of my head. We need to include the time component. also needs to be something that returns a DateTime.
                 Ok(Some(datetime))
             }
             else {
-                let datetime = get_date_time_from_filetime(float);
+                let filetime = u64::from_le_bytes(v.try_into().unwrap());
+                let datetime = get_date_time_from_filetime(filetime);
                 Ok(Some(datetime))
             }
 		}
