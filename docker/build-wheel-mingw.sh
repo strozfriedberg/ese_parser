@@ -33,6 +33,6 @@ docker run --rm \
 	 PYO3_CROSS_PYTHON_VERSION=3.7 \
 	 PYO3_CROSS_LIB_DIR="$PWD/../docker/Python37/libs" \
 	maturin build --target x86_64-pc-windows-gnu -i "../docker/mypython" --release
-	cp target/wheels/ese_parser-0.1.0-cp39-none-win_amd64.whl /builds
+	cp target/wheels/ese_parser-0.1.0-cp36-none-win_amd64.whl /builds
 	popd
 '
