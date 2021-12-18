@@ -65,6 +65,17 @@ fn test_datetimes() {
 }
 
 #[test]
+fn test_vartime_datetime() {
+    let jdb = init_tests(5, Some("test.edb"));
+    let columns = jdb.get_columns("TestTable").unwrap();
+    let table_id = jdb.open_table("TestTable").unwrap();
+    let insert_date = columns.iter().find(|x| x.name == "DateTime" ).unwrap();
+    let expected_datetime = "2021-03-29 11:49:47.000000000 UTC";
+    let column_contents = jdb.get_column_date(table_id, insert_date.id).unwrap().unwrap();
+    assert_eq!(column_contents.format("%Y-%m-%d %H:%M:%S.%f %Z").to_string(), expected_datetime.to_string());
+}
+
+#[test]
 fn test_columns() {
     let jdb = init_tests(5, None);
     let table = "TestTable";
