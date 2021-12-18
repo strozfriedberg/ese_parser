@@ -27,7 +27,7 @@ class TestEseDbMethods(unittest.TestCase):
 		self.assertEqual(edb.get_row(tbl, edb.get_column(t, "UnsignedLong")), 4294967295)
 		self.assertEqual(edb.get_row(tbl, edb.get_column(t, "LongLong")), 9223372036854775807)
 		self.assertEqual(edb.get_row(tbl, edb.get_column(t, "UnsignedShort")), 65535)
-		self.assertEqual(edb.get_row(tbl, edb.get_column_date(t, "DateTime")), datetime(2021, 3, 29, 11, 49, 47))
+		self.assertEqual(edb.get_row(tbl, edb.get_column(t, "DateTime")), datetime(2021, 3, 29, 11, 49, 47))
 		self.assertEqual(edb.get_row(tbl, edb.get_column(t, "GUID")), "{4D36E96E-E325-11CE-BFC1-08002BE10318}")
 
 		b = edb.get_row(tbl, edb.get_column(t, "Binary"))
