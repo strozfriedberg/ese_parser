@@ -129,7 +129,7 @@ pub fn get_date_time_from_filetime(filetime: u64) -> DateTime<Utc> {
 }
 
 pub fn VariantTimeToSystemTime(dateIn: f64, st: &mut SYSTEMTIME) -> bool {
-	if dateIn <= (DATE_MIN as f64 - 1.0) || dateIn >= (DATE_MAX as f64 + 1.0) {
+	if dateIn < 1 as f64 || dateIn <= (DATE_MIN as f64 - 1.0) || dateIn >= (DATE_MAX as f64 + 1.0) {
 		return false;
     }
 
