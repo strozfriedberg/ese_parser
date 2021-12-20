@@ -5,7 +5,7 @@ ARG GROUP_ID
 
 RUN apt-get update
 
-RUN apt-get install -y python3 curl && \
+RUN apt-get install -y python3\.6 curl && \
 	curl https://bootstrap.pypa.io/get-pip.py -o get-pip.py && \
 	python3 get-pip.py && \
 	rm get-pip.py
