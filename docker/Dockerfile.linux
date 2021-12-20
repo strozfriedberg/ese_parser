@@ -6,7 +6,7 @@ ARG GROUP_ID
 RUN apt-get update -y
 
 RUN apt-get install -y build-essential checkinstall && \
-apt-get install -y libssl-dev libc6-dev libbz2-dev
+apt-get install -y libssl-dev libc6-dev libbz2-dev python3-venv
 
 RUN wget https://www.python.org/ftp/python/3.6.9/Python-3.6.9.tar.xz && \
 tar xvf Python-3.6.9.tar.xz
