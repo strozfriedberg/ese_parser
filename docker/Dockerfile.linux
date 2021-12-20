@@ -5,7 +5,17 @@ ARG GROUP_ID
 
 RUN apt-get update
 
-RUN apt-get install -y python3\.6 curl && \
+RUN apt-get install build-essential checkinstall && \
+apt-get install libreadline-gplv2-dev libncursesw5-dev libssl-dev libsqlite3-dev tk-dev libgdbm-dev libc6-dev libbz2-dev
+
+RUN wget https://www.python.org/ftp/python/3.6.9/Python-3.6.9.tar.xz && \
+tar xvf Python-3.6.9.tar.xz
+
+RUN cd Python-3.6.9/ && \
+./configure && \
+make altinstall
+
+RUN apt-get install -y curl && \
 	curl https://bootstrap.pypa.io/get-pip.py -o get-pip.py && \
 	python3 get-pip.py && \
 	rm get-pip.py
