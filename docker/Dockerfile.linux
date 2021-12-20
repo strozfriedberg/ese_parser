@@ -3,10 +3,10 @@ FROM rust:1.55
 ARG USER_ID
 ARG GROUP_ID
 
-RUN apt-get update
+RUN apt-get update -y
 
-RUN apt-get install build-essential checkinstall && \
-apt-get install libreadline-gplv2-dev libncursesw5-dev libssl-dev libsqlite3-dev tk-dev libgdbm-dev libc6-dev libbz2-dev
+RUN apt-get install -y build-essential checkinstall && \
+apt-get install -y libssl-dev libc6-dev libbz2-dev
 
 RUN wget https://www.python.org/ftp/python/3.6.9/Python-3.6.9.tar.xz && \
 tar xvf Python-3.6.9.tar.xz
