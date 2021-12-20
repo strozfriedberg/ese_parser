@@ -35,7 +35,8 @@ docker run --rm \
 	pushd python
 	maturin build --interpreter python3.6 --release
 
-	virtualenv test
+	python3m -m venv test
+	./test/bin/pip install --upgrade pip
 	./test/bin/pip install --force-reinstall target/wheels/ese_parser-0.1.0-cp36-cp36m-manylinux*_x86_64.whl
 	./test/bin/python py/test.py
 
