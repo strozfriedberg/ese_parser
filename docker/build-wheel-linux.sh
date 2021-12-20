@@ -35,7 +35,7 @@ docker run --rm \
 	pushd python
 	maturin build --interpreter python3.6 --release
 
-  /usr/bin/python3.6 --version
+  whereis python
 	/usr/bin/python3.6 -m venv test
 	source ./test/bin/activate
 	pip install --upgrade pip
