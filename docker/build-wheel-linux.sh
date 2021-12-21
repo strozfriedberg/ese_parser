@@ -36,7 +36,7 @@ docker run --rm \
 	maturin build --interpreter python3.6 --release
 
   whereis python
-	/usr/bin/python3.6 -m venv test
+	/usr/local/bin/python3.6m -m venv test
 	source ./test/bin/activate
 	pip install --upgrade pip
 	pip install --force-reinstall target/wheels/ese_parser-0.1.0-cp36-cp36m-manylinux*_x86_64.whl
