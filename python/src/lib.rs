@@ -3,13 +3,12 @@
 
 use chrono::{DateTime, Datelike, Timelike, Utc};
 use pyo3::prelude::*;
-use pyo3::{exceptions, wrap_pyfunction};
-use pyo3::callback::convert;
+use pyo3::exceptions;
 use pyo3::types::PyDateTime;
 
-use ese_parser_lib::{ese_trait::*, ese_parser::*, ese_parser::FromBytes, vartime::*};
+use ese_parser_lib::{ese_trait::*, ese_parser::*, ese_parser::FromBytes};
 use widestring::U16String;
-use std::convert::{TryFrom, TryInto};
+use std::convert::TryFrom;
 use std::cmp::Ordering;
 
 #[pyclass]
@@ -70,49 +69,6 @@ pub fn date_to_pyobject(date: &DateTime<Utc>) -> PyResult<PyObject> {
         None,
     )
     .map(|dt| dt.to_object(py))
-}
-
-fn SystemTimeToFileTime(st: &SYSTEMTIME) -> i64 {
-    const TICKSPERMSEC : i64  = 10000;
-    const TICKSPERSEC : i64 = 10000000;
-    const SECSPERDAY : i64 = 86400;
-    const SECSPERHOUR : i64 = 3600;
-    const SECSPERMIN : i64 = 60;
-
-    let monthLengths = vec![
-        vec![31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31],
-        vec![31, 29, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31]
-    ];
-
-    fn IsLeapYear(year: i32) -> bool {
-        year % 4 == 0 && (year % 100 != 0 || year % 400 == 0)
-    }
-
-    fn DaysSinceEpoch(mut year: i32) -> i64 {
-        const DAYSPERNORMALYEAR : i32 = 365;
-        const EPOCHYEAR : i32 = 1601;
-        year -= 1; // Don't include a leap day from the current year
-        let mut days = year * DAYSPERNORMALYEAR + year / 4 - year / 100 + year / 400;
-        days -= (EPOCHYEAR - 1) * DAYSPERNORMALYEAR + (EPOCHYEAR - 1) / 4 - (EPOCHYEAR - 1) / 100 + (EPOCHYEAR - 1) / 400;
-        days as i64
-    }
-
-    let mut t : i64 = DaysSinceEpoch(st.wYear as i32);
-    for curMonth in 1..st.wMonth {
-        t += monthLengths[IsLeapYear(st.wYear as i32) as usize][curMonth as usize  - 1];
-    }
-    t += st.wDay as i64 - 1;
-    t *= SECSPERDAY;
-    t += st.wHour as i64 * SECSPERHOUR + st.wMinute as i64 * SECSPERMIN + st.wSecond as i64;
-    t *= TICKSPERSEC;
-    t += st.wMilliseconds as i64 * TICKSPERMSEC;
-    t
-}
-
-#[pyfunction]
-pub fn wrap_date_time_from_filetime(column_contents: Vec<u8>) -> String {
-    let datetime = format!("{}", get_date_time_from_filetime(u64::from_le_bytes(column_contents.try_into().unwrap())));
-    datetime
 }
 
 #[pymethods]
@@ -350,6 +306,5 @@ impl PyEseDb {
 #[pymodule]
 fn ese_parser(_py: Python<'_>, m: &PyModule) -> PyResult<()> {
     m.add_class::<PyEseDb>();
-    m.add_function(wrap_pyfunction!(wrap_date_time_from_filetime, m)?)?;
     Ok(())
 }
