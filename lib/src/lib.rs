@@ -12,8 +12,6 @@ pub mod process_tables;
 
 use byteorder::*;
 use ese_trait::*;
-use crate::vartime::*;
-use std::convert::TryInto;
 
 #[cfg(test)]
 fn init_tests(cache_size: usize, db: Option<&str>) -> ese_parser::EseParser{
