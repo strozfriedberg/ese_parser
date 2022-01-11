@@ -1,5 +1,5 @@
 import ese_parser
-import unittest, datetime
+import unittest
 import platform
 
 from datetime import datetime
@@ -11,7 +11,6 @@ class TestEseDbMethods(unittest.TestCase):
 		edb.load("../lib/testdata/test.edb")
 		tables = edb.get_tables()
 		self.assertEqual(tables, ['MSysObjects', 'MSysObjectsShadow', 'MSysObjids', 'MSysLocales', 'TestTable'])
-
 		t = "TestTable"
 		tbl = edb.open_table(t)
 		self.assertTrue(tbl > 0)
@@ -28,7 +27,7 @@ class TestEseDbMethods(unittest.TestCase):
 		self.assertEqual(edb.get_row(tbl, edb.get_column(t, "UnsignedLong")), 4294967295)
 		self.assertEqual(edb.get_row(tbl, edb.get_column(t, "LongLong")), 9223372036854775807)
 		self.assertEqual(edb.get_row(tbl, edb.get_column(t, "UnsignedShort")), 65535)
-		self.assertEqual(datetime.utcfromtimestamp(edb.get_row(tbl, edb.get_column(t, "DateTime"))), datetime(2021, 3, 29, 11, 49, 47))
+		self.assertEqual(edb.get_row(tbl, edb.get_column(t, "DateTime")), datetime(2021, 3, 29, 11, 49, 47))
 		self.assertEqual(edb.get_row(tbl, edb.get_column(t, "GUID")), "{4D36E96E-E325-11CE-BFC1-08002BE10318}")
 
 		b = edb.get_row(tbl, edb.get_column(t, "Binary"))
@@ -66,6 +65,31 @@ class TestEseDbMethods(unittest.TestCase):
 				ind += 1
 
 		edb.close_table(tbl)
+
+	def test_datetimes(self):
+		edb = ese_parser.PyEseDb()
+		edb.load("../lib/testdata/Current.mdb")
+		t = "CLIENTS"
+		tbl = edb.open_table(t)
+		d1 = edb.get_row(tbl, edb.get_column(t, "InsertDate"))
+		self.assertEqual(d1, datetime(2021, 6, 12, 23, 47, 21, 232324))
+		edb.move_row(tbl, 1)
+		d2 = edb.get_row(tbl, edb.get_column(t, "InsertDate"))
+		self.assertEqual(d2, datetime(2021, 6, 12, 23, 48, 45, 468902))
+		edb.move_row(tbl, 1)
+		d3 = edb.get_row(tbl, edb.get_column(t, "InsertDate"))
+		self.assertEqual(d3, datetime(2021, 6, 12, 23, 49, 44, 255548))
+		edb.move_row(tbl, 2147483647)  # move to the last row
+		d_last = edb.get_row(tbl, edb.get_column(t, "InsertDate"))
+		self.assertEqual(d_last, datetime(2021, 6, 20, 20, 48, 48, 366867))
+
+		# Move to the first row again
+		edb.move_row(tbl, -2147483648)
+		total_access = edb.get_row(tbl, edb.get_column(t, "TotalAccesses"))  # for this column type get_row fetches data fine
+		self.assertEqual(total_access, 310)
+		edb.move_row(tbl, 1)  # move to the second row
+		total_access = edb.get_row(tbl, edb.get_column(t, "TotalAccesses"))
+		self.assertEqual(total_access, 101)
 
 if __name__ == '__main__':
     unittest.main()

@@ -11,6 +11,7 @@ name = "ese_parser"
 crate-type = ["cdylib"]
 
 [dependencies]
+chrono = "*"
 ese_parser_lib = { path = "../lib" }
 simple-error = "*"
 widestring = "*"
@@ -20,4 +21,4 @@ winapi = { version = "0.3.9", features = ["oleauto"] }
 
 [dependencies.pyo3]
 version = "0.13.1"
-features = ["extension-module", "abi3", "abi3-py36"]
+features = ["extension-module"]

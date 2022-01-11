@@ -1,6 +1,9 @@
 use simple_error::SimpleError;
 use byteorder::*;
-use std::mem; 
+use std::mem;
+use chrono::{DateTime, Utc, TimeZone};
+use crate::vartime::*;
+use std::convert::TryInto;
 
 #[derive(Debug)]
 pub struct ColumnInfo {
@@ -72,6 +75,26 @@ pub trait EseDb {
 
     fn move_row(&self, table: u64, crow: i32) -> bool;
 
+    fn get_column_date(&self, table: u64, column: u32) -> Result<Option<DateTime<Utc>>, SimpleError> {
+		let r = self.get_column(table, column)?;
+		if let Some(v) = r {
+            let vartime = f64::from_le_bytes(v.clone().try_into().unwrap());
+            let mut st = SYSTEMTIME::default();
+            if VariantTimeToSystemTime(vartime as f64, &mut st) {
+                let datetime = Utc.ymd(st.wYear as i32, st.wMonth as u32, st.wDay as u32).and_hms(st.wHour as u32, st.wMinute as u32, st.wSecond as u32); // this is obviously not the right function! I didn't know what the right one was off the top of my head. We need to include the time component. also needs to be something that returns a DateTime.
+                Ok(Some(datetime))
+            }
+            else {
+                let filetime = u64::from_le_bytes(v.try_into().unwrap());
+                let datetime = get_date_time_from_filetime(filetime);
+                Ok(Some(datetime))
+            }
+		}
+        else {
+		    Err(SimpleError::new(format!("can't decode date from {:?}", r)))
+        }
+	}
+
 	fn get_column_str(&self, table: u64, column: u32, cp: u16) -> Result<Option<String>, SimpleError> {
 		use std::convert::TryFrom;
 		let r = self.get_column(table, column)?;
@@ -94,7 +117,7 @@ pub trait EseDb {
 	}
 }
 
-use std::convert::TryInto;
+
 
 pub trait FromBytes {
     fn from_bytes(bytes: &[u8]) -> Self;
