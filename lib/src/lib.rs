@@ -13,6 +13,8 @@ pub mod process_tables;
 use byteorder::*;
 use ese_trait::*;
 
+use std::collections::HashMap;
+
 #[cfg(test)]
 fn init_tests(cache_size: usize, db: Option<&str>) -> ese_parser::EseParser{
     let mut jdb = ese_parser::EseParser::init(cache_size);
@@ -60,6 +62,43 @@ fn test_datetimes() {
         assert_eq!(column_contents.format("%Y-%m-%d %H:%M:%S.%f %Z").to_string(), expected_datetime.to_string());
         jdb.move_row(table_id, ESE_MoveNext);
     }
+}
+
+fn get_column_names(columns: Vec<ColumnInfo>) -> Vec<String> {
+    let mut column_names= vec!();
+    for ci in columns.iter() {
+        column_names.push(ci.name.clone());
+    }
+    column_names
+}
+
+#[test]
+fn test_system_identity_columns() {
+    let jdb = init_tests(5, Some("SystemIdentity.mdb"));
+    let mut tables_map = HashMap::new();
+    tables_map.insert(String::from("SYSTEM_IDENTITY"), vec!("CreationTime", "PhysicalProcessorCount", "CoresPerPhysicalProcessor", "LogicalProcessorsPerPhysicalProcessor", "MaximumMemory", "OSMajor", "OSMinor", "OSBuildNumber", "OSPlatformId", "ServicePackMajor", "ServicePackMinor", "OSSuiteMask", "OSProductType", "OSCurrentTimeZone", "OSDaylightInEffect", "SystemManufacturer", "SystemProductName", "SystemSMBIOSUUID", "SystemSerialNumber", "SystemDNSHostName", "SystemDomainName", "OSSerialNumber", "OSCountryCode", "OSLastBootUpTime"));
+    tables_map.insert(String::from("CHAINED_DATABASES"), vec!("Year", "FileName"));
+    tables_map.insert(String::from("ROLE_IDS"), vec!("RoleGuid", "ProductName", "RoleName"));
+    for (table_name, coulumn_names) in &tables_map {
+        let columns = jdb.get_columns(table_name).unwrap();
+        assert_eq!(&get_column_names(columns), coulumn_names);
+    }
+}
+
+fn get_text_value(table_name: &str, column_name: &str) -> String{
+    let jdb = init_tests(5, Some("SystemIdentity.mdb"));
+    let columns = jdb.get_columns(table_name).unwrap();
+    let table_id = jdb.open_table(table_name).unwrap();
+    let filename = columns.iter().find(|x| x.name == column_name).unwrap();
+    jdb.get_column_str(table_id, filename.id, filename.cp).unwrap().unwrap()
+}
+
+#[test]
+fn test_system_identity_values() {
+    let column_contents = get_text_value("CHAINED_DATABASES", "FileName");
+    assert_eq!(column_contents, "{03A01CC5-91BB-4936-B685-63697785D39E}.mdb\u{0}");
+    let dns_host_name = get_text_value("SYSTEM_IDENTITY", "SystemDNSHostName");
+    assert_eq!(dns_host_name, "WIN-M5M48LSM8UB\u{0}\u{0}\u{0}\u{0}\u{0}\u{0}\u{0}\u{0}\u{0}");
 }
 
 #[test]
