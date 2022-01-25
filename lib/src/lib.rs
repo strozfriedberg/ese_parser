@@ -85,19 +85,19 @@ fn test_system_identity_columns() {
     }
 }
 
-fn get_text_value(table_name: &str, column_name: &str) -> String{
-    let jdb = init_tests(5, Some("SystemIdentity.mdb"));
+fn get_str_value(db_name: &str, table_name: &str, column_name: &str) -> String {
+    let jdb = init_tests(5, Some(db_name));
     let columns = jdb.get_columns(table_name).unwrap();
     let table_id = jdb.open_table(table_name).unwrap();
-    let filename = columns.iter().find(|x| x.name == column_name).unwrap();
-    jdb.get_column_str(table_id, filename.id, filename.cp).unwrap().unwrap()
+    let column_info = columns.iter().find(|x| x.name == column_name).unwrap();
+    jdb.get_column_str(table_id, column_info.id, column_info.cp).unwrap().unwrap()
 }
 
 #[test]
 fn test_system_identity_values() {
-    let column_contents = get_text_value("CHAINED_DATABASES", "FileName");
+    let column_contents = get_str_value("SystemIdentity.mdb","CHAINED_DATABASES", "FileName");
     assert_eq!(column_contents, "{03A01CC5-91BB-4936-B685-63697785D39E}.mdb\u{0}");
-    let dns_host_name = get_text_value("SYSTEM_IDENTITY", "SystemDNSHostName");
+    let dns_host_name = get_str_value("SystemIdentity.mdb","SYSTEM_IDENTITY", "SystemDNSHostName");
     assert_eq!(dns_host_name, "WIN-M5M48LSM8UB\u{0}\u{0}\u{0}\u{0}\u{0}\u{0}\u{0}\u{0}\u{0}");
 }
 
