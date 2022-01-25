@@ -49,9 +49,8 @@ fn test_edb_table_decompress() {
     check_table_names(expected_tables, jdb);
 }
 
-#[test]
-fn test_datetimes() {
-    let jdb = init_tests(5, Some("Current.mdb"));
+fn test_datetimes(db: &str) {
+    let jdb = init_tests(5, Some(db));
     let columns = jdb.get_columns("CLIENTS").unwrap();
     let table_id = jdb.open_table("CLIENTS").unwrap();
     let insert_date = columns.iter().find(|x| x.name == "InsertDate" ).unwrap();
@@ -62,6 +61,17 @@ fn test_datetimes() {
         assert_eq!(column_contents.format("%Y-%m-%d %H:%M:%S.%f %Z").to_string(), expected_datetime.to_string());
         jdb.move_row(table_id, ESE_MoveNext);
     }
+}
+
+#[test]
+fn test_datetime_current(){
+    test_datetimes("Current.mdb");
+}
+
+#[test]
+fn test_datetime_guid(){
+    //expect same dates because current and GUID are from year 2021
+    test_datetimes("{03A01CC5-91BB-4936-B685-63697785D39E}.mdb");
 }
 
 fn get_column_names(columns: Vec<ColumnInfo>) -> Vec<String> {
