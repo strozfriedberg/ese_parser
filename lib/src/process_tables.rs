@@ -134,7 +134,7 @@ fn get_column_val(
                 if ESE_CP::try_from(c.cp) == Ok(ESE_CP::Unicode) {
                     const SIZE_OF_UTF16_CHAR: usize = mem::size_of::<u16>();
                     let iter = (0..v.len() / SIZE_OF_UTF16_CHAR)
-                        .map(|i| u16::from_le_bytes([v[2*i], v[2*i+1]]));
+                        .map(|i| u16::from_le_bytes([v[SIZE_OF_UTF16_CHAR * i], v[SIZE_OF_UTF16_CHAR * i + 1]]));
 
                     match std::char::decode_utf16(iter).collect::<Result<String, _>>() {
                         Ok(s) => val = s,
