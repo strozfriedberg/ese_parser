@@ -1,5 +1,6 @@
 use crate::{ese_parser::*, ese_trait::*, vartime::*};
 use simple_error::SimpleError;
+use std::char::DecodeUtf16Error;
 use std::mem::size_of;
 use std::mem;
 use std::convert::TryFrom;
@@ -31,6 +32,13 @@ fn get_column<T: FromBytes>(jdb: &dyn EseDb, table: u64, column: u32) -> Result<
         Some(v) => Ok(Some(T::from_bytes(&v))),
         None => Ok(None)
     }
+}
+
+fn from_utf16(v: &Vec<u8>) -> Result<String, DecodeUtf16Error>{
+   const SIZE_OF_UTF16_CHAR: usize = mem::size_of::<u16>();
+   let iter = (0..v.len() / SIZE_OF_UTF16_CHAR)
+                        .map(|i| u16::from_le_bytes([v[SIZE_OF_UTF16_CHAR * i], v[SIZE_OF_UTF16_CHAR * i + 1]]));
+   std::char::decode_utf16(iter).collect::<Result<String, _>>()
 }
 
 fn get_column_val(
@@ -132,12 +140,8 @@ fn get_column_val(
         ESE_coltypText => match jdb.get_column(table_id, c.id)? {
             Some(v) => {
                 if ESE_CP::try_from(c.cp) == Ok(ESE_CP::Unicode) {
-                    const SIZE_OF_UTF16_CHAR: usize = mem::size_of::<u16>();
-                    let iter = (0..v.len() / SIZE_OF_UTF16_CHAR)
-                        .map(|i| u16::from_le_bytes([v[SIZE_OF_UTF16_CHAR * i], v[SIZE_OF_UTF16_CHAR * i + 1]]));
-
-                    match std::char::decode_utf16(iter).collect::<Result<String, _>>() {
-                        Ok(s) => val = s,
+                    match from_utf16(&v) {
+                        Ok(s) => val = s.to_string(),
                         Err(e) => val = format!("from_utf16 failed: {}", e),
                     }
                 } else {
