@@ -25,6 +25,7 @@ fn init_tests(cache_size: usize, db: Option<&str>) -> ese_parser::EseParser{
     jdb
 }
 
+#[cfg(test)]
 fn check_table_names(expected_tables:Vec<&str>, jdb: ese_parser::EseParser) {
     let tables = jdb.get_tables().unwrap();
     assert_eq!(tables.len(), expected_tables.len());
@@ -49,7 +50,8 @@ fn test_edb_table_decompress() {
     check_table_names(expected_tables, jdb);
 }
 
-fn test_datetimes(db: &str) {
+#[cfg(test)]
+fn check_datetimes(db: &str) {
     let jdb = init_tests(5, Some(db));
     let columns = jdb.get_columns("CLIENTS").unwrap();
     let table_id = jdb.open_table("CLIENTS").unwrap();
@@ -65,15 +67,16 @@ fn test_datetimes(db: &str) {
 
 #[test]
 fn test_datetime_current(){
-    test_datetimes("Current.mdb");
+    check_datetimes("Current.mdb");
 }
 
 #[test]
 fn test_datetime_guid(){
     //expect same dates because current and GUID are from year 2021
-    test_datetimes("{03A01CC5-91BB-4936-B685-63697785D39E}.mdb");
+    check_datetimes("{03A01CC5-91BB-4936-B685-63697785D39E}.mdb");
 }
 
+#[cfg(test)]
 fn get_column_names(columns: Vec<ColumnInfo>) -> Vec<String> {
     let mut column_names= vec!();
     for ci in columns.iter() {
@@ -95,6 +98,7 @@ fn test_system_identity_columns() {
     }
 }
 
+#[cfg(test)]
 fn get_str_value(db_name: &str, table_name: &str, column_name: &str) -> String {
     let jdb = init_tests(5, Some(db_name));
     let columns = jdb.get_columns(table_name).unwrap();
