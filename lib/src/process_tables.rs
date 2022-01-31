@@ -158,19 +158,9 @@ fn get_column_val(
         ESE_coltypLongText => match jdb.get_column(table_id, c.id)? {
             Some(v) => {
                 if ESE_CP::try_from(c.cp) == Ok(ESE_CP::Unicode) {
-                    let mut vec16: Vec<u16> = vec![0;v.len()/mem::size_of::<u16>()];
-                    LittleEndian::read_u16_into(&v, &mut vec16);
-                    let s16 = String::from_utf16(&vec16[..]).unwrap();
-                    let U16Str = U16String::from_str(&s16);
-                    let ws = U16Str.to_string_lossy();
-                    if ws.len() > 32 { 
-                        val = format!(
-                            "{:4} bytes: {}...", //maybe don't truncate this, or have an option that doesn't 
-                            ws.len(),
-                            truncate(&ws, 32).to_string()
-                        );
-                    } else {
-                        val = ws;
+                    match from_utf16(&v) {
+                        Ok(s) => val = s.to_string(),
+                        Err(e) => val = format!("from_utf16 failed: {}", e),
                     }
                 } else {
                     match std::str::from_utf8(&v) {
@@ -417,4 +407,18 @@ impl FromBytes for f32 {
 
 impl FromBytes for f64 {
     fn from_bytes(bytes: &[u8]) -> Self  { f64::from_le_bytes(bytes.try_into().unwrap()) }
+}
+
+#[test]
+fn test_from_utf16() {
+    let expected = vec!["Record          #", "Record", "Flowers "];
+    let tests = [
+        vec!(82, 0, 101, 0, 99, 0, 111, 0, 114, 0, 100, 0, 32, 0, 32, 0, 32, 0, 32, 0, 32, 0, 32, 0, 32, 0, 32, 0, 32, 0, 32, 0, 35, 0),
+        vec!(82, 0, 101, 0, 99, 0, 111, 0, 114, 0, 100, 0, 32),
+        vec!(70, 0, 108, 0, 111, 0, 119, 0, 101, 0, 114, 0, 115, 0, 32, 0)
+    ];
+    for et in tests.iter().zip(expected.iter()) {
+        let (t, expected) = et;
+        assert_eq!(expected, &&from_utf16(&t).unwrap());
+    }
 }
