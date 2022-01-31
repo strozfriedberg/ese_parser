@@ -1,4 +1,3 @@
-//ese_db
 #![allow(non_camel_case_types)]
 
 use crate::parser::jet;

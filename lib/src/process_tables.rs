@@ -4,26 +4,17 @@ use std::char::DecodeUtf16Error;
 use std::mem::size_of;
 use std::mem;
 use std::convert::TryFrom;
-use widestring::U16String;
 use std::fs::File;
 use std::io::{self, Error, Write};
 use std::path::PathBuf;
 use std::result::Result;
-use byteorder::*;
 #[cfg(target_os = "windows")]
 use crate::parser::ese_both::*;
 
 #[derive(Debug)]
 struct Args {
     /// write to the provided file, or `stdout` when not provided
-    output: Option<PathBuf>,
-}
-
-fn truncate(s: &str, max_chars: usize) -> &str {
-    match s.char_indices().nth(max_chars) {
-        None => s,
-        Some((idx, _)) => &s[..idx],
-    }
+    _output: Option<PathBuf>,
 }
 
 fn get_column<T: FromBytes>(jdb: &dyn EseDb, table: u64, column: u32) -> Result<Option<T>, SimpleError> {
@@ -34,7 +25,7 @@ fn get_column<T: FromBytes>(jdb: &dyn EseDb, table: u64, column: u32) -> Result<
     }
 }
 
-fn from_utf16(v: &Vec<u8>) -> Result<String, DecodeUtf16Error>{
+pub(crate) fn from_utf16(v: &Vec<u8>) -> Result<String, DecodeUtf16Error>{
    const SIZE_OF_UTF16_CHAR: usize = mem::size_of::<u16>();
    let iter = (0..v.len() / SIZE_OF_UTF16_CHAR)
                         .map(|i| u16::from_le_bytes([v[SIZE_OF_UTF16_CHAR * i], v[SIZE_OF_UTF16_CHAR * i + 1]]));
@@ -137,25 +128,7 @@ fn get_column_val(
                 val = (" ").to_string();
             }
         },
-        ESE_coltypText => match jdb.get_column(table_id, c.id)? {
-            Some(v) => {
-                if ESE_CP::try_from(c.cp) == Ok(ESE_CP::Unicode) {
-                    match from_utf16(&v) {
-                        Ok(s) => val = s.to_string(),
-                        Err(e) => val = format!("from_utf16 failed: {}", e),
-                    }
-                } else {
-                    match std::str::from_utf8(&v) {
-                        Ok(s) => val = s.to_string(),
-                        Err(e) => val = format!("from_utf8 failed: {}", e),
-                    }
-                }
-            }
-            None => {
-                val = (" ").to_string();
-            }
-        },
-        ESE_coltypLongText => match jdb.get_column(table_id, c.id)? {
+        ESE_coltypText | ESE_coltypLongText => match jdb.get_column(table_id, c.id)? {
             Some(v) => {
                 if ESE_CP::try_from(c.cp) == Ok(ESE_CP::Unicode) {
                     match from_utf16(&v) {
