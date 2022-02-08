@@ -491,7 +491,8 @@ pub fn load_catalog_item(
                     },
                     _ => {
                         if data_type_size > 0 {
-                            println!("TODO handle data_type_number {}", data_type_number);
+                            // removed println! for ASDF wheel
+                            // println!("TODO handle data_type_number {}", data_type_number);
                         }
                     }
                 }
