@@ -143,7 +143,6 @@ pub fn decompress_buf(
 				},
 				Err(e) => {
 					let s = format!("{:?}", e);
-					println!("{}", s);
 					Err(SimpleError::new(s))
 				}
 			}

@@ -198,6 +198,7 @@ fn get_column_val(
 type Row = Vec<Vec<String>>;
 type Col = Vec<ColumnInfo>;
 type Table = (Col, Row);
+
 fn dump_table(
     jdb: &dyn EseDb,
     t: &str,
@@ -305,7 +306,6 @@ pub fn resolve_path(test_file: Option<PathBuf>) -> Result<Box<dyn Write>, Error>
 }
 
 pub fn process_table(dbpath: &str, test_file: Option<PathBuf>, mode: Mode, table: String) {
-
     let mut output_destination = resolve_path(test_file).unwrap();
     let mut jdb = alloc_jdb(&mode);
 
