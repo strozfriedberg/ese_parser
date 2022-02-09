@@ -153,14 +153,14 @@ pub fn decompress_buf(
 	}
 }
 
-#[cfg(target_os = "windows")]
+#[cfg(all(feature = "nt_comparison", target_os = "windows"))]
 extern "C" {
     fn decompress(
         data: *const u8, data_size: u32, out_buffer: *mut u8, out_buffer_size: u32, decompressed: *mut u32) -> u32;
 }
 
 #[allow(dead_code)]
-#[cfg(target_os = "windows")]
+#[cfg(all(feature = "nt_comparison", target_os = "windows"))]
 pub fn ms_impl_decompress_size(
     v: &[u8]
 ) -> usize {
@@ -176,7 +176,7 @@ pub fn ms_impl_decompress_size(
 }
 
 #[allow(dead_code)]
-#[cfg(target_os = "windows")]
+#[cfg(all(feature = "nt_comparison", target_os = "windows"))]
 pub fn ms_impl_decompress_buf(
     v: &[u8],
     decompressed_size: usize
@@ -193,7 +193,7 @@ pub fn ms_impl_decompress_buf(
     Ok(buf)
 }
 
-#[cfg(target_os = "windows")]
+#[cfg(all(feature = "nt_comparison", target_os = "windows"))]
 #[test]
 fn test_lzxpress_decompression() {
 	let comp_data : Vec<u8> = vec![

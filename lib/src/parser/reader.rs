@@ -11,7 +11,7 @@ use crate::parser::ese_db::*;
 use crate::parser::jet;
 use crate::parser::decomp::*;
 
-#[cfg(target_os = "windows")]
+#[cfg(all(feature = "nt_comparison", target_os = "windows"))]
 mod gen_db;
 
 mod test;

@@ -6,7 +6,10 @@
     clippy::cast_ptr_alignment
 )]
 
-use ese_parser_lib::process_tables::*;
+mod process_tables;
+mod compare_output;
+
+use crate::process_tables::*;
 use std::env;
 
 fn main() {

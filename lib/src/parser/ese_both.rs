@@ -1,4 +1,4 @@
-#![cfg(target_os = "windows")]
+#![cfg(all(feature = "nt_comparison", target_os = "windows"))]
 #![allow(
     non_upper_case_globals,
     non_snake_case,

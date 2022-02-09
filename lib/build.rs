@@ -1,12 +1,10 @@
-#[cfg(target_os = "windows")]
-
+#[cfg(all(feature = "nt_comparison", target_os = "windows"))]
 extern crate bindgen;
 
 fn main() {
-    #[cfg(target_os = "windows")] {
+    #[cfg(all(feature = "nt_comparison", target_os = "windows"))] {
         use std::env;
         use std::path::PathBuf;
-
         println!("cargo:rerun-if-changed=src/esent/esent.h");
         let bindings = bindgen::Builder::default()
             .header("src/esent/esent.h")
@@ -27,7 +25,6 @@ fn main() {
         bindings
             .write_to_file(out_path.join("esent.rs"))
             .expect("Couldn't write bindings!");
-
         let sources = [
             "cpp/decompress.cpp",
             "cpp/ms/checksum.cxx",

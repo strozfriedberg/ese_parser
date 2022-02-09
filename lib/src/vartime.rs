@@ -198,7 +198,7 @@ pub fn VariantTimeToSystemTime(dateIn: f64, st: &mut SYSTEMTIME) -> bool {
 
 #[test]
 fn test_vartimes() {
-	let t1 : f64 = 44_286.466_608_796_3; 
+	let t1 : f64 = 44_286.466_608_796_3;
 	let mut st : SYSTEMTIME = unsafe { std::mem::MaybeUninit::<SYSTEMTIME>::zeroed().assume_init() };
 	VariantTimeToSystemTime(t1, &mut st);
 	assert_eq!(st.wYear, 2021);

@@ -3,5 +3,5 @@
 #![allow(non_snake_case)]
 
 // generated in build.rs by bindgen from esent.h
-#[cfg(target_os = "windows")]
+#[cfg(all(feature = "nt_comparison", target_os = "windows"))]
 include!(concat!(env!("OUT_DIR"), "/esent.rs"));
