@@ -24,7 +24,12 @@ docker run --rm \
 
 	pushd lib
 	rustc --version
-	cargo test --all-targets
+	cargo test
+	popd
+
+	pushd app
+	cargo build --release
+	cp target/release/ese_parser /builds
 	popd
 
 	pushd python
