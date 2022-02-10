@@ -38,7 +38,7 @@ pub struct EseAPI {
 impl EseAPI {
     fn new(instance_name: &str, pg_size: usize) -> EseAPI {
         EseAPI::set_system_parameter_l(JET_paramDatabasePageSize, pg_size as u64);
-        EseAPI::set_system_parameter_l(JET_paramDisableCallbacks, (true as u64).into());
+        EseAPI::set_system_parameter_l(JET_paramDisableCallbacks, true.into());
         EseAPI::set_system_parameter_sz(JET_paramRecovery, "Off");
 
         let mut instance : JET_INSTANCE = 0;
@@ -190,7 +190,7 @@ pub fn prepare_db_gen(filename: &str, table: &str, pg_size: usize, record_size: 
     dst_path
 }
 
-pub fn clean_db_gen(dst_path: &std::path::PathBuf) {
+pub fn clean_db_gen(dst_path: &Path) {
     fs::remove_file(dst_path.with_extension("jfm")).unwrap();
     fs::remove_file(dst_path).unwrap();
 }

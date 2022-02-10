@@ -26,9 +26,9 @@ pub struct Reader {
 
 impl Reader {
     fn load_db_file_header(&mut self) -> Result<ese_db::FileHeader, SimpleError> {
-        fn calc_crc32(buffer: &Vec<u8>) -> u32 {
+        fn calc_crc32(buffer: &[u8]) -> u32 {
             let mut buf32: Vec<u32> = vec![0;buffer.len()/mem::size_of::<u32>()];
-            LittleEndian::read_u32_into(&buffer, &mut buf32);
+            LittleEndian::read_u32_into(buffer, &mut buf32);
             buf32.iter().skip(1).fold(0x89abcdef, |crc, &val| crc ^ val)
         }
 

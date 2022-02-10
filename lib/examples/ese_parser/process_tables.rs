@@ -125,7 +125,7 @@ fn get_column_val(
             Some(v) => {
                 if ESE_CP::try_from(c.cp) == Ok(ESE_CP::Unicode) {
                     match ese_parser_lib::utils::from_utf16(&v) {
-                        Ok(s) => val = s.to_string(),
+                        Ok(s) => val = s,
                         Err(e) => val = format!("from_utf16 failed: {}", e),
                     }
                 } else {
@@ -248,7 +248,7 @@ fn alloc_jdb(m: &Mode) -> Box<dyn EseDb> {
             return Box::new(EseBoth::init());
         }
     }
-    return alloc_jdb_ese_parser(m);
+    alloc_jdb_ese_parser(m)
 }
 
 #[cfg(any(target_os = "linux", target_os = "macos"))]
