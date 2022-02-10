@@ -32,7 +32,18 @@ C:> ese_parser.exe /help
 [/m mode] [/t table] db path
 where mode one of [EseAPI, EseParser, *Both - default]
 ```
-To ensure that the unit tests for `ese_parser` are run, make sure to run `cargo test --all-targets`.
+There are a couple of ways to run `ese_parser`:
+* Directly with `cargo run`
+  * `cargo run --example ese_parser /m eseparser testdata/decompress_test.edb`
+  * `cargo run --example ese_parser --features nt_comparison /m both testdata/decompress_test.edb`
+  * Note that this will fail because the `nt_comparison` feature was not enabled: `cargo run --example ese_parser /m both testdata/decompress_test.edb`
+* Building and running ese_parser
+  * `cargo build --example ese_parser`
+    * `./target/debug/examples/ese_parser /m eseparser testdata/decompress_test.edb `
+  * `cargo build --example ese_parser --features nt_comparison`
+    * `./target/debug/examples/ese_parser /m both testdata/decompress_test.edb`
+
+To ensure that the unit tests for `ese_parser` are run, make sure to specify `--all-targets` when running cargo test: `cargo test --all-targets`.
 
 ### [EDB format  specification](https://github.com/libyal/libesedb/blob/main/documentation/Extensible%20Storage%20Engine%20(ESE)%20Database%20File%20(EDB)%20format.asciidoc)
 ### [Open Source Microsoft ESE reader](https://github.com/microsoft/Extensible-Storage-Engine)
