@@ -20,11 +20,6 @@ docker run --rm \
 	cp -r /ese_parser .
 	cd ese_parser
 
-	pushd app
-	cargo build --target x86_64-pc-windows-gnu --release
-	cp target/x86_64-pc-windows-gnu/release/ese_parser.exe /builds
-	popd
-
 	pushd docker/
 	unzip python37.zip
 	popd
