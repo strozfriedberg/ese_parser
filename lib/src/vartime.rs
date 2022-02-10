@@ -211,7 +211,7 @@ fn test_vartimes() {
 	assert_eq!(st.wMilliseconds, 0);
 }
 
-#[cfg(target_os = "windows")]
+#[cfg(all(feature = "nt_comparison", target_os = "windows"))]
 #[test]
 fn test_curr_time_with_API() {
 	use std::mem::MaybeUninit;
