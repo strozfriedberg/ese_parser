@@ -129,7 +129,7 @@ pub fn get_date_time_from_filetime(filetime: u64) -> DateTime<Utc> {
 }
 
 pub fn VariantTimeToSystemTime(dateIn: f64, st: &mut SYSTEMTIME) -> bool {
-	if dateIn < 1 as f64 || dateIn <= (DATE_MIN as f64 - 1.0) || dateIn >= (DATE_MAX as f64 + 1.0) {
+	if dateIn < 1_f64 || dateIn <= (DATE_MIN as f64 - 1.0) || dateIn >= (DATE_MAX as f64 + 1.0) {
 		return false;
     }
 
@@ -198,7 +198,7 @@ pub fn VariantTimeToSystemTime(dateIn: f64, st: &mut SYSTEMTIME) -> bool {
 
 #[test]
 fn test_vartimes() {
-	let t1 : f64 = 44_286.466_608_796_3; 
+	let t1 : f64 = 44_286.466_608_796_3;
 	let mut st : SYSTEMTIME = unsafe { std::mem::MaybeUninit::<SYSTEMTIME>::zeroed().assume_init() };
 	VariantTimeToSystemTime(t1, &mut st);
 	assert_eq!(st.wYear, 2021);
@@ -211,7 +211,7 @@ fn test_vartimes() {
 	assert_eq!(st.wMilliseconds, 0);
 }
 
-#[cfg(target_os = "windows")]
+#[cfg(all(feature = "nt_comparison", target_os = "windows"))]
 #[test]
 fn test_curr_time_with_API() {
 	use std::mem::MaybeUninit;

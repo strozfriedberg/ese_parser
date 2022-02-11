@@ -265,7 +265,6 @@ impl PagesOrLocale {
     // }
 }
 
-
 #[repr(packed)]
 #[derive(Copy, Clone, Nom)]
 pub struct DataDefinition

@@ -1,13 +1,13 @@
 #![allow(non_upper_case_globals, non_snake_case, non_camel_case_types, clippy::mut_from_ref, clippy::cast_ptr_alignment, clippy::approx_constant)]
-mod parser;
+pub mod parser;
 
-#[cfg(target_os = "windows")]
+#[cfg(all(feature = "nt_comparison", target_os = "windows"))]
 pub mod esent;
 
 pub mod ese_trait;
 pub mod ese_parser;
 pub mod vartime;
-pub mod process_tables;
+pub mod utils;
 
 #[cfg(test)]
 mod tests {
@@ -253,7 +253,7 @@ mod tests {
             assert_eq!(long_text.cp, ESE_CP::Unicode as u16);
 
             let lt = jdb.get_column(table_id, long_text.id).unwrap().unwrap();
-            let ws = crate::process_tables::from_utf16(&lt).unwrap();
+            let ws = crate::utils::from_utf16(&lt).unwrap();
             for i in 0..ws.len() {
                 let l = ws.chars().nth(i).unwrap();
                 let r = abc.as_bytes()[i % abc.len()] as char;

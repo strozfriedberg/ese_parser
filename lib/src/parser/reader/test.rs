@@ -6,7 +6,7 @@ use crate::ese_parser::EseParser;
 use crate::ese_trait::*;
 use std::path::PathBuf;
 
-#[cfg(target_os = "windows")]
+#[cfg(all(feature = "nt_comparison", target_os = "windows"))]
 use crate::parser::reader::gen_db::*;
 
 pub fn prepare_db(filename: &str, _table: &str, _pg_size: usize, _record_size: usize, _records_cnt: usize) -> PathBuf {
@@ -57,7 +57,7 @@ pub fn caching_test() -> Result<(), SimpleError> {
     Ok(())
 }
 
-#[cfg(target_os = "windows")]
+#[cfg(all(feature = "nt_comparison", target_os = "windows"))]
 #[test]
 pub fn caching_test_windows() -> Result<(), SimpleError> {
     let cache_size: usize = 10;
