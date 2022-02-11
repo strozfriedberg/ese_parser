@@ -1,4 +1,4 @@
-#[cfg(target_os = "windows")]
+#[cfg(all(feature = "nt_comparison", target_os = "windows"))]
 
 use crate::ese_trait::*;
 use crate::esent::esent::*;

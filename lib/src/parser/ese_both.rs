@@ -1,4 +1,4 @@
-#![cfg(target_os = "windows")]
+#![cfg(all(feature = "nt_comparison", target_os = "windows"))]
 #![allow(
     non_upper_case_globals,
     non_snake_case,
@@ -7,7 +7,6 @@
     clippy::cast_ptr_alignment
 )]
 
-//use ese_parser_lib::{ese_parser::*, ese_trait::*, esent::ese_api::*};
 use simple_error::SimpleError;
 use std::cell::RefCell;
 use crate::ese_parser::*;

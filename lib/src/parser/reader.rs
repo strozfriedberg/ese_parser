@@ -11,7 +11,7 @@ use crate::parser::ese_db::*;
 use crate::parser::jet;
 use crate::parser::decomp::*;
 
-#[cfg(target_os = "windows")]
+#[cfg(all(feature = "nt_comparison", target_os = "windows"))]
 mod gen_db;
 
 mod test;
@@ -24,20 +24,11 @@ pub struct Reader {
     page_size: u32,
 }
 
-// Looks like we need this; the zerocopy crate's AsBytes trait doesn't work for ese_db::FileHeader
-/*#[allow(clippy::mut_from_ref)]
-unsafe fn _any_as_slice<'a, U: Sized, T: Sized>(p: &'a &T) -> &'a [U] {
-    slice::from_raw_parts(
-        (*p as *const T) as *const U,
-        mem::size_of::<T>() / mem::size_of::<U>(),
-    )
-}*/
-
 impl Reader {
     fn load_db_file_header(&mut self) -> Result<ese_db::FileHeader, SimpleError> {
-        fn calc_crc32(buffer: &Vec<u8>) -> u32 {
+        fn calc_crc32(buffer: &[u8]) -> u32 {
             let mut buf32: Vec<u32> = vec![0;buffer.len()/mem::size_of::<u32>()];
-            LittleEndian::read_u32_into(&buffer, &mut buf32);
+            LittleEndian::read_u32_into(buffer, &mut buf32);
             buf32.iter().skip(1).fold(0x89abcdef, |crc, &val| crc ^ val)
         }
 
@@ -375,19 +366,20 @@ pub fn load_catalog(
                         "corrupted table detected: column/long definition is going before table"));
                 }
                 table_def.table_catalog_definition = Some(cat_item);
-            } else if cat_item.cat_type == jet::CatalogType::Column as u16 {
+            }
+            else if cat_item.cat_type == jet::CatalogType::Column as u16 {
                 table_def.column_catalog_definition_array.push(cat_item);
-            } else if cat_item.cat_type == jet::CatalogType::Index as u16 {
-                // TODO
-            } else if cat_item.cat_type == jet::CatalogType::LongValue as u16 {
+            }
+            else if cat_item.cat_type == jet::CatalogType::LongValue as u16 {
                 if table_def.long_value_catalog_definition.is_some() {
                     return Err(SimpleError::new("long-value catalog definition duplicate?"));
                 }
                 table_def.long_value_catalog_definition = Some(cat_item);
-            } else if cat_item.cat_type == jet::CatalogType::Callback as u16 {
-                // TODO
-            } else {
-                println!("TODO: Unknown cat_item.cat_type {}", cat_item.cat_type);
+            }
+            // we knowingly ignore Index and Callback Catalog types
+            else if cat_item.cat_type != jet::CatalogType::Index as u16 &&
+                    cat_item.cat_type != jet::CatalogType::Callback as u16 {
+                return Err(SimpleError::new(format!("TODO: Unhandled cat_item.cat_type {}", cat_item.cat_type)));
             }
         }
         prev_page_number = page_number;
@@ -485,13 +477,14 @@ pub fn load_catalog_item(
                     133 | // VarSegMac
                     134 | // ConditionalColumns
                     135 | // TupleLimits
-                    136   // Version
+                    136 | // Version
+                    137  // iMSO_SortID (?)
                         => {
                         // not useful fields
                     },
                     _ => {
                         if data_type_size > 0 {
-                            println!("TODO handle data_type_number {}", data_type_number);
+                            return Err(SimpleError::new(format!("TODO handle data_type_number: {}", data_type_number)));
                         }
                     }
                 }

@@ -1,4 +1,3 @@
-//ese_db
 #![allow(non_camel_case_types)]
 
 use crate::parser::jet;
@@ -265,7 +264,6 @@ impl PagesOrLocale {
         // self.nop_or_cp_or_li
     // }
 }
-
 
 #[repr(packed)]
 #[derive(Copy, Clone, Nom)]
