@@ -1,5 +1,5 @@
 //reader.rs
-use std::{fs, io, io::{Seek, Read}, mem, path::Path, convert::TryInto, cell::RefCell};
+use std::{fs, io, io::{Seek, SeekFrom, Read}, mem, path::Path, convert::TryInto, cell::RefCell};
 use std::collections::{BTreeSet, HashMap, hash_map::Entry};
 use std::array::TryFromSliceError;
 use simple_error::SimpleError;
@@ -16,15 +16,23 @@ mod gen_db;
 
 mod test;
 
-pub struct Reader {
-    file: RefCell<fs::File>,
+pub trait ReadSeek: Read + Seek {
+    fn tell(&mut self) -> io::Result<u64> {
+        self.seek(SeekFrom::Current(0))
+    }
+}
+
+impl<T: Read + Seek> ReadSeek for T {}
+
+pub struct Reader<T: ReadSeek> {
+    file: T, //file: RefCell<fs::File>,
     cache: RefCell<Cache<u32, Vec<u8>>>,
     format_version: jet::FormatVersion,
     format_revision: jet::FormatRevision,
     page_size: u32,
 }
 
-impl Reader {
+impl <T: ReadSeek> Reader<T>  {
     fn load_db_file_header(&mut self) -> Result<ese_db::FileHeader, SimpleError> {
         fn calc_crc32(buffer: &[u8]) -> u32 {
             let mut buf32: Vec<u32> = vec![0;buffer.len()/mem::size_of::<u32>()];
@@ -71,13 +79,13 @@ impl Reader {
         Ok(db_file_header)
     }
 
-    fn new(path: &Path, cache_size: usize) -> Result<Reader, SimpleError> {
-        let f = match fs::File::open(path) {
-            Ok(f) => f,
-            Err(e) => return Err(SimpleError::new(format!("File::open failed: {:?}", e)))
-        };
+    fn new(path_or_file_like: Box<ReadSeek>, cache_size: usize) -> Result<Reader<T>, SimpleError> {
+        // let f = match fs::File::open(path) {
+        //     Ok(f) => f,
+        //     Err(e) => return Err(SimpleError::new(format!("File::open failed: {:?}", e)))
+        // };
         let mut reader = Reader {
-            file: RefCell::new(f),
+            file: RefCell::new(path_or_file_like),
             cache: RefCell::new(Cache::new(cache_size)),
             page_size: 2 * 1024, //just to read header
             format_version: 0,
@@ -145,8 +153,8 @@ impl Reader {
         }
     }
 
-    pub fn load_db(path: &std::path::Path, cache_size: usize) -> Result<Reader, SimpleError> {
-        Reader::new(path, cache_size)
+    pub fn load_db(path_or_file_like: Box<ReadSeek>, cache_size: usize) -> Result<Reader, SimpleError> {
+        Reader::new(path_or_file_like, cache_size)
     }
 
     pub fn page_size(&self) -> u32 {
@@ -205,7 +213,7 @@ macro_rules! impl_read_struct {
 macro_rules! impl_read_struct_buffer {
     ($struct_type: ident) => {
         impl $struct_type {
-            pub(crate) fn read(reader: &crate::parser::reader::Reader, page_offset: u64) -> Result<(Self, Vec<u8>), simple_error::SimpleError> {
+            pub(crate) fn read(reader: &crate::parser::reader::Reader<T>, page_offset: u64) -> Result<(Self, Vec<u8>), simple_error::SimpleError> {
                 let buffer = reader.read_bytes(page_offset, std::mem::size_of::<$struct_type>())?;
                 let (_, ret) = $struct_type::parse_le(&buffer[..]).map_err(|e: nom::Err<nom::error::Error<&[u8]>>| simple_error::SimpleError::new(e.to_string()))?;
                 Ok((ret, buffer))

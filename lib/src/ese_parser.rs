@@ -18,7 +18,7 @@ struct Table {
 
 pub struct EseParser {
 	cache_size: usize,
-	reader: Option<Reader>,
+	reader: Option<Reader<T>>,
 	tables: Vec<RefCell<Table>>,
 }
 
@@ -214,9 +214,18 @@ impl EseParser {
     }
 }
 
+pub trait ReadSeek: Read + Seek {
+    fn tell(&mut self) -> io::Result<u64> {
+        self.seek(SeekFrom::Current(0))
+    }
+}
+
+impl<T: Read + Seek> ReadSeek for T {}
+
+
 impl EseDb for EseParser {
-    fn load(&mut self, dbpath: &str) -> Option<SimpleError> {
-        let reader = match Reader::load_db(&std::path::PathBuf::from(dbpath), self.cache_size) {
+    fn load(&mut self, path_or_file_like: Box<ReadSeek>) -> Option<SimpleError> {
+        let reader = match Reader::load_db(path_or_file_like, self.cache_size) {
             Ok(h) => h,
             Err(e) => {
                 return Some(SimpleError::new(e.to_string()));

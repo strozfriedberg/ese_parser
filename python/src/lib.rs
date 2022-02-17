@@ -54,6 +54,34 @@ fn nanos_to_micros_round_half_even(nanos: u32) -> u32 {
     micros
 }
 
+
+#[derive(Debug)]
+pub enum FileOrFileLike {
+    File(String),
+    FileLike(PyFileLikeObject),
+}
+
+impl FileOrFileLike {
+    pub fn from_pyobject(path_or_file_like: PyObject) -> PyResult<FileOrFileLike> {
+        let gil = Python::acquire_gil();
+        let py = gil.python();
+
+        // is a path
+        if let Ok(string_ref) = path_or_file_like.cast_as::<PyString>(py) {
+            return Ok(FileOrFileLike::File(
+                string_ref.to_string_lossy().to_string(),
+            ));
+        }
+
+        // We only need read + seek
+        match PyFileLikeObject::with_requirements(path_or_file_like, true, false, true) {
+            Ok(f) => Ok(FileOrFileLike::FileLike(f)),
+            Err(e) => Err(e),
+        }
+    }
+}
+
+
 pub fn date_to_pyobject(date: &DateTime<Utc>) -> PyResult<PyObject> {
     let gil = Python::acquire_gil();
     let py = gil.python();
@@ -80,8 +108,22 @@ impl PyEseDb {
         }
     }
 
-    fn load(&mut self, dbpath: &str) -> Option<String> {
-        match self.jdb.load(dbpath) {
+    fn load(&mut self, path_or_file_like: PyObject) -> Option<String> {
+        let file_or_file_like = FileOrFileLike::from_pyobject(path_or_file_like)?;
+
+        let (boxed_read_seek, _) = match file_or_file_like {
+            FileOrFileLike::File(s) => {
+                let file = File::open(s)?;
+                let size = file.metadata()?.len();
+
+                let reader = BufReader::with_capacity(4096, file);
+
+                (Box::new(reader) as Box<dyn ReadSeek + Send>, Some(size))
+            }
+            FileOrFileLike::FileLike(f) => (Box::new(f) as Box<dyn ReadSeek + Send>, None),
+        };
+
+        match self.jdb.load(boxed_read_seek) {
             Some(x) => Some(x.as_str().to_string()),
             None => None
         }
