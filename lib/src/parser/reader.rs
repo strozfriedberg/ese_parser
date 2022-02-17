@@ -194,6 +194,303 @@ impl <T: ReadSeek> Reader<T>  {
             }
         }
     }
+        pub fn load_page_tags(
+        reader: &Reader,
+        db_page: &jet::DbPage,
+    ) -> Result<Vec<PageTag>, SimpleError> {
+        let page_offset = db_page.offset();
+        let mut tags_offset = (page_offset + reader.page_size as u64) as u64;
+        let tags_cnt = db_page.get_available_page_tag();
+        let mut tags = Vec::<PageTag>::with_capacity(tags_cnt);
+
+        for _i in 0..tags_cnt {
+            tags_offset -= 2;
+            let page_tag_offset = read_u16(reader, tags_offset)?;
+            tags_offset -= 2;
+            let page_tag_size = read_u16(reader, tags_offset)?;
+
+            let flags : u8;
+            let offset : u16;
+            let size : u16;
+
+            if reader.format_revision >= ESEDB_FORMAT_REVISION_EXTENDED_PAGE_HEADER && reader.page_size >= 16384 {
+                offset = page_tag_offset & 0x7fff;
+                size   = page_tag_size & 0x7fff;
+
+                // The upper 3-bits of the first 16-bit-value in the leaf page entry contain the page tag flags
+                //if db_page.flags().contains(jet::PageFlags::IS_LEAF)
+                {
+                    let flags_offset = page_offset + db_page.size() as u64 + offset as u64;
+                    let f : u16 = read_u16(reader, flags_offset)?;
+                    flags = (f >> 13) as u8;
+                }
+            } else {
+                flags  = (page_tag_offset >> 13) as u8;
+                offset = page_tag_offset & 0x1fff;
+                size   = page_tag_size & 0x1fff;
+            }
+            tags.push(PageTag{ flags, offset, size } );
+        }
+
+        Ok(tags)
+    }
+
+    pub fn load_root_page_header(
+        reader: &Reader,
+        db_page: &jet::DbPage,
+        page_tag: &PageTag,
+    ) -> Result<RootPageHeader, SimpleError> {
+        let root_page_offset = page_tag.offset(db_page);
+
+        // TODO Seen in format version 0x620 revision 0x14
+        // check format and revision
+        if page_tag.size == 16 {
+            let root_page_header = ese_db::RootPageHeader16::read(reader, root_page_offset)?;
+            return Ok(RootPageHeader::xf(root_page_header));
+        } else if page_tag.size == 25 {
+            let root_page_header = ese_db::RootPageHeader25::read(reader, root_page_offset)?;
+            return Ok(RootPageHeader::x19(root_page_header));
+        }
+
+        Err(SimpleError::new(format!("wrong size of page tag: {:?}", page_tag)))
+    }
+
+    pub fn page_tag_get_branch_child_page_number(
+        reader: &Reader,
+        db_page: &jet::DbPage,
+        page_tag: &PageTag,
+    ) -> Result<u32, SimpleError> {
+        let mut offset = page_tag.offset(db_page);
+
+        if page_tag.flags().intersects(jet::PageTagFlags::FLAG_HAS_COMMON_KEY_SIZE) { // Why is this intersect vs contains?
+            offset += 2;
+        }
+        let local_page_key_size : u16 = read_u16(reader, offset)?;
+        offset += 2;
+        offset += local_page_key_size as u64;
+
+        let child_page_number : u32 = read_u32(reader, offset)?;
+        Ok(child_page_number)
+    }
+
+    pub fn load_catalog(
+        reader: &Reader,
+    ) -> Result<Vec<jet::TableDefinition>, SimpleError> {
+        let db_page = jet::DbPage::new(reader, jet::FixedPageNumber::Catalog as u32)?;
+        let pg_tags = &db_page.page_tags;
+
+
+        let is_root = db_page.flags().contains(jet::PageFlags::IS_ROOT);
+        if is_root {
+            let _root_page_header = load_root_page_header(reader, &db_page, &pg_tags[0])?;
+        }
+
+        let mut res : Vec<jet::TableDefinition> = vec![];
+        let mut table_def : jet::TableDefinition = jet::TableDefinition { table_catalog_definition: None,
+            column_catalog_definition_array: vec![], long_value_catalog_definition: None };
+
+        let mut page_number;
+        if db_page.flags().contains(jet::PageFlags::IS_PARENT) {
+            page_number = page_tag_get_branch_child_page_number(reader, &db_page, &pg_tags[1])?;
+        } else if db_page.flags().contains(jet::PageFlags::IS_LEAF) {
+                page_number = db_page.page_number;
+            } else {
+                return Err(SimpleError::new(format!("pageno {}: neither IS_PARENT nor IS_LEAF is present in {:?}",
+                                                    db_page.page_number, db_page.flags())));
+        }
+        let mut prev_page_number = db_page.page_number;
+
+        while page_number != 0 {
+            let db_page = jet::DbPage::new(reader, page_number)?;
+            let pg_tags = &db_page.page_tags;
+
+            if db_page.prev_page() != 0 && prev_page_number != db_page.prev_page() {
+                return Err(SimpleError::new(format!("pageno {}: wrong previous_page number {}, expected {}",
+                    db_page.page_number, db_page.prev_page(), prev_page_number)));
+            }
+            if !db_page.flags().contains(jet::PageFlags::IS_LEAF) {
+                return Err(SimpleError::new(format!("pageno {}: IS_LEAF flag should be present",
+                    db_page.page_number)));
+            }
+
+            for i in pg_tags.iter().skip(1) {
+                if jet::PageTagFlags::from_bits_truncate(i.flags).intersects(jet::PageTagFlags::FLAG_IS_DEFUNCT) {
+                    continue;
+                }
+                let cat_item = load_catalog_item(reader, &db_page, i)?;
+                if cat_item.cat_type == jet::CatalogType::Table as u16 {
+                    if table_def.table_catalog_definition.is_some() {
+                        res.push(table_def);
+                        table_def = jet::TableDefinition { table_catalog_definition: None,
+                            column_catalog_definition_array: vec![], long_value_catalog_definition: None };
+                    } else if !table_def.column_catalog_definition_array.is_empty() ||
+                        table_def.long_value_catalog_definition.is_some() {
+                        return Err(SimpleError::new(
+                            "corrupted table detected: column/long definition is going before table"));
+                    }
+                    table_def.table_catalog_definition = Some(cat_item);
+                }
+                else if cat_item.cat_type == jet::CatalogType::Column as u16 {
+                    table_def.column_catalog_definition_array.push(cat_item);
+                }
+                else if cat_item.cat_type == jet::CatalogType::LongValue as u16 {
+                    if table_def.long_value_catalog_definition.is_some() {
+                        return Err(SimpleError::new("long-value catalog definition duplicate?"));
+                    }
+                    table_def.long_value_catalog_definition = Some(cat_item);
+                }
+                // we knowingly ignore Index and Callback Catalog types
+                else if cat_item.cat_type != jet::CatalogType::Index as u16 &&
+                        cat_item.cat_type != jet::CatalogType::Callback as u16 {
+                    return Err(SimpleError::new(format!("TODO: Unhandled cat_item.cat_type {}", cat_item.cat_type)));
+                }
+            }
+            prev_page_number = page_number;
+            page_number = db_page.next_page();
+        }
+
+        if table_def.table_catalog_definition.is_some() {
+            res.push(table_def);
+        }
+
+        Ok(res)
+    }
+
+    pub fn load_catalog_item(
+        reader: &Reader,
+        db_page: &jet::DbPage,
+        page_tag: &PageTag,
+    ) -> Result<jet::CatalogDefinition, SimpleError> {
+        let mut offset = page_tag.offset(db_page);
+
+        let mut first_word_read = false;
+        if page_tag.flags().intersects(jet::PageTagFlags::FLAG_HAS_COMMON_KEY_SIZE) {
+            first_word_read = true;
+            offset += 2;
+        }
+        let mut local_page_key_size : u16 = read_u16(reader, offset)?;
+        if !first_word_read {
+            local_page_key_size = clean_pgtag_flag(reader, db_page, local_page_key_size);
+        }
+        offset += 2;
+        offset += local_page_key_size as u64;
+
+        let offset_ddh = offset;
+        let ddh = ese_db::DataDefinitionHeader::read(reader, offset_ddh)?;
+        offset += mem::size_of::<ese_db::DataDefinitionHeader>() as u64;
+
+        let number_of_variable_size_data_types : u32;
+        if ddh.last_variable_size_data_type > 127 {
+            number_of_variable_size_data_types = ddh.last_variable_size_data_type as u32 - 127;
+        } else {
+            number_of_variable_size_data_types = 0;
+        }
+
+        let mut cat_def = jet::CatalogDefinition::default();
+        let data_def = ese_db::DataDefinition::read(reader, offset)?;
+
+        cat_def.father_data_page_object_identifier = data_def.father_data_page_object_identifier;
+        cat_def.cat_type = data_def.data_type;
+        cat_def.identifier = data_def.identifier;
+        if cat_def.cat_type == jet::CatalogType::Column as u16 {
+            cat_def.column_type = data_def.coltyp_or_fdp.column_type();
+        } else {
+            cat_def.father_data_page_number = data_def.coltyp_or_fdp.father_data_page_number();
+        }
+        cat_def.size = data_def.space_usage;
+        cat_def.flags = data_def.flags;
+        if cat_def.cat_type == jet::CatalogType::Column as u16 {
+            cat_def.codepage = data_def.pages_or_locale.codepage();
+        }
+        if ddh.last_fixed_size_data_type >= 10 {
+            cat_def.lcmap_flags = data_def.lc_map_flags;
+        }
+
+        if number_of_variable_size_data_types > 0 {
+            let mut variable_size_data_types_offset = ddh.variable_size_data_types_offset as u32;
+            let variable_size_data_type_value_data_offset = variable_size_data_types_offset + (number_of_variable_size_data_types * 2);
+            let mut previous_variable_size_data_type_size : u16 = 0;
+            let mut data_type_number : u16 = 128;
+            for _ in 0..number_of_variable_size_data_types {
+                offset += ddh.variable_size_data_types_offset as u64;
+                let variable_size_data_type_size : u16 = read_u16(reader, offset_ddh + variable_size_data_types_offset as u64)?;
+                variable_size_data_types_offset += 2;
+
+                let data_type_size : u16;
+                if variable_size_data_type_size & 0x8000 != 0 {
+                    data_type_size = 0;
+                } else {
+                    data_type_size = variable_size_data_type_size - previous_variable_size_data_type_size;
+                }
+                if data_type_size > 0 {
+                    match data_type_number {
+                        128 => {
+                            let offset_dtn = offset_ddh + variable_size_data_type_value_data_offset as u64 + previous_variable_size_data_type_size as u64;
+                            cat_def.name = reader.read_string(offset_dtn, data_type_size as usize)?;
+                        },
+                        130 => {
+                            // TODO template_name
+                        },
+                        131 => {
+                            // TODO default_value
+                            let offset_def = offset_ddh + variable_size_data_type_value_data_offset as u64 + previous_variable_size_data_type_size as u64;
+                            cat_def.default_value = reader.read_bytes(offset_def, data_type_size as usize)?;
+                        },
+                        132 | // KeyFldIDs
+                        133 | // VarSegMac
+                        134 | // ConditionalColumns
+                        135 | // TupleLimits
+                        136 | // Version
+                        137  // iMSO_SortID (?)
+                            => {
+                            // not useful fields
+                        },
+                        _ => {
+                            if data_type_size > 0 {
+                                return Err(SimpleError::new(format!("TODO handle data_type_number: {}", data_type_number)));
+                            }
+                        }
+                    }
+                    previous_variable_size_data_type_size = variable_size_data_type_size;
+                }
+                data_type_number += 1;
+            }
+        }
+
+        Ok(cat_def)
+    }
+
+    pub fn clean_pgtag_flag(reader: &Reader, db_page: &jet::DbPage, data: u16) -> u16 {
+        // The upper 3-bits of the first 16-bit-value in the leaf page entry contain the page tag flags
+        if reader.format_revision >= ESEDB_FORMAT_REVISION_EXTENDED_PAGE_HEADER
+            && reader.page_size >= 16384
+            && db_page.flags().contains(jet::PageFlags::IS_LEAF)
+        {
+            return data & 0x1FFF;
+        }
+        data
+    }
+
+    pub fn find_first_leaf_page(reader: &Reader, mut page_number: u32)
+        -> Result<u32, SimpleError> {
+        let mut visited_pages : BTreeSet<u32> = BTreeSet::new();
+        loop {
+            if visited_pages.contains(&page_number) {
+                return Err(SimpleError::new(format!("Child page loop detected at page number {}, visited pages: {:?}",
+                    page_number, visited_pages)));
+            }
+
+            let db_page = jet::DbPage::new(reader, page_number)?;
+            if db_page.flags().contains(jet::PageFlags::IS_LEAF) {
+                return Ok(page_number);
+            } else {
+                visited_pages.insert(page_number);
+            }
+
+            let pg_tags = &db_page.page_tags;
+            page_number = page_tag_get_branch_child_page_number(reader, &db_page, &pg_tags[1])?;
+        }
+    }
 }
 
 #[macro_export]
@@ -238,304 +535,6 @@ macro_rules! impl_read_primitive {
 impl_read_primitive!(u8);
 impl_read_primitive!(u16);
 impl_read_primitive!(u32);
-
-pub fn load_page_tags(
-    reader: &Reader,
-    db_page: &jet::DbPage,
-) -> Result<Vec<PageTag>, SimpleError> {
-    let page_offset = db_page.offset();
-    let mut tags_offset = (page_offset + reader.page_size as u64) as u64;
-    let tags_cnt = db_page.get_available_page_tag();
-    let mut tags = Vec::<PageTag>::with_capacity(tags_cnt);
-
-    for _i in 0..tags_cnt {
-        tags_offset -= 2;
-        let page_tag_offset = read_u16(reader, tags_offset)?;
-        tags_offset -= 2;
-        let page_tag_size = read_u16(reader, tags_offset)?;
-
-        let flags : u8;
-		let offset : u16;
-        let size : u16;
-
-        if reader.format_revision >= ESEDB_FORMAT_REVISION_EXTENDED_PAGE_HEADER && reader.page_size >= 16384 {
-			offset = page_tag_offset & 0x7fff;
-            size   = page_tag_size & 0x7fff;
-
-            // The upper 3-bits of the first 16-bit-value in the leaf page entry contain the page tag flags
-            //if db_page.flags().contains(jet::PageFlags::IS_LEAF)
-            {
-                let flags_offset = page_offset + db_page.size() as u64 + offset as u64;
-                let f : u16 = read_u16(reader, flags_offset)?;
-                flags = (f >> 13) as u8;
-            }
-        } else {
-            flags  = (page_tag_offset >> 13) as u8;
-            offset = page_tag_offset & 0x1fff;
-            size   = page_tag_size & 0x1fff;
-        }
-        tags.push(PageTag{ flags, offset, size } );
-    }
-
-    Ok(tags)
-}
-
-pub fn load_root_page_header(
-    reader: &Reader,
-    db_page: &jet::DbPage,
-    page_tag: &PageTag,
-) -> Result<RootPageHeader, SimpleError> {
-    let root_page_offset = page_tag.offset(db_page);
-
-    // TODO Seen in format version 0x620 revision 0x14
-    // check format and revision
-    if page_tag.size == 16 {
-        let root_page_header = ese_db::RootPageHeader16::read(reader, root_page_offset)?;
-        return Ok(RootPageHeader::xf(root_page_header));
-    } else if page_tag.size == 25 {
-        let root_page_header = ese_db::RootPageHeader25::read(reader, root_page_offset)?;
-        return Ok(RootPageHeader::x19(root_page_header));
-    }
-
-    Err(SimpleError::new(format!("wrong size of page tag: {:?}", page_tag)))
-}
-
-pub fn page_tag_get_branch_child_page_number(
-    reader: &Reader,
-    db_page: &jet::DbPage,
-    page_tag: &PageTag,
-) -> Result<u32, SimpleError> {
-    let mut offset = page_tag.offset(db_page);
-
-    if page_tag.flags().intersects(jet::PageTagFlags::FLAG_HAS_COMMON_KEY_SIZE) { // Why is this intersect vs contains?
-        offset += 2;
-    }
-    let local_page_key_size : u16 = read_u16(reader, offset)?;
-    offset += 2;
-    offset += local_page_key_size as u64;
-
-    let child_page_number : u32 = read_u32(reader, offset)?;
-    Ok(child_page_number)
-}
-
-pub fn load_catalog(
-    reader: &Reader,
-) -> Result<Vec<jet::TableDefinition>, SimpleError> {
-    let db_page = jet::DbPage::new(reader, jet::FixedPageNumber::Catalog as u32)?;
-    let pg_tags = &db_page.page_tags;
-
-
-    let is_root = db_page.flags().contains(jet::PageFlags::IS_ROOT);
-    if is_root {
-        let _root_page_header = load_root_page_header(reader, &db_page, &pg_tags[0])?;
-    }
-
-    let mut res : Vec<jet::TableDefinition> = vec![];
-    let mut table_def : jet::TableDefinition = jet::TableDefinition { table_catalog_definition: None,
-        column_catalog_definition_array: vec![], long_value_catalog_definition: None };
-
-    let mut page_number;
-    if db_page.flags().contains(jet::PageFlags::IS_PARENT) {
-        page_number = page_tag_get_branch_child_page_number(reader, &db_page, &pg_tags[1])?;
-    } else if db_page.flags().contains(jet::PageFlags::IS_LEAF) {
-            page_number = db_page.page_number;
-        } else {
-            return Err(SimpleError::new(format!("pageno {}: neither IS_PARENT nor IS_LEAF is present in {:?}",
-                                                db_page.page_number, db_page.flags())));
-    }
-    let mut prev_page_number = db_page.page_number;
-
-    while page_number != 0 {
-        let db_page = jet::DbPage::new(reader, page_number)?;
-        let pg_tags = &db_page.page_tags;
-
-        if db_page.prev_page() != 0 && prev_page_number != db_page.prev_page() {
-            return Err(SimpleError::new(format!("pageno {}: wrong previous_page number {}, expected {}",
-                db_page.page_number, db_page.prev_page(), prev_page_number)));
-        }
-        if !db_page.flags().contains(jet::PageFlags::IS_LEAF) {
-            return Err(SimpleError::new(format!("pageno {}: IS_LEAF flag should be present",
-                db_page.page_number)));
-        }
-
-        for i in pg_tags.iter().skip(1) {
-            if jet::PageTagFlags::from_bits_truncate(i.flags).intersects(jet::PageTagFlags::FLAG_IS_DEFUNCT) {
-                continue;
-            }
-            let cat_item = load_catalog_item(reader, &db_page, i)?;
-            if cat_item.cat_type == jet::CatalogType::Table as u16 {
-                if table_def.table_catalog_definition.is_some() {
-                    res.push(table_def);
-                    table_def = jet::TableDefinition { table_catalog_definition: None,
-                        column_catalog_definition_array: vec![], long_value_catalog_definition: None };
-                } else if !table_def.column_catalog_definition_array.is_empty() ||
-                    table_def.long_value_catalog_definition.is_some() {
-                    return Err(SimpleError::new(
-                        "corrupted table detected: column/long definition is going before table"));
-                }
-                table_def.table_catalog_definition = Some(cat_item);
-            }
-            else if cat_item.cat_type == jet::CatalogType::Column as u16 {
-                table_def.column_catalog_definition_array.push(cat_item);
-            }
-            else if cat_item.cat_type == jet::CatalogType::LongValue as u16 {
-                if table_def.long_value_catalog_definition.is_some() {
-                    return Err(SimpleError::new("long-value catalog definition duplicate?"));
-                }
-                table_def.long_value_catalog_definition = Some(cat_item);
-            }
-            // we knowingly ignore Index and Callback Catalog types
-            else if cat_item.cat_type != jet::CatalogType::Index as u16 &&
-                    cat_item.cat_type != jet::CatalogType::Callback as u16 {
-                return Err(SimpleError::new(format!("TODO: Unhandled cat_item.cat_type {}", cat_item.cat_type)));
-            }
-        }
-        prev_page_number = page_number;
-        page_number = db_page.next_page();
-    }
-
-    if table_def.table_catalog_definition.is_some() {
-        res.push(table_def);
-    }
-
-    Ok(res)
-}
-
-pub fn load_catalog_item(
-    reader: &Reader,
-    db_page: &jet::DbPage,
-    page_tag: &PageTag,
-) -> Result<jet::CatalogDefinition, SimpleError> {
-    let mut offset = page_tag.offset(db_page);
-
-    let mut first_word_read = false;
-    if page_tag.flags().intersects(jet::PageTagFlags::FLAG_HAS_COMMON_KEY_SIZE) {
-        first_word_read = true;
-        offset += 2;
-    }
-    let mut local_page_key_size : u16 = read_u16(reader, offset)?;
-    if !first_word_read {
-        local_page_key_size = clean_pgtag_flag(reader, db_page, local_page_key_size);
-    }
-    offset += 2;
-    offset += local_page_key_size as u64;
-
-    let offset_ddh = offset;
-    let ddh = ese_db::DataDefinitionHeader::read(reader, offset_ddh)?;
-    offset += mem::size_of::<ese_db::DataDefinitionHeader>() as u64;
-
-    let number_of_variable_size_data_types : u32;
-    if ddh.last_variable_size_data_type > 127 {
-        number_of_variable_size_data_types = ddh.last_variable_size_data_type as u32 - 127;
-    } else {
-        number_of_variable_size_data_types = 0;
-    }
-
-    let mut cat_def = jet::CatalogDefinition::default();
-    let data_def = ese_db::DataDefinition::read(reader, offset)?;
-
-    cat_def.father_data_page_object_identifier = data_def.father_data_page_object_identifier;
-    cat_def.cat_type = data_def.data_type;
-    cat_def.identifier = data_def.identifier;
-    if cat_def.cat_type == jet::CatalogType::Column as u16 {
-        cat_def.column_type = data_def.coltyp_or_fdp.column_type();
-    } else {
-        cat_def.father_data_page_number = data_def.coltyp_or_fdp.father_data_page_number();
-    }
-    cat_def.size = data_def.space_usage;
-    cat_def.flags = data_def.flags;
-    if cat_def.cat_type == jet::CatalogType::Column as u16 {
-        cat_def.codepage = data_def.pages_or_locale.codepage();
-    }
-    if ddh.last_fixed_size_data_type >= 10 {
-        cat_def.lcmap_flags = data_def.lc_map_flags;
-    }
-
-    if number_of_variable_size_data_types > 0 {
-        let mut variable_size_data_types_offset = ddh.variable_size_data_types_offset as u32;
-        let variable_size_data_type_value_data_offset = variable_size_data_types_offset + (number_of_variable_size_data_types * 2);
-        let mut previous_variable_size_data_type_size : u16 = 0;
-        let mut data_type_number : u16 = 128;
-        for _ in 0..number_of_variable_size_data_types {
-            offset += ddh.variable_size_data_types_offset as u64;
-            let variable_size_data_type_size : u16 = read_u16(reader, offset_ddh + variable_size_data_types_offset as u64)?;
-            variable_size_data_types_offset += 2;
-
-            let data_type_size : u16;
-            if variable_size_data_type_size & 0x8000 != 0 {
-                data_type_size = 0;
-            } else {
-                data_type_size = variable_size_data_type_size - previous_variable_size_data_type_size;
-            }
-            if data_type_size > 0 {
-                match data_type_number {
-                    128 => {
-                        let offset_dtn = offset_ddh + variable_size_data_type_value_data_offset as u64 + previous_variable_size_data_type_size as u64;
-                        cat_def.name = reader.read_string(offset_dtn, data_type_size as usize)?;
-                    },
-                    130 => {
-                        // TODO template_name
-                    },
-                    131 => {
-                        // TODO default_value
-                        let offset_def = offset_ddh + variable_size_data_type_value_data_offset as u64 + previous_variable_size_data_type_size as u64;
-                        cat_def.default_value = reader.read_bytes(offset_def, data_type_size as usize)?;
-                    },
-                    132 | // KeyFldIDs
-                    133 | // VarSegMac
-                    134 | // ConditionalColumns
-                    135 | // TupleLimits
-                    136 | // Version
-                    137  // iMSO_SortID (?)
-                        => {
-                        // not useful fields
-                    },
-                    _ => {
-                        if data_type_size > 0 {
-                            return Err(SimpleError::new(format!("TODO handle data_type_number: {}", data_type_number)));
-                        }
-                    }
-                }
-                previous_variable_size_data_type_size = variable_size_data_type_size;
-			}
-			data_type_number += 1;
-        }
-    }
-
-    Ok(cat_def)
-}
-
-pub fn clean_pgtag_flag(reader: &Reader, db_page: &jet::DbPage, data: u16) -> u16 {
-    // The upper 3-bits of the first 16-bit-value in the leaf page entry contain the page tag flags
-    if reader.format_revision >= ESEDB_FORMAT_REVISION_EXTENDED_PAGE_HEADER
-        && reader.page_size >= 16384
-        && db_page.flags().contains(jet::PageFlags::IS_LEAF)
-    {
-        return data & 0x1FFF;
-    }
-    data
-}
-
-pub fn find_first_leaf_page(reader: &Reader, mut page_number: u32)
-    -> Result<u32, SimpleError> {
-    let mut visited_pages : BTreeSet<u32> = BTreeSet::new();
-    loop {
-        if visited_pages.contains(&page_number) {
-            return Err(SimpleError::new(format!("Child page loop detected at page number {}, visited pages: {:?}",
-                page_number, visited_pages)));
-        }
-
-        let db_page = jet::DbPage::new(reader, page_number)?;
-        if db_page.flags().contains(jet::PageFlags::IS_LEAF) {
-            return Ok(page_number);
-        } else {
-            visited_pages.insert(page_number);
-        }
-
-        let pg_tags = &db_page.page_tags;
-        page_number = page_tag_get_branch_child_page_number(reader, &db_page, &pg_tags[1])?;
-    }
-}
 
 #[derive(Copy, Clone, Debug, Default)]
 pub struct TaggedDataState {
