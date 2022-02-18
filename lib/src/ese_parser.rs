@@ -1,4 +1,3 @@
-
 use crate::parser::*;
 use crate::ese_trait::*;
 use crate::parser::reader::*;
@@ -7,6 +6,9 @@ use simple_error::SimpleError;
 use std::cell::{RefCell, RefMut};
 use std::collections::HashMap;
 use std::cmp::Ordering;
+use std::path::Path;
+use std::fs::File;
+use std::io::BufReader;
 
 struct Table {
 	cat: Box<jet::TableDefinition>,
@@ -14,12 +16,6 @@ struct Table {
 	current_page: Option<jet::DbPage>,
 	page_tag_index: usize,
 	lls: RefCell<LastLoadState>,
-}
-
-pub struct EseParser {
-	cache_size: usize,
-	reader: Option<Reader<T>>,
-	tables: Vec<RefCell<Table>>,
 }
 
 impl Table {
@@ -37,7 +33,53 @@ impl Table {
 	}
 }
 
-impl EseParser {
+pub struct EseParser<R: ReadSeek> {
+	reader: Reader<R>,
+	tables: Vec<RefCell<Table>>,
+}
+
+impl EseParser<BufReader<File>> {
+    /// Instantiates an instance of the parser from a file path.
+    /// Does not mutate the file contents in any way.
+    /// Useful for testing and sample programs.
+    pub fn load_from_path(cache_size: usize, filename: impl AsRef<Path>) -> Result<Self, SimpleError> {
+        let f = filename.as_ref();
+        let file = File::open(f).unwrap();
+        let buf_reader = BufReader::with_capacity(4096, file);
+
+        Self::load(cache_size, buf_reader)
+    }
+}
+
+impl<R: ReadSeek> EseParser<R> {
+     // reserve room for cache_size recent entries, and cache_size frequent entries
+    pub fn load(cache_size: usize, read_seek: R) -> Result<Self, SimpleError> {
+        let reader =  Reader::load_db(read_seek, cache_size)?;
+        let mut cat = reader.load_catalog()?;
+
+        let mut tables =  vec![];
+        for i in cat.drain(0..) {
+            if i.table_catalog_definition.is_some() {
+                let itrnl =
+                    Table {
+                        cat: Box::new(i),
+                        lv_tags: HashMap::new(),
+                        current_page: None,
+                        page_tag_index: 0,
+                        lls: RefCell::new( LastLoadState { ..Default::default() })
+                    };
+                tables.push(RefCell::new(itrnl));
+            }
+        }
+
+        Ok(
+            EseParser {
+                reader,
+                tables
+            }
+        )
+    }
+
     fn get_table_by_name(&self, table: &str, index: &mut usize) -> Result<RefMut<Table>, SimpleError> {
         for i in 0..self.tables.len() {
             let n = self.tables[i].borrow_mut();
@@ -51,11 +93,8 @@ impl EseParser {
         Err(SimpleError::new(format!("can't find table name {}", table)))
     }
 
-    fn get_reader(&self) -> Result<&Reader, SimpleError> {
-        match &self.reader {
-            Some(reader) => Ok(reader),
-            None => Err(SimpleError::new("Reader is uninit, database opened?")),
-        }
+    fn get_reader(&self) -> Result<&Reader<R>, SimpleError> {
+        Ok(&self.reader)
     }
 
     fn get_table_by_id(&self, table_id: u64) -> Result<RefMut<Table>, SimpleError> {
@@ -74,7 +113,7 @@ impl EseParser {
         }
 		table.review_last_load_state(column);
 		let mut lls = table.lls.borrow_mut();
-        match load_data(&mut lls, reader, &table.cat, &table.lv_tags, table.page(), table.page_tag_index, column,
+        match reader.load_data(&mut lls, &table.cat, &table.lv_tags, table.page(), table.page_tag_index, column,
 			mv_index as usize) {
 			Ok(r) => {
 				lls.last_column = column;
@@ -90,7 +129,7 @@ impl EseParser {
 
         let mut i = t.page_tag_index + 1;
         if crow == ESE_MoveFirst {
-            let first_leaf_page = find_first_leaf_page(reader,
+            let first_leaf_page = reader.find_first_leaf_page(
                 t.cat.table_catalog_definition.as_ref().expect("First leaf page failed").father_data_page_number)?;
             if t.current_page.is_none() || t.page().page_number != first_leaf_page {
                 let page = jet::DbPage::new(reader, first_leaf_page)?;
@@ -207,45 +246,9 @@ impl EseParser {
             None => Ok(None)
         }
     }
-
-    // reserve room for cache_size recent entries, and cache_size frequent entries
-    pub fn init(cache_size: usize) -> EseParser {
-        EseParser { cache_size, reader: None, tables: vec![] }
-    }
 }
 
-pub trait ReadSeek: Read + Seek {
-    fn tell(&mut self) -> io::Result<u64> {
-        self.seek(SeekFrom::Current(0))
-    }
-}
-
-impl<T: Read + Seek> ReadSeek for T {}
-
-
-impl EseDb for EseParser {
-    fn load(&mut self, path_or_file_like: Box<ReadSeek>) -> Option<SimpleError> {
-        let reader = match Reader::load_db(path_or_file_like, self.cache_size) {
-            Ok(h) => h,
-            Err(e) => {
-                return Some(SimpleError::new(e.to_string()));
-            }
-        };
-        let mut cat = match load_catalog(&reader) {
-            Ok(c) => c,
-            Err(e) => return Some(e)
-        };
-        self.reader = Some(reader);
-        for i in cat.drain(0..) {
-            if i.table_catalog_definition.is_some() {
-                let itrnl = Table { cat: Box::new(i), lv_tags: HashMap::new(), current_page: None, page_tag_index: 0,
-					lls: RefCell::new( LastLoadState { ..Default::default() }) };
-                self.tables.push(RefCell::new(itrnl));
-            }
-        }
-        None
-    }
-
+impl<R: ReadSeek> EseDb for EseParser<R> {
     fn error_to_string(&self, err: i32) -> String {
         format!("EseParser: error {}", err)
     }
@@ -265,8 +268,7 @@ impl EseDb for EseParser {
             let mut t = self.get_table_by_name(table, &mut index)?;
             if let Some(long_value_catalog_definition) = &t.cat.long_value_catalog_definition {
                 let reader = self.get_reader()?;
-                t.lv_tags = load_lv_metadata(reader,
-                    long_value_catalog_definition.father_data_page_number)?;
+                t.lv_tags = reader.load_lv_metadata(long_value_catalog_definition.father_data_page_number)?;
             }
 
             // if t.cat.long_value_catalog_definition.is_some() {

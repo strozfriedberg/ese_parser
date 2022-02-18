@@ -1,20 +1,17 @@
 #![allow(non_upper_case_globals)]
 #![allow(non_snake_case)]
 
-use chrono::{DateTime, Datelike, Timelike, Utc};
+mod utils;
+
 use pyo3::prelude::*;
 use pyo3::exceptions;
-use pyo3::types::PyDateTime;
 
 use ese_parser_lib::{ese_trait::*, ese_parser::*, ese_parser::FromBytes};
-use widestring::U16String;
 use std::convert::TryFrom;
-use std::cmp::Ordering;
+use std::fs::File;
+use std::io::BufReader;
+use crate::utils::*;
 
-#[pyclass]
-pub struct PyEseDb {
-    jdb : EseParser,
-}
 
 #[pyclass]
 pub struct PyColumnInfo {
@@ -30,85 +27,44 @@ pub struct PyColumnInfo {
     pub cp: u16
 }
 
-fn bytes_to_string(v: Vec<u8>, wide: bool) -> Option<String> {
-    if wide {
-        let t = v.as_slice();
-        unsafe {
-            let (_, v16, _) = t.align_to::<u16>();
-            Some(U16String::from_ptr(v16.as_ptr(), v16.len()).to_string_lossy())
-        }
-    } else {
-        std::str::from_utf8(&v).map(|s| s.to_string()).ok()
-    }
+#[pyclass]
+pub struct PyEseDb {
+    //jdb : EseParser,
+    jdb: EseParser<Box<dyn ReadSeek + Send>>,
 }
 
-fn nanos_to_micros_round_half_even(nanos: u32) -> u32 {
-    let nanos_e7 = (nanos % 1000) / 100;
-    let nanos_e6 = (nanos % 10000) / 1000;
-    let mut micros = (nanos / 10000) * 10;
-    match nanos_e7.cmp(&5) {
-        Ordering::Greater => micros += nanos_e6 + 1,
-        Ordering::Less => micros += nanos_e6,
-        Ordering::Equal => micros += nanos_e6 + (nanos_e6 % 2),
-    }
-    micros
-}
-
-
-#[derive(Debug)]
-pub enum FileOrFileLike {
-    File(String),
-    FileLike(PyFileLikeObject),
-}
-
-impl FileOrFileLike {
-    pub fn from_pyobject(path_or_file_like: PyObject) -> PyResult<FileOrFileLike> {
-        let gil = Python::acquire_gil();
-        let py = gil.python();
-
-        // is a path
-        if let Ok(string_ref) = path_or_file_like.cast_as::<PyString>(py) {
-            return Ok(FileOrFileLike::File(
-                string_ref.to_string_lossy().to_string(),
-            ));
-        }
-
-        // We only need read + seek
-        match PyFileLikeObject::with_requirements(path_or_file_like, true, false, true) {
-            Ok(f) => Ok(FileOrFileLike::FileLike(f)),
-            Err(e) => Err(e),
-        }
-    }
-}
-
-
-pub fn date_to_pyobject(date: &DateTime<Utc>) -> PyResult<PyObject> {
-    let gil = Python::acquire_gil();
-    let py = gil.python();
-    PyDateTime::new(
-        py,
-        date.year(),
-        date.month() as u8,
-        date.day() as u8,
-        date.hour() as u8,
-        date.minute() as u8,
-        date.second() as u8,
-        nanos_to_micros_round_half_even(date.timestamp_subsec_nanos()),
-        None,
-    )
-    .map(|dt| dt.to_object(py))
-}
 
 #[pymethods]
 impl PyEseDb {
     #[new]
+    fn new(path_or_file_like: PyObject) -> PyResult<Self> {
+        let file_or_file_like = FileOrFileLike::from_pyobject(path_or_file_like)?;
+
+        let boxed_read_seek = match file_or_file_like {
+            FileOrFileLike::File(s) => {
+                let file = File::open(s)?;
+                let reader = BufReader::with_capacity(4096, file);
+                Box::new(reader) as Box<dyn ReadSeek + Send>
+            }
+            FileOrFileLike::FileLike(f) => Box::new(f) as Box<dyn ReadSeek + Send>,
+        };
+
+        let parser = EseParser::load(10, boxed_read_seek).unwrap(); // fix this unwrap!
+           // .map_err(|e| PyErr::new::<pyo3::exceptions::RuntimeError, _>(format!("{:?}", e)))?;
+
+        Ok(Self {
+            jdb: parser,
+        })
+    }
+
+    /*#[new]
     fn new() -> Self {
         PyEseDb {
             jdb : EseParser::init(10)
         }
-    }
+    }*/
 
-    fn load(&mut self, path_or_file_like: PyObject) -> Option<String> {
+    /*fn load(path_or_file_like: PyObject) -> PyResult<String> {
         let file_or_file_like = FileOrFileLike::from_pyobject(path_or_file_like)?;
 
         let (boxed_read_seek, _) = match file_or_file_like {
@@ -123,11 +79,8 @@ impl PyEseDb {
             FileOrFileLike::FileLike(f) => (Box::new(f) as Box<dyn ReadSeek + Send>, None),
         };
 
-        match self.jdb.load(boxed_read_seek) {
-            Some(x) => Some(x.as_str().to_string()),
-            None => None
-        }
-    }
+        EseParser::load(10, boxed_read_seek)
+    }*/
 
     fn open_table(&self, table: &str) -> PyResult<u64> {
         match self.jdb.open_table(table) {
@@ -274,7 +227,7 @@ impl PyEseDb {
                         match ov {
                             Some(v) => {
                                 let unicode = ESE_CP::try_from(column.cp) == Ok(ESE_CP::Unicode);
-                                return Ok(bytes_to_string(v, unicode).map(|s| s.to_object(py)));
+                                return Ok(utils::bytes_to_string(v, unicode).map(|s| s.to_object(py)));
                             }
                             None => return Ok(None)
                         }
@@ -288,7 +241,7 @@ impl PyEseDb {
                         match ov {
                             Some(v) => {
                                 let unicode = ESE_CP::try_from(column.cp) == Ok(ESE_CP::Unicode);
-                                return Ok(bytes_to_string(v, unicode).map(|s| s.to_object(py)));
+                                return Ok(utils::bytes_to_string(v, unicode).map(|s| s.to_object(py)));
                             }
                             None => return Ok(None)
                         }
@@ -347,6 +300,6 @@ impl PyEseDb {
 
 #[pymodule]
 fn ese_parser(_py: Python<'_>, m: &PyModule) -> PyResult<()> {
-    m.add_class::<PyEseDb>();
+    m.add_class::<PyEseDb>()?;
     Ok(())
 }

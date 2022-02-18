@@ -22,25 +22,26 @@ pub struct EseBoth {
 }
 
 impl EseBoth {
-    pub fn init() -> EseBoth {
+    /*pub fn init() -> EseBoth {
         EseBoth {
             api: EseAPI::init(),
             parser: EseParser::init(CACHE_SIZE_ENTRIES),
+            opened_tables: RefCell::new(Vec::new()),
+        }
+    }*/
+
+    pub fn load_from_path(dbpath: impl AsRef<Path>) -> Result<Self, SimpleError> {
+        let api = EseAPI::load_from_path(dbpath)?;
+        let parser = EseParser::load_from_path(CACHE_SIZE_ENTRIES, dbpath)?;
+        EseBoth {
+            api,
+            parser,
             opened_tables: RefCell::new(Vec::new()),
         }
     }
 }
 
 impl EseDb for EseBoth {
-    fn load(&mut self, dbpath: &str) -> Option<SimpleError> {
-        if let Some(e) = self.api.load(dbpath) {
-            return Some(SimpleError::new(format!("EseAPI::load failed: {}", e)));
-        }
-        if let Some(e) = self.parser.load(dbpath) {
-            return Some(SimpleError::new(format!("EseParser::load failed: {}", e)));
-        }
-        None
-    }
 
     fn error_to_string(&self, _err: i32) -> String {
         "unused".to_string()

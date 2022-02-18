@@ -14,17 +14,20 @@ mod tests {
     use super::*;
     use super::ese_trait::*;
     use std::collections::HashMap;
-    fn init_tests(cache_size: usize, db: Option<&str>) -> ese_parser::EseParser{
-        let mut jdb = ese_parser::EseParser::init(cache_size);
-        match jdb.load(&["testdata", db.unwrap_or("test.edb")].join("/")) {
-            Some(e) => panic!("Error: {}", e),
-            None => println!("Loaded.")
-            }
-        jdb
+    use std::fs::File;
+    use std::io::BufReader;
+
+    fn init_tests(cache_size: usize, db: Option<&str>) -> ese_parser::EseParser<BufReader<File>> {
+        let path = &["testdata", db.unwrap_or("test.edb")].join("/");
+        ese_parser::EseParser::load_from_path(cache_size, path);
+        match ese_parser::EseParser::load_from_path(cache_size, path) {
+            Ok(jdb) => jdb,
+            Err(e) => panic!("Error: {}", e)
+        }
     }
 
     #[cfg(test)]
-    fn check_table_names(expected_tables:Vec<&str>, jdb: ese_parser::EseParser) {
+    fn check_table_names(expected_tables:Vec<&str>, jdb: ese_parser::EseParser<BufReader<File>>) {
         let tables = jdb.get_tables().unwrap();
         assert_eq!(tables.len(), expected_tables.len());
         for i in 0..tables.len() {
