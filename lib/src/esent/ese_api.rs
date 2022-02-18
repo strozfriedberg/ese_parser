@@ -94,10 +94,6 @@ impl EseAPI {
         }
     }
 
-   /*pub fn init() -> EseAPI {
-        EseAPI { instance: 0, sesid: 0, dbid: 0 }
-    }*/
-
     pub fn load_from_path(filename: impl AsRef<Path>) -> Result<Self, SimpleError> {
         let dbinfo = EseAPI::get_database_file_info(dbpath)?;
         EseAPI::set_system_parameter_l(JET_paramDatabasePageSize, dbinfo.cbPageSize as u64);

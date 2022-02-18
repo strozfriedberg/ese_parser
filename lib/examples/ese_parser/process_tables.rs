@@ -239,13 +239,13 @@ fn alloc_jdb(m: &Mode, dbpath: &str) -> Box<dyn EseDb> {
         use ese_parser_lib::esent::ese_api::EseAPI;
 
         if *m == Mode::EseApi {
-            return Box::new(EseAPI::load_from_path(dbpath).unwrap());//Box::new(EseAPI::init());
+            return Box::new(EseAPI::load_from_path(dbpath).unwrap());
         }
         else if *m == Mode::EseParser {
-            return Box::new(EseParser::load_from_path(CACHE_SIZE_ENTRIES, dbpath).unwrap()); //Box::new(EseParser::init(CACHE_SIZE_ENTRIES));
+            return Box::new(EseParser::load_from_path(CACHE_SIZE_ENTRIES, dbpath).unwrap());
         }
         else {
-            return Box::new(EseBoth::load_from_path(dbpath).unwrap());;//Box::new(EseBoth::init());
+            return Box::new(EseBoth::load_from_path(dbpath).unwrap());;
         }
     }
     // else

@@ -22,14 +22,6 @@ pub struct EseBoth {
 }
 
 impl EseBoth {
-    /*pub fn init() -> EseBoth {
-        EseBoth {
-            api: EseAPI::init(),
-            parser: EseParser::init(CACHE_SIZE_ENTRIES),
-            opened_tables: RefCell::new(Vec::new()),
-        }
-    }*/
-
     pub fn load_from_path(dbpath: impl AsRef<Path>) -> Result<Self, SimpleError> {
         let api = EseAPI::load_from_path(dbpath)?;
         let parser = EseParser::load_from_path(CACHE_SIZE_ENTRIES, dbpath)?;

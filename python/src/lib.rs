@@ -29,10 +29,8 @@ pub struct PyColumnInfo {
 
 #[pyclass]
 pub struct PyEseDb {
-    //jdb : EseParser,
     jdb: EseParser<Box<dyn ReadSeek + Send>>,
 }
-
 
 #[pymethods]
 impl PyEseDb {
@@ -56,31 +54,6 @@ impl PyEseDb {
             jdb: parser,
         })
     }
-
-    /*#[new]
-    fn new() -> Self {
-        PyEseDb {
-            jdb : EseParser::init(10)
-        }
-    }*/
-
-    /*fn load(path_or_file_like: PyObject) -> PyResult<String> {
-        let file_or_file_like = FileOrFileLike::from_pyobject(path_or_file_like)?;
-
-        let (boxed_read_seek, _) = match file_or_file_like {
-            FileOrFileLike::File(s) => {
-                let file = File::open(s)?;
-                let size = file.metadata()?.len();
-
-                let reader = BufReader::with_capacity(4096, file);
-
-                (Box::new(reader) as Box<dyn ReadSeek + Send>, Some(size))
-            }
-            FileOrFileLike::FileLike(f) => (Box::new(f) as Box<dyn ReadSeek + Send>, None),
-        };
-
-        EseParser::load(10, boxed_read_seek)
-    }*/
 
     fn open_table(&self, table: &str) -> PyResult<u64> {
         match self.jdb.open_table(table) {
