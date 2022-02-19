@@ -10,12 +10,25 @@ use std::path::Path;
 use std::fs::File;
 use std::io::BufReader;
 
+enum Direction {
+    None,
+    Forward,
+    Backward
+}
+
+struct ValidityInfo {
+    visited_pages: Vec<u32>, //Need to keep track of the increment direction
+    visited_tag_offsets: Vec<u32>, //Needs to be cleared out when we visit a new page
+    direction: Direction,
+}
+
 struct Table {
 	cat: Box<jet::TableDefinition>,
 	lv_tags: LV_tags,
 	current_page: Option<jet::DbPage>,
 	page_tag_index: usize,
 	lls: RefCell<LastLoadState>,
+    validity_info: ValidityInfo
 }
 
 impl Table {
@@ -31,6 +44,10 @@ impl Table {
 			*lls = LastLoadState::init(self.page().page_number, self.page_tag_index);
 		}
 	}
+    fn clear_validity_lists(&mut self) {
+        self.validity_info.visited_pages.clear();
+        self.validity_info.visited_tag_offsets.clear();
+    }
 }
 
 pub struct EseParser<R: ReadSeek> {
@@ -66,7 +83,12 @@ impl<R: ReadSeek> EseParser<R> {
                         lv_tags: HashMap::new(),
                         current_page: None,
                         page_tag_index: 0,
-                        lls: RefCell::new( LastLoadState { ..Default::default() })
+                        lls: RefCell::new( LastLoadState { ..Default::default() }),
+                        validity_info: ValidityInfo {
+                            visited_pages: vec![],
+                            visited_tag_offsets: vec![],
+                            direction: Direction::None
+                        }
                     };
                 tables.push(RefCell::new(itrnl));
             }
@@ -126,6 +148,19 @@ impl<R: ReadSeek> EseParser<R> {
     fn move_next_row(&self, table_id: u64, crow: i32) -> Result<bool, SimpleError> {
         let reader = self.get_reader()?;
         let mut t = self.get_table_by_id(table_id)?;
+
+        if crow == ESE_MoveFirst || crow > 0 {
+            if t.validity_info.direction == Direction::Backward {
+                t.clear_validity_lists(); // clear out the table_validity lists
+            }
+            t.validity_info.direction = Direction::Forward
+        }
+        else if crow == ESE_MoveLast || crow < 0 {
+            if t.validity_info.direction == Direction::Forward {
+                t.clear_validity_lists(); // clear out the table_validity lists
+            }
+            t.validity_info.direction = Direction::Backward
+        }
 
         let mut i = t.page_tag_index + 1;
         if crow == ESE_MoveFirst {
