@@ -10,6 +10,7 @@ use std::path::Path;
 use std::fs::File;
 use std::io::BufReader;
 
+#[derive(PartialEq)]
 enum Direction {
     None,
     Forward,
