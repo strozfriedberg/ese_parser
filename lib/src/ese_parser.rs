@@ -170,6 +170,8 @@ impl<R: ReadSeek> EseParser<R> {
             if t.current_page.is_none() || t.page().page_number != first_leaf_page {
                 let page = jet::DbPage::new(reader, first_leaf_page)?;
                 t.current_page = Some(page);
+                let page_number = t.page().page_number.clone();
+                t.validity_info.visited_pages.push(page_number);
             }
             if t.page().page_tags.len() < 2 {
                 // empty table
@@ -181,6 +183,7 @@ impl<R: ReadSeek> EseParser<R> {
             while i < t.page().page_tags.len() &&
                 t.page().page_tags[i].flags().intersects(jet::PageTagFlags::FLAG_IS_DEFUNCT) {
                 i += 1;
+                t.validity_info.visited_tag_offsets.push(i as u32);
             }
             if i < t.page().page_tags.len() {
                 // found non-free data tag
