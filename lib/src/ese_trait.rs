@@ -60,8 +60,6 @@ pub const ESE_MoveNext: i32 = 1;
 pub const ESE_MoveLast: i32 = 2147483647;
 
 pub trait EseDb {
-    fn load(&mut self, dbpath: &str) -> Option<SimpleError>;
-
     fn error_to_string(&self, err: i32) -> String;
 
     fn open_table(&self, table: &str) -> Result<u64, SimpleError>;

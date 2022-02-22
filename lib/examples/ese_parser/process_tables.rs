@@ -234,29 +234,30 @@ const CACHE_SIZE_ENTRIES: usize = 10;
 
 #[allow(unreachable_code)]
 #[cfg(target_os = "windows")]
-fn alloc_jdb(m: &Mode) -> Box<dyn EseDb> {
+fn alloc_jdb(m: &Mode, dbpath: &str) -> Box<dyn EseDb> {
     #[cfg(feature = "nt_comparison")] {
         use ese_parser_lib::esent::ese_api::EseAPI;
 
         if *m == Mode::EseApi {
-            return Box::new(EseAPI::init());
+            return Box::new(EseAPI::load_from_path(dbpath).unwrap());
         }
         else if *m == Mode::EseParser {
-            return Box::new(EseParser::init(CACHE_SIZE_ENTRIES));
+            return Box::new(EseParser::load_from_path(CACHE_SIZE_ENTRIES, dbpath).unwrap());
         }
         else {
-            return Box::new(EseBoth::init());
+            return Box::new(EseBoth::load_from_path(dbpath).unwrap());;
         }
     }
-    alloc_jdb_ese_parser(m)
+    // else
+    alloc_jdb_ese_parser(m, dbpath)
 }
 
 #[cfg(any(target_os = "linux", target_os = "macos"))]
-fn alloc_jdb(m: &Mode) -> Box<dyn EseDb> {
-    alloc_jdb_ese_parser(m)
+fn alloc_jdb(m: &Mode, dbpath: &str) -> Box<dyn EseDb> {
+    alloc_jdb_ese_parser(m, dbpath)
 }
 
-fn alloc_jdb_ese_parser(m: &Mode) -> Box<dyn EseDb> {
+fn alloc_jdb_ese_parser(m: &Mode, dbpath: &str) -> Box<dyn EseDb> {
     if *m != Mode::EseParser {
         eprintln!(
             "Unsupported mode: {:?}. EseAPI is available only under Windows \"nt_comparison\" feature build.",
@@ -264,7 +265,7 @@ fn alloc_jdb_ese_parser(m: &Mode) -> Box<dyn EseDb> {
         );
         std::process::exit(-1);
     }
-    Box::new(EseParser::init(CACHE_SIZE_ENTRIES))
+    Box::new(EseParser::load_from_path(CACHE_SIZE_ENTRIES, dbpath).unwrap())
 }
 
 fn print_table(cols: &[ColumnInfo], rows: &[Vec<String>], output_destination: &mut dyn std::io::Write) {
@@ -311,13 +312,8 @@ pub fn resolve_path(test_file: Option<PathBuf>) -> Result<Box<dyn Write>, Error>
 
 pub fn process_table(dbpath: &str, test_file: Option<PathBuf>, mode: Mode, table: String) {
     let mut output_destination = resolve_path(test_file).unwrap();
-    let mut jdb = alloc_jdb(&mode);
-
     println!("mode {:?}, path: {}", &mode, dbpath);
-    if let Some(load_error) = jdb.load(dbpath) {
-        println!("Error: {:?}", load_error);
-        return;
-    }
+    let jdb = alloc_jdb(&mode, dbpath);
     println!("loaded {}", dbpath);
     //let output_destination = output_destination.clone();
     let mut handle_table = |t: &str| {

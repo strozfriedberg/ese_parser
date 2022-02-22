@@ -6,9 +6,16 @@ from datetime import datetime
 from platform import system
 
 class TestEseDbMethods(unittest.TestCase):
-	def test_test_db(self):
-		edb = ese_parser.PyEseDb()
-		edb.load("../lib/testdata/test.edb")
+	def test_test_db_path(self):
+		edb = ese_parser.PyEseDb("../lib/testdata/test.edb")
+		self._test_db(edb)
+
+	def test_test_db_file(self):
+		f = open("../lib/testdata/test.edb", "rb")
+		edb = ese_parser.PyEseDb(f)
+		self._test_db(edb)
+
+	def _test_db(self, edb):
 		tables = edb.get_tables()
 		self.assertEqual(tables, ['MSysObjects', 'MSysObjectsShadow', 'MSysObjids', 'MSysLocales', 'TestTable'])
 		t = "TestTable"
@@ -16,7 +23,7 @@ class TestEseDbMethods(unittest.TestCase):
 		self.assertTrue(tbl > 0)
 
 		self.assertEqual(len(edb.get_columns(t)), 18)
-		
+
 		self.assertEqual(edb.get_row(tbl, edb.get_column(t, "Bit")), 0)
 		self.assertEqual(edb.get_row(tbl, edb.get_column(t, "UnsignedByte")), 255)
 		self.assertEqual(edb.get_row(tbl, edb.get_column(t, "Short")), None)
@@ -35,7 +42,7 @@ class TestEseDbMethods(unittest.TestCase):
 		for i in b:
 			self.assertEqual(i, ind % 255)
 			ind += 1
-		
+
 		b = edb.get_row(tbl, edb.get_column(t, "LongBinary"))
 		ind = 0
 		for i in b:
@@ -67,8 +74,7 @@ class TestEseDbMethods(unittest.TestCase):
 		edb.close_table(tbl)
 
 	def test_datetimes(self):
-		edb = ese_parser.PyEseDb()
-		edb.load("../lib/testdata/Current.mdb")
+		edb = ese_parser.PyEseDb("../lib/testdata/Current.mdb")
 		t = "CLIENTS"
 		tbl = edb.open_table(t)
 		d1 = edb.get_row(tbl, edb.get_column(t, "InsertDate"))

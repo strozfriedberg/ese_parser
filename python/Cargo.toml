@@ -15,10 +15,8 @@ chrono = "*"
 ese_parser_lib = { path = "../lib" }
 simple-error = "*"
 widestring = "*"
+pyo3 = { version = "0.12.1", features = ["extension-module"] }
+pyo3-file = "0.3.3"
 
 [target.'cfg(windows)'.dependencies]
 winapi = { version = "0.3.9", features = ["oleauto"] }
-
-[dependencies.pyo3]
-version = "0.13.1"
-features = ["extension-module"]

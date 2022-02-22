@@ -4,7 +4,10 @@ use super::*;
 use std::collections::HashSet;
 use crate::ese_parser::EseParser;
 use crate::ese_trait::*;
+use std::fs;
 use std::path::PathBuf;
+use std::fs::File;
+use std::io::BufReader;
 
 #[cfg(all(feature = "nt_comparison", target_os = "windows"))]
 use crate::parser::reader::gen_db::*;
@@ -23,7 +26,11 @@ pub fn caching_test() -> Result<(), SimpleError> {
     let test_db = "decompress_test.edb";
     println!("db {}", test_db);
     let path = prepare_db(test_db, table, 1024 * 8, 1024, 1000);
-    let mut reader = Reader::new(&path, cache_size as usize)?;
+
+    let file = File::open(path.clone()).unwrap();
+    let buf_reader = BufReader::with_capacity(4096, file);
+
+    let mut reader = Reader::new(buf_reader, cache_size as usize)?;
     let page_size = reader.page_size as u64;
     let num_of_pages = std::cmp::min(fs::metadata(&path).unwrap().len() / page_size, page_size) as usize;
     let full_cache_size = 6 * cache_size;
@@ -100,7 +107,7 @@ pub fn caching_test_windows() -> Result<(), SimpleError> {
     Ok(())
 }
 
-fn check_row(jdb: &mut EseParser, table_id: u64, columns: &[ColumnInfo]) -> HashSet<String> {
+fn check_row<R: ReadSeek>(jdb: &mut EseParser<R>, table_id: u64, columns: &[ColumnInfo]) -> HashSet<String> {
     let mut values = HashSet::<String>::new();
     for col in columns {
         match jdb.get_column_str(table_id, col.id, col.cp) {
@@ -134,12 +141,13 @@ pub fn decompress_test_lzxpress() -> Result<(), SimpleError> {
 pub fn run_decompress_test(filename: &str, record_size : usize) -> Result<(), SimpleError> {
     let table = "test_table";
     let path = prepare_db(filename, table, 1024 * 8, record_size, 10);
-    let mut jdb = EseParser::init(5);
+    //let mut jdb = EseParser::init(5);
+    let mut jdb = EseParser::load_from_path(5, path.to_str().unwrap())?;
 
-    match jdb.load(path.to_str().unwrap()) {
+    /*match jdb.load(path.to_str().unwrap()) {
         Some(e) => panic!("Error: {}", e),
         None => println!("Loaded {}", path.display())
-    }
+    }*/
 
     let table_id = jdb.open_table(table)?;
     let columns = jdb.get_columns(table)?;

@@ -9,8 +9,7 @@ use nom_derive::*;
 use crate::impl_read_struct;
 use crate::parser::ese_db;
 use crate::parser::ese_db::*;
-use crate::parser::reader;
-use crate::parser::reader::Reader;
+use crate::parser::reader::{Reader, ReadSeek};
 
 pub type uint8_t = u8;
 pub type uint16_t = u16;
@@ -254,7 +253,7 @@ pub struct DbPage {
 }
 
 impl DbPage {
-    pub fn new(reader: &Reader, page_number: uint32_t) -> Result<DbPage, SimpleError> {
+    pub fn new<T: ReadSeek>(reader: &Reader<T>, page_number: uint32_t) -> Result<DbPage, SimpleError> {
         let page_header = reader.load_page_header(page_number)?;
         let mut db_page = DbPage {
             page_number,
@@ -263,7 +262,7 @@ impl DbPage {
             page_tags: vec![],
         };
 
-        db_page.page_tags = reader::load_page_tags(reader, &db_page)?;
+        db_page.page_tags = reader.load_page_tags(&db_page)?;
         Ok(db_page)
     }
 
