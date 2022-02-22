@@ -17,37 +17,146 @@ enum Direction {
     Backward
 }
 
+// The ValidityInfo struct keeps track of pages and page_tags that we have already visited
+// to protect against circular reference situations
 struct ValidityInfo {
-    visited_pages: Vec<u32>, //Need to keep track of the increment direction
-    visited_tag_offsets: Vec<u32>, //Needs to be cleared out when we visit a new page
+    visited_pages: Vec<u32>,
+    visited_page_tag_offsets: Vec<u16>,
     direction: Direction,
+}
+
+#[derive(Default, Debug)]
+struct CurrentPage {
+    current_page: Option<jet::DbPage>,
+}
+
+impl CurrentPage {
+    pub(crate) fn is_none(&self) -> bool {
+        self.current_page.is_none()
+    }
+
+    pub(crate) fn get(&self) -> &jet::DbPage {
+        self.current_page.as_ref().expect("Did not find current page")
+    }
+
+    pub(crate) fn set(&mut self, page: jet::DbPage) {
+        self.current_page = Some(page);
+    }
+}
+
+#[derive(Copy, Clone, Default, Debug)]
+struct PageTagIndex {
+    page_tag_index: usize
+}
+
+impl PageTagIndex {
+    pub(crate) fn get(&self) -> usize {
+        self.page_tag_index
+    }
+
+    pub(crate) fn set(&mut self, page_tag_index: usize) {
+        self.page_tag_index = page_tag_index;
+    }
 }
 
 struct Table {
 	cat: Box<jet::TableDefinition>,
 	lv_tags: LV_tags,
-	current_page: Option<jet::DbPage>,
-	page_tag_index: usize,
+	current_page: CurrentPage,
+	page_tag_index: PageTagIndex,
 	lls: RefCell<LastLoadState>,
     validity_info: ValidityInfo
 }
 
 impl Table {
     fn page(&self) -> &jet::DbPage {
-        self.current_page.as_ref().expect("Did not find current page")
+        self.current_page.get()
     }
 
 	fn review_last_load_state(&mut self, column: u32) {
 		let mut lls = self.lls.borrow_mut();
-		if lls.page_number != self.page().page_number || lls.page_tag_index != self.page_tag_index ||
+		if lls.page_number != self.page().page_number || lls.page_tag_index != self.page_tag_index.get() ||
             column <= lls.last_column {
 			// reset
-			*lls = LastLoadState::init(self.page().page_number, self.page_tag_index);
+			*lls = LastLoadState::init(self.page().page_number, self.page_tag_index.get());
 		}
 	}
+
     fn clear_validity_lists(&mut self) {
         self.validity_info.visited_pages.clear();
-        self.validity_info.visited_tag_offsets.clear();
+        self.validity_info.visited_page_tag_offsets.clear();
+    }
+
+    fn update_validity_info(&mut self, crow: i32) {
+        if crow == ESE_MoveFirst {
+            self.clear_validity_lists(); // if we're going to the beginning, clear out any previous visited into
+            self.validity_info.direction = Direction::Forward
+        }
+        else if crow == ESE_MoveLast {
+            self.clear_validity_lists(); // if we're going to the end, clear out any previous visited into
+            self.validity_info.direction = Direction::Backward
+        }
+        // We clear out the visited info if we switch direction while reading a table.
+        // Otherwise if we read forward one row, then backward one row, we are reading the same row and would trigger the circular reference error.
+        else if crow > 0 { // incrementing our row
+            if self.validity_info.direction == Direction::Backward {
+                self.clear_validity_lists();
+            }
+            self.validity_info.direction = Direction::Forward
+        }
+        else if crow < 0 { // decrementing our row
+            if self.validity_info.direction == Direction::Forward {
+                self.clear_validity_lists();
+            }
+            self.validity_info.direction = Direction::Backward
+        }
+    }
+
+    fn already_visited_page(&self, page: u32) -> bool {
+        self.validity_info.visited_pages.contains(&page)
+    }
+
+    fn update_visited_pages(&mut self, page: u32) {
+        self.validity_info.visited_pages.push(page)
+    }
+
+    fn set_current_page(&mut self, page: jet::DbPage) -> Result<bool, SimpleError> {
+        if self.already_visited_page(page.page_number) {
+            Err(SimpleError::new(format!(
+                "Circular page reference identified for page_number: {}",
+                page.page_number
+            )))
+        }
+        else {
+            self.update_visited_pages(page.page_number);
+            self.current_page.set(page);
+            self.validity_info.visited_page_tag_offsets.clear();
+            Ok(true)
+        }
+    }
+
+    fn already_visited_page_tag_offset(&self, page_tag_offset: u16) -> bool {
+        self.validity_info.visited_page_tag_offsets.contains(&page_tag_offset)
+    }
+
+    fn update_visited_page_tag_offsets(&mut self, page_tag_offset: u16) {
+        self.validity_info.visited_page_tag_offsets.push(page_tag_offset)
+    }
+
+    fn set_page_tag_index(&mut self, page_tag_index: usize) -> Result<bool, SimpleError> {
+        let page_tag_offset = self.page().page_tags[page_tag_index].offset;
+        if self.already_visited_page_tag_offset(page_tag_offset) {
+            Err(SimpleError::new(format!(
+                "Circular page reference identified for page_tag_index: {} (offset: {}) ",
+                page_tag_index,
+                page_tag_offset
+            )))
+        }
+        else {
+            self.update_visited_page_tag_offsets(page_tag_offset);
+            self.page_tag_index.set(page_tag_index);
+            Ok(true)
+        }
     }
 }
 
@@ -82,12 +191,12 @@ impl<R: ReadSeek> EseParser<R> {
                     Table {
                         cat: Box::new(i),
                         lv_tags: HashMap::new(),
-                        current_page: None,
-                        page_tag_index: 0,
+                        current_page: CurrentPage::default(),
+                        page_tag_index: PageTagIndex::default(),
                         lls: RefCell::new( LastLoadState { ..Default::default() }),
                         validity_info: ValidityInfo {
                             visited_pages: vec![],
-                            visited_tag_offsets: vec![],
+                            visited_page_tag_offsets: vec![],
                             direction: Direction::None
                         }
                     };
@@ -136,7 +245,7 @@ impl<R: ReadSeek> EseParser<R> {
         }
 		table.review_last_load_state(column);
 		let mut lls = table.lls.borrow_mut();
-        match reader.load_data(&mut lls, &table.cat, &table.lv_tags, table.page(), table.page_tag_index, column,
+        match reader.load_data(&mut lls, &table.cat, &table.lv_tags, table.page(), table.page_tag_index.get(), column,
 			mv_index as usize) {
 			Ok(r) => {
 				lls.last_column = column;
@@ -149,29 +258,15 @@ impl<R: ReadSeek> EseParser<R> {
     fn move_next_row(&self, table_id: u64, crow: i32) -> Result<bool, SimpleError> {
         let reader = self.get_reader()?;
         let mut t = self.get_table_by_id(table_id)?;
+        t.update_validity_info(crow);
 
-        if crow == ESE_MoveFirst || crow > 0 {
-            if t.validity_info.direction == Direction::Backward {
-                t.clear_validity_lists(); // clear out the table_validity lists
-            }
-            t.validity_info.direction = Direction::Forward
-        }
-        else if crow == ESE_MoveLast || crow < 0 {
-            if t.validity_info.direction == Direction::Forward {
-                t.clear_validity_lists(); // clear out the table_validity lists
-            }
-            t.validity_info.direction = Direction::Backward
-        }
-
-        let mut i = t.page_tag_index + 1;
+        let mut i = t.page_tag_index.get() + 1;
         if crow == ESE_MoveFirst {
             let first_leaf_page = reader.find_first_leaf_page(
                 t.cat.table_catalog_definition.as_ref().expect("First leaf page failed").father_data_page_number)?;
             if t.current_page.is_none() || t.page().page_number != first_leaf_page {
                 let page = jet::DbPage::new(reader, first_leaf_page)?;
-                t.current_page = Some(page);
-                let page_number = t.page().page_number.clone();
-                t.validity_info.visited_pages.push(page_number);
+                t.set_current_page(page)?;
             }
             if t.page().page_tags.len() < 2 {
                 // empty table
@@ -183,15 +278,14 @@ impl<R: ReadSeek> EseParser<R> {
             while i < t.page().page_tags.len() &&
                 t.page().page_tags[i].flags().intersects(jet::PageTagFlags::FLAG_IS_DEFUNCT) {
                 i += 1;
-                t.validity_info.visited_tag_offsets.push(i as u32);
             }
             if i < t.page().page_tags.len() {
                 // found non-free data tag
-                t.page_tag_index = i;
+                t.set_page_tag_index(i)?;
                 return Ok(true);
             } else if t.page().common().next_page != 0 {
                 let page = jet::DbPage::new(self.get_reader()?, t.page().common().next_page)?;
-                t.current_page = Some(page);
+                t.set_current_page(page)?;
                 i = 1;
             } else {
                 // no more leaf pages
@@ -203,12 +297,13 @@ impl<R: ReadSeek> EseParser<R> {
     fn move_previous_row(&self, table_id: u64, crow: i32) -> Result<bool, SimpleError> {
         let reader = self.get_reader()?;
         let mut t = self.get_table_by_id(table_id)?;
+        t.update_validity_info(crow);
 
-        let mut i = t.page_tag_index - 1;
+        let mut i = t.page_tag_index.get() - 1;
         if crow == ESE_MoveLast {
             while t.page().common().next_page != 0 {
                 let page = jet::DbPage::new(reader, t.page().common().next_page)?;
-                t.current_page = Some(page);
+                t.set_current_page(page)?;
             }
             if t.page().page_tags.len() < 2 {
                 // empty table
@@ -222,11 +317,11 @@ impl<R: ReadSeek> EseParser<R> {
             }
             if i > 0 {
                 // found non-free data tag
-                t.page_tag_index = i;
+                t.page_tag_index.set(i);
                 return Ok(true);
             } else if t.page().common().previous_page != 0 {
                     let page = jet::DbPage::new(reader, t.page().common().previous_page)?;
-                    t.current_page = Some(page);
+                    t.set_current_page(page)?;
                     i = t.page().page_tags.len()-1;
             } else {
                 // no more leaf pages

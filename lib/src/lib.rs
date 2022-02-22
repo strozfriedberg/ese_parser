@@ -19,7 +19,7 @@ mod tests {
 
     fn init_tests(cache_size: usize, db: Option<&str>) -> ese_parser::EseParser<BufReader<File>> {
         let path = &["testdata", db.unwrap_or("test.edb")].join("/");
-        ese_parser::EseParser::load_from_path(cache_size, path);
+        ese_parser::EseParser::load_from_path(cache_size, path).unwrap();
         match ese_parser::EseParser::load_from_path(cache_size, path) {
             Ok(jdb) => jdb,
             Err(e) => panic!("Error: {}", e)
