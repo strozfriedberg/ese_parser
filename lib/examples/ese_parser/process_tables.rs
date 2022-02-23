@@ -245,7 +245,7 @@ fn alloc_jdb(m: &Mode, dbpath: &str) -> Box<dyn EseDb> {
             return Box::new(EseParser::load_from_path(CACHE_SIZE_ENTRIES, dbpath).unwrap());
         }
         else {
-            return Box::new(EseBoth::load_from_path(dbpath).unwrap());;
+            return Box::new(EseBoth::load_from_path(dbpath).unwrap());
         }
     }
     // else

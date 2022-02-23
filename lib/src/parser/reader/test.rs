@@ -71,8 +71,12 @@ pub fn caching_test_windows() -> Result<(), SimpleError> {
     let table = "test_table";
     let test_db = "caching_test.edb";
     println!("db {}", test_db);
+
     let path = prepare_db_gen(test_db, table, 1024 * 8, 1024, 1000);
-    let mut reader = Reader::new(&path, cache_size as usize)?;
+    let file = File::open(path.clone()).unwrap();
+    let buf_reader = BufReader::with_capacity(4096, file);
+
+    let mut reader = Reader::new(buf_reader, cache_size as usize)?;
     let page_size = reader.page_size as u64;
     let num_of_pages = std::cmp::min(fs::metadata(&path).unwrap().len() / page_size, page_size) as usize;
     let full_cache_size = 6 * cache_size;

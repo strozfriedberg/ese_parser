@@ -8,6 +8,7 @@ use simple_error::SimpleError;
 use std::ffi::CString;
 use std::os::raw::{c_void, c_ulong};
 use std::mem::{size_of, MaybeUninit};
+use std::path::Path;
 
 #[derive(Debug)]
 pub struct EseAPI {
@@ -95,63 +96,68 @@ impl EseAPI {
     }
 
     pub fn load_from_path(filename: impl AsRef<Path>) -> Result<Self, SimpleError> {
-        let dbinfo = EseAPI::get_database_file_info(dbpath)?;
-        EseAPI::set_system_parameter_l(JET_paramDatabasePageSize, dbinfo.cbPageSize as u64);
-        EseAPI::set_system_parameter_l(JET_paramDisableCallbacks, true as u64);
-        EseAPI::set_system_parameter_sz(JET_paramRecovery, "Off");
+        match filename.as_ref().to_str() {
+            None => Err(SimpleError::new(format!("Unable to convert {:?}", filename.as_ref()))),
+            Some(dbpath) => {
+                let dbinfo = EseAPI::get_database_file_info(dbpath)?;
+                EseAPI::set_system_parameter_l(JET_paramDatabasePageSize, dbinfo.cbPageSize as u64);
+                EseAPI::set_system_parameter_l(JET_paramDisableCallbacks, true as u64);
+                EseAPI::set_system_parameter_sz(JET_paramRecovery, "Off");
 
-        let mut instance : JET_INSTANCE = 0;
-        unsafe {
-            let err = JetCreateInstanceA(&mut instance, std::ptr::null());
-            if err != 0 {
-                return SimpleError::new(format!("JetCreateInstanceA failed with error: {}", err));
+                let mut instance : JET_INSTANCE = 0;
+                unsafe {
+                    let err = JetCreateInstanceA(&mut instance, std::ptr::null());
+                    if err != 0 {
+                        return Err(SimpleError::new(format!("JetCreateInstanceA failed with error: {}", err)));
+                    }
+                }
+                unsafe {
+                    let err = JetInit(&mut instance);
+                    if err != 0 {
+                        JetTerm(instance);
+                        return Err(SimpleError::new(format!("JetInit failed with error {}", err)));
+                    }
+                }
+
+                let mut sesid : JET_SESID = 0;
+                unsafe {
+                    let err = JetBeginSessionA(instance, &mut sesid, std::ptr::null(), std::ptr::null() );
+                    if err != 0 {
+                        JetTerm(instance);
+                        return Err(SimpleError::new(format!("JetBeginSessionA failed with error {}", err)));
+                    }
+                }
+
+                let dbpath = CString::new(dbpath).unwrap();
+                unsafe {
+                    let err = JetAttachDatabaseA(sesid, dbpath.as_ptr(), JET_bitDbReadOnly);
+                    if err != 0 {
+                        JetEndSession(sesid, 0);
+                        JetTerm(instance);
+                        return Err(SimpleError::new(format!("JetAttachDatabaseA failed with error {}", err)));
+                    }
+                }
+
+                let mut dbid : JET_DBID = 0;
+                unsafe {
+                    let err = JetOpenDatabaseA(sesid, dbpath.as_ptr(), std::ptr::null(), &mut dbid, JET_bitDbReadOnly);
+                    if err != 0 {
+                        JetDetachDatabaseA(sesid, std::ptr::null());
+                        JetEndSession(sesid, 0);
+                        JetTerm(instance);
+                        return Err(SimpleError::new(format!("JetOpenDatabaseA failed with error {}", err)));
+                    }
+                }
+
+                Ok(
+                    EseAPI {
+                        instance,
+                        sesid,
+                        dbid
+                    }
+                )
             }
         }
-        unsafe {
-            let err = JetInit(&mut instance);
-            if err != 0 {
-                JetTerm(instance);
-                return SimpleError::new(format!("JetInit failed with error {}", err));
-            }
-        }
-
-        let mut sesid : JET_SESID = 0;
-        unsafe {
-            let err = JetBeginSessionA(instance, &mut sesid, std::ptr::null(), std::ptr::null() );
-            if err != 0 {
-                JetTerm(instance);
-                return SimpleError::new(format!("JetBeginSessionA failed with error {}", err));
-            }
-        }
-
-        let dbpath = CString::new(dbpath).unwrap();
-        unsafe {
-            let err = JetAttachDatabaseA(sesid, dbpath.as_ptr(), JET_bitDbReadOnly);
-            if err != 0 {
-                JetEndSession(sesid, 0);
-                JetTerm(instance);
-                return SimpleError::new(format!("JetAttachDatabaseA failed with error {}", err));
-            }
-        }
-
-        let mut dbid : JET_DBID = 0;
-        unsafe {
-            let err = JetOpenDatabaseA(sesid, dbpath.as_ptr(), std::ptr::null(), &mut dbid, JET_bitDbReadOnly);
-            if err != 0 {
-                JetDetachDatabaseA(sesid, std::ptr::null());
-                JetEndSession(sesid, 0);
-                JetTerm(instance);
-                return SimpleError::new(format!("JetOpenDatabaseA failed with error {}", err));
-            }
-        }
-
-        Ok(
-            EseAPI {
-                instance,
-                sesid,
-                dbid
-            }
-        )
     }
 }
 
