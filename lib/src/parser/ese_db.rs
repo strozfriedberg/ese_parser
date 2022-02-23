@@ -167,7 +167,7 @@ pub enum PageHeader {
     x11_ext(PageHeader0x11, PageHeaderCommon, PageHeaderExt0x11),
 }
 
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 pub struct PageTag {
     pub size: u16,
     pub offset: u16,

@@ -201,7 +201,7 @@ fn dump_table(
 > {
     let table_id = jdb.open_table(t)?;
     let cols = jdb.get_columns(t)?;
-    if !jdb.move_row(table_id, ESE_MoveFirst) {
+    if !jdb.move_row(table_id, ESE_MoveFirst)? {
         // empty table
         return Ok(None);
     }
@@ -222,7 +222,7 @@ fn dump_table(
         }
         assert_eq!(values.len(), cols.len());
         rows.push(values);
-        if !jdb.move_row(table_id, ESE_MoveNext) {
+        if !jdb.move_row(table_id, ESE_MoveNext)? {
             break;
         }
     }

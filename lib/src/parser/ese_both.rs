@@ -126,17 +126,14 @@ impl EseDb for EseBoth {
         Ok(parser_columns)
     }
 
-    fn move_row(&self, table: u64, crow: i32) -> bool {
+    fn move_row(&self, table: u64, crow: i32) -> Result<bool, SimpleError>  {
         let (api_table, parser_table) = self.opened_tables.borrow()[table as usize];
-        let r1 = self.api.move_row(api_table, crow);
-        let r2 = self.parser.move_row(parser_table, crow);
+        let r1 = self.api.move_row(api_table, crow)?;
+        let r2 = self.parser.move_row(parser_table, crow)?;
         if r1 != r2 {
-            println!(
-                "move_row return result different: EseAPI {} != EseParser {}",
-                r1, r2
-            );
+            Err(SimpleError::new(format!("move_row return result different: EseAPI {} != EseParser {}", r1, r2)));
         }
-        r1
+        Ok(r1)
     }
 
     fn get_column_str(

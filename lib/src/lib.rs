@@ -26,7 +26,6 @@ mod tests {
         }
     }
 
-    #[cfg(test)]
     fn check_table_names(expected_tables:Vec<&str>, jdb: ese_parser::EseParser<BufReader<File>>) {
         let tables = jdb.get_tables().unwrap();
         assert_eq!(tables.len(), expected_tables.len());
@@ -51,7 +50,6 @@ mod tests {
         check_table_names(expected_tables, jdb);
     }
 
-    #[cfg(test)]
     fn check_datetimes(db: &str) {
         let jdb = init_tests(5, Some(db));
         let columns = jdb.get_columns("CLIENTS").unwrap();
@@ -62,7 +60,7 @@ mod tests {
         for expected_datetime in dates.into_iter() {
             let column_contents = jdb.get_column_date(table_id, insert_date.id).unwrap().unwrap();
             assert_eq!(column_contents.format("%Y-%m-%d %H:%M:%S.%f %Z").to_string(), expected_datetime.to_string());
-            jdb.move_row(table_id, ESE_MoveNext);
+            jdb.move_row(table_id, ESE_MoveNext).unwrap();
         }
     }
 
@@ -77,7 +75,6 @@ mod tests {
         check_datetimes("{03A01CC5-91BB-4936-B685-63697785D39E}.mdb");
     }
 
-    #[cfg(test)]
     fn get_column_names(columns: Vec<ColumnInfo>) -> Vec<String> {
         let mut column_names= vec!();
         for ci in columns.iter() {
@@ -99,7 +96,6 @@ mod tests {
         }
     }
 
-    #[cfg(test)]
     fn get_str_value(db_name: &str, table_name: &str, column_name: &str) -> String {
         let jdb = init_tests(5, Some(db_name));
         let columns = jdb.get_columns(table_name).unwrap();
@@ -135,7 +131,7 @@ mod tests {
         let columns = jdb.get_columns(table).unwrap();
 
         let table_id = jdb.open_table(table).unwrap();
-        assert!(jdb.move_row(table_id, ESE_MoveFirst), "{}", true);
+        assert!(jdb.move_row(table_id, ESE_MoveFirst).unwrap(), "{}", true);
 
         let bit = columns.iter().find(|x| x.name == "Bit" ).unwrap();
         assert_eq!(jdb.get_fixed_column::<i8>(table_id, bit.id).unwrap(), Some(0));

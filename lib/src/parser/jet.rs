@@ -244,7 +244,7 @@ pub struct DbFile {
     file_header: ese_db::FileHeader,
 }
 
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 pub struct DbPage {
     pub page_number: uint32_t,
     pub page_size: uint32_t,

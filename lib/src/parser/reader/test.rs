@@ -152,30 +152,16 @@ pub fn run_decompress_test(filename: &str, record_size : usize) -> Result<(), Si
     let table_id = jdb.open_table(table)?;
     let columns = jdb.get_columns(table)?;
 
-    assert!(jdb.move_row(table_id, ESE_MoveFirst));
+    assert!(jdb.move_row(table_id, ESE_MoveFirst)?);
 
     for i in 0.. {
 		let values = check_row(&mut jdb, table_id, &columns);
 		assert_eq!(values.len(), 1);
 		let v = format!("Record {number:>width$}", number=i, width=record_size);
 		assert!(values.contains(&v), "{}", true);
-		if !jdb.move_row(table_id, ESE_MoveNext) {
+		if !jdb.move_row(table_id, ESE_MoveNext)? {
 			break;
 		}
     }
     Ok(())
-}
-
-
-#[test]
-pub fn test_circular_page_access() -> Result<(), SimpleError> {
-    /*let table = "test_table";
-    let path = prepare_db("decompress_test.edb", table, 1024 * 8, 10, 10);
-    let mut jdb = EseParser::load_from_path(5, path.to_str().unwrap())?;
-
-    let table_id = jdb.open_table(table)?;
-    let columns = jdb.get_columns(table)?;
-
-    assert!(jdb.move_row(table_id, ESE_MoveFirst));*/
-	Ok(())
 }

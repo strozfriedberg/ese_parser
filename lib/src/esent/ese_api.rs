@@ -269,10 +269,10 @@ impl EseDb for EseAPI {
             Ok(Some(vres))
     }
 
-    fn move_row(&self, table: u64, crow: i32) -> bool {
+    fn move_row(&self, table: u64, crow: i32) -> Result<bool, SimpleError>  {
         unsafe {
             let err = JetMove(self.sesid, table, crow as std::os::raw::c_long, 0);
-            err == 0
+            Ok(err == 0)
         }
     }
 
@@ -291,7 +291,7 @@ impl EseDb for EseAPI {
                err.push(name_str);
             }
 
-            if !self.move_row(table_id, ESE_MoveNext) {
+            if !self.move_row(table_id, ESE_MoveNext)? {
                 break;
             }
         }
@@ -329,7 +329,7 @@ impl EseDb for EseAPI {
                     cp: col_cp
                 });
 
-                if !self.move_row(subtable_id, ESE_MoveNext) {
+                if !self.move_row(subtable_id, ESE_MoveNext)? {
                     break;
                 }
             }
