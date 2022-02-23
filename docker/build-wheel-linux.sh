@@ -24,7 +24,7 @@ docker run --rm \
 
 	pushd lib
 	rustc --version
-	cargo test --all-targets
+	cargo test --all-targets --features nt_comparison
 	popd
 
 	pushd python
