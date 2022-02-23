@@ -47,8 +47,7 @@ impl PyEseDb {
             FileOrFileLike::FileLike(f) => Box::new(f) as Box<dyn ReadSeek + Send>,
         };
 
-        let parser = EseParser::load(10, boxed_read_seek).unwrap(); // fix this unwrap!
-           // .map_err(|e| PyErr::new::<pyo3::exceptions::RuntimeError, _>(format!("{:?}", e)))?;
+        let parser = EseParser::load(10, boxed_read_seek).map_err(|e| PyErr::new::<exceptions::PyTypeError, _>(e.as_str().to_string()))?;
 
         Ok(Self {
             jdb: parser,
@@ -56,10 +55,7 @@ impl PyEseDb {
     }
 
     fn open_table(&self, table: &str) -> PyResult<u64> {
-        match self.jdb.open_table(table) {
-            Ok(v) => Ok(v),
-            Err(e) => Err(PyErr::new::<exceptions::PyTypeError, _>(e.as_str().to_string()))
-        }
+        self.jdb.open_table(table).map_err(|e| PyErr::new::<exceptions::PyTypeError, _>(e.as_str().to_string()))
     }
 
     fn close_table(&self, table: u64) -> bool {
@@ -67,10 +63,7 @@ impl PyEseDb {
     }
 
     fn get_tables(&self) -> PyResult<Vec<String>> {
-        match self.jdb.get_tables() {
-            Ok(t) => Ok(t),
-            Err(e) => Err(PyErr::new::<exceptions::PyTypeError, _>(e.as_str().to_string()))
-        }
+        self.jdb.get_tables().map_err(|e| PyErr::new::<exceptions::PyTypeError, _>(e.as_str().to_string()))
     }
 
     fn get_columns(&self, table: &str) -> PyResult<Vec<PyColumnInfo>> {
@@ -102,8 +95,8 @@ impl PyEseDb {
         }
     }
 
-    fn move_row(&self, table: u64, crow: i32) -> bool {
-        self.jdb.move_row(table, crow)
+    fn move_row(&self, table: u64, crow: i32) -> PyResult<bool> {
+        self.jdb.move_row(table, crow).map_err(|e| PyErr::new::<exceptions::PyTypeError, _>(e.as_str().to_string()))
     }
 
     fn get_row_mv(&self, table: u64, column: &PyColumnInfo, multi_value_index: u32) -> PyResult<Option<PyObject>> {
