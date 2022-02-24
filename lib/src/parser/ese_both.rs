@@ -9,6 +9,9 @@
 
 use simple_error::SimpleError;
 use std::cell::RefCell;
+use std::fs::File;
+use std::io::BufReader;
+use std::path::Path;
 use crate::ese_parser::*;
 use crate::ese_trait::*;
 use crate::esent::ese_api::*;
@@ -17,24 +20,23 @@ const CACHE_SIZE_ENTRIES: usize = 10;
 
 pub struct EseBoth {
     api: EseAPI,
-    parser: EseParser,
+    parser: EseParser<BufReader<File>>,
     opened_tables: RefCell<Vec<(u64, u64)>>,
 }
 
 impl EseBoth {
-    pub fn load_from_path(dbpath: impl AsRef<Path>) -> Result<Self, SimpleError> {
-        let api = EseAPI::load_from_path(dbpath)?;
+    pub fn load_from_path(dbpath: impl AsRef<Path> + Clone) -> Result<Self, SimpleError> {
+        let api = EseAPI::load_from_path(dbpath.clone())?;
         let parser = EseParser::load_from_path(CACHE_SIZE_ENTRIES, dbpath)?;
-        EseBoth {
+        Ok(EseBoth {
             api,
             parser,
             opened_tables: RefCell::new(Vec::new()),
-        }
+        })
     }
 }
 
 impl EseDb for EseBoth {
-
     fn error_to_string(&self, _err: i32) -> String {
         "unused".to_string()
     }
@@ -126,17 +128,16 @@ impl EseDb for EseBoth {
         Ok(parser_columns)
     }
 
-    fn move_row(&self, table: u64, crow: i32) -> bool {
+    fn move_row(&self, table: u64, crow: i32) -> Result<bool, SimpleError>  {
         let (api_table, parser_table) = self.opened_tables.borrow()[table as usize];
-        let r1 = self.api.move_row(api_table, crow);
-        let r2 = self.parser.move_row(parser_table, crow);
+        let r1 = self.api.move_row(api_table, crow)?;
+        let r2 = self.parser.move_row(parser_table, crow)?;
         if r1 != r2 {
-            println!(
-                "move_row return result different: EseAPI {} != EseParser {}",
-                r1, r2
-            );
+            Err(SimpleError::new(format!("move_row return result different: EseAPI {} != EseParser {}", r1, r2)))
         }
-        r1
+        else {
+            Ok(r1)
+        }
     }
 
     fn get_column_str(

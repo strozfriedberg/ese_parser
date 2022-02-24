@@ -1,8 +1,7 @@
 #![cfg(all(feature = "nt_comparison", target_os = "windows"))]
 #![cfg(test)]
 
-use super::*;
-use std::{str, ffi::CString, mem::size_of, os::raw, ptr};
+use std::{fs, str, ffi::CString, mem::size_of, os::raw, path::Path, ptr};
 use crate::esent::esent::*;
 use encoding::{all::{ASCII, UTF_16LE, UTF_8}, Encoding, EncoderTrap};
 use crate::ese_trait::ESE_CP;
@@ -127,8 +126,7 @@ impl Drop for EseAPI {
     }
 }
 
-pub fn prepare_db_gen(filename: &str, table: &str, pg_size: usize, record_size: usize, records_cnt: usize)
-    -> std::path::PathBuf {
+pub fn prepare_db_gen(filename: &str, table: &str, pg_size: usize, record_size: usize, records_cnt: usize) -> std::path::PathBuf {
     let mut dst_path = std::env::temp_dir();
     dst_path.push(filename);
 

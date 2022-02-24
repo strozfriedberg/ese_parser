@@ -17,6 +17,7 @@ pipeline {
             steps {
                 dir("lib") {
                     bat "cargo test --all-targets --target x86_64-pc-windows-msvc"
+                    bat "cargo test --all-targets --features nt_comparison --target x86_64-pc-windows-msvc"
                 }
             }
 		}

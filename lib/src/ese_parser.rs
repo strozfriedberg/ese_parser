@@ -10,17 +10,51 @@ use std::path::Path;
 use std::fs::File;
 use std::io::BufReader;
 
+#[derive(Debug, PartialEq)]
+enum Direction {
+    None,
+    Forward,
+    Backward
+}
+
+// The ValidityInfo struct keeps track of pages that we have already visited
+// to protect against circular reference situations
+struct ValidityInfo {
+    visited_pages: Vec<u32>,
+    direction: Direction,
+}
+
+#[derive(Default, Debug)]
+struct CurrentPage {
+    current_page: Option<jet::DbPage>,
+}
+
+impl CurrentPage {
+    pub(crate) fn is_none(&self) -> bool {
+        self.current_page.is_none()
+    }
+
+    pub(crate) fn get(&self) -> &jet::DbPage {
+        self.current_page.as_ref().expect("Did not find current page")
+    }
+
+    pub(crate) fn set(&mut self, page: jet::DbPage) {
+        self.current_page = Some(page);
+    }
+}
+
 struct Table {
 	cat: Box<jet::TableDefinition>,
 	lv_tags: LV_tags,
-	current_page: Option<jet::DbPage>,
+	current_page: CurrentPage,
 	page_tag_index: usize,
 	lls: RefCell<LastLoadState>,
+    validity_info: ValidityInfo
 }
 
 impl Table {
     fn page(&self) -> &jet::DbPage {
-        self.current_page.as_ref().expect("Did not find current page")
+        self.current_page.get()
     }
 
 	fn review_last_load_state(&mut self, column: u32) {
@@ -31,6 +65,53 @@ impl Table {
 			*lls = LastLoadState::init(self.page().page_number, self.page_tag_index);
 		}
 	}
+
+    fn update_validity_info_for_crow(&mut self, crow: i32) {
+        if crow == ESE_MoveFirst {
+            self.validity_info.visited_pages.clear(); // if we're going to the beginning, clear out any previous visited into
+            self.validity_info.direction = Direction::Forward
+        }
+        else if crow == ESE_MoveLast {
+            self.validity_info.visited_pages.clear(); // if we're going to the end, clear out any previous visited into
+            self.validity_info.direction = Direction::Backward
+        }
+        // We clear out the visited info if we switch direction while reading a table.
+        // Otherwise if we read forward one row, then backward one row, we are reading the same row and would trigger the circular reference error.
+        else if crow > 0 { // incrementing our row
+            if self.validity_info.direction == Direction::Backward {
+                self.validity_info.visited_pages.clear();
+            }
+            self.validity_info.direction = Direction::Forward
+        }
+        else if crow < 0 { // decrementing our row
+            if self.validity_info.direction == Direction::Forward {
+                self.validity_info.visited_pages.clear();
+            }
+            self.validity_info.direction = Direction::Backward
+        }
+    }
+
+    fn already_visited_page(&self, page: u32) -> bool {
+        self.validity_info.visited_pages.contains(&page)
+    }
+
+    fn update_visited_pages(&mut self, page: u32) {
+        self.validity_info.visited_pages.push(page)
+    }
+
+    fn set_current_page(&mut self, page: jet::DbPage) -> Result<bool, SimpleError> {
+        if self.already_visited_page(page.page_number) {
+            Err(SimpleError::new(format!(
+                "Circular page reference identified for page_number: {}",
+                page.page_number
+            )))
+        }
+        else {
+            self.update_visited_pages(page.page_number);
+            self.current_page.set(page);
+            Ok(true)
+        }
+    }
 }
 
 pub struct EseParser<R: ReadSeek> {
@@ -64,9 +145,13 @@ impl<R: ReadSeek> EseParser<R> {
                     Table {
                         cat: Box::new(i),
                         lv_tags: HashMap::new(),
-                        current_page: None,
+                        current_page: CurrentPage::default(),
                         page_tag_index: 0,
-                        lls: RefCell::new( LastLoadState { ..Default::default() })
+                        lls: RefCell::new( LastLoadState { ..Default::default() }),
+                        validity_info: ValidityInfo {
+                            visited_pages: vec![],
+                            direction: Direction::None
+                        }
                     };
                 tables.push(RefCell::new(itrnl));
             }
@@ -126,14 +211,19 @@ impl<R: ReadSeek> EseParser<R> {
     fn move_next_row(&self, table_id: u64, crow: i32) -> Result<bool, SimpleError> {
         let reader = self.get_reader()?;
         let mut t = self.get_table_by_id(table_id)?;
+        t.update_validity_info_for_crow(crow);
 
         let mut i = t.page_tag_index + 1;
         if crow == ESE_MoveFirst {
             let first_leaf_page = reader.find_first_leaf_page(
-                t.cat.table_catalog_definition.as_ref().expect("First leaf page failed").father_data_page_number)?;
+                t.cat.table_catalog_definition.as_ref().expect("First leaf page failed").father_data_page_number
+            )?;
             if t.current_page.is_none() || t.page().page_number != first_leaf_page {
                 let page = jet::DbPage::new(reader, first_leaf_page)?;
-                t.current_page = Some(page);
+                t.set_current_page(page)?;
+            }
+            else {
+                t.update_visited_pages(first_leaf_page);
             }
             if t.page().page_tags.len() < 2 {
                 // empty table
@@ -152,7 +242,7 @@ impl<R: ReadSeek> EseParser<R> {
                 return Ok(true);
             } else if t.page().common().next_page != 0 {
                 let page = jet::DbPage::new(self.get_reader()?, t.page().common().next_page)?;
-                t.current_page = Some(page);
+                t.set_current_page(page)?;
                 i = 1;
             } else {
                 // no more leaf pages
@@ -164,12 +254,13 @@ impl<R: ReadSeek> EseParser<R> {
     fn move_previous_row(&self, table_id: u64, crow: i32) -> Result<bool, SimpleError> {
         let reader = self.get_reader()?;
         let mut t = self.get_table_by_id(table_id)?;
+        t.update_validity_info_for_crow(crow);
 
         let mut i = t.page_tag_index - 1;
         if crow == ESE_MoveLast {
             while t.page().common().next_page != 0 {
                 let page = jet::DbPage::new(reader, t.page().common().next_page)?;
-                t.current_page = Some(page);
+                t.set_current_page(page)?;
             }
             if t.page().page_tags.len() < 2 {
                 // empty table
@@ -187,7 +278,7 @@ impl<R: ReadSeek> EseParser<R> {
                 return Ok(true);
             } else if t.page().common().previous_page != 0 {
                     let page = jet::DbPage::new(reader, t.page().common().previous_page)?;
-                    t.current_page = Some(page);
+                    t.set_current_page(page)?;
                     i = t.page().page_tags.len()-1;
             } else {
                 // no more leaf pages
@@ -310,22 +401,15 @@ impl<R: ReadSeek> EseDb for EseParser<R> {
         Ok(columns)
     }
 
-    fn move_row(&self, table: u64, crow: i32) -> bool {
-        match self.move_row_helper(table, crow) {
-            Ok(r) => r,
-            Err(e) => {
-                println!("move_row_helper failed: {:?}", e);
-                false
-            }
-        }
+    fn move_row(&self, table: u64, crow: i32) -> Result<bool, SimpleError> {
+        self.move_row_helper(table, crow).map_err(|e| SimpleError::new(format!("move_row failed: {:?}", e)))
     }
 
     fn get_column(&self, table: u64, column: u32) -> Result< Option<Vec<u8>>, SimpleError> {
         self.get_column_dyn_helper(table, column, 0)
     }
 
-    fn get_column_mv(&self, table: u64, column: u32, multi_value_index: u32)
-        -> Result< Option<Vec<u8>>, SimpleError> {
+    fn get_column_mv(&self, table: u64, column: u32, multi_value_index: u32) -> Result< Option<Vec<u8>>, SimpleError> {
         self.get_column_dyn_helper(table, column, multi_value_index)
     }
 }
@@ -374,4 +458,136 @@ impl FromBytes for f32 {
 
 impl FromBytes for f64 {
     fn from_bytes(bytes: &[u8]) -> Self  { f64::from_le_bytes(bytes.try_into().unwrap()) }
+}
+
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::collections::HashMap;
+    use crate::parser::ese_db::*;
+
+    fn init_table() -> Table {
+        let table_definition = jet::TableDefinition {
+            table_catalog_definition: None,
+            column_catalog_definition_array: vec![],
+            long_value_catalog_definition: None,
+        };
+
+        Table {
+            cat: Box::new(table_definition),
+            lv_tags: HashMap::new(),
+            current_page: CurrentPage::default(),
+            page_tag_index: 0,
+            lls: RefCell::new( LastLoadState { ..Default::default() }),
+            validity_info: ValidityInfo {
+                visited_pages: vec![],
+                direction: Direction::None
+            }
+        }
+    }
+
+    #[test]
+    fn test_validity_info_direction() {
+        let mut table = init_table();
+
+        assert_eq!(0, table.validity_info.visited_pages.len());
+
+        // test ESE_MoveFirst
+        table.update_visited_pages(10);
+        assert_eq!(1, table.validity_info.visited_pages.len(), "Visiting page didn't increment visited_pages member");
+        table.update_validity_info_for_crow(ESE_MoveFirst);
+        assert_eq!(Direction::Forward, table.validity_info.direction, "ESE_MoveFirst didn't set Direction member properly");
+        assert_eq!(0, table.validity_info.visited_pages.len(), "ESE_MoveFirst didn't clear visited_pages list");
+
+        // test continuing to move forward
+        table.update_visited_pages(10);
+        assert_eq!(1, table.validity_info.visited_pages.len(), "Visiting page didn't increment visited_pages member");
+        table.update_validity_info_for_crow(1);
+        assert_eq!(Direction::Forward, table.validity_info.direction, "Moving in the same dirction switched Direction member");
+        assert_ne!(0, table.validity_info.visited_pages.len(), "Moving in the same dirction cleared out visited_pages list");
+
+        // test switching direction (forward -> backward)
+        table.update_validity_info_for_crow(-1);
+        assert_eq!(Direction::Backward, table.validity_info.direction, "Moving backward didn't switch Direction member");
+        assert_eq!(0, table.validity_info.visited_pages.len(), "Switching direction didn't clear visited_pages list");
+
+        // test switching direction (backward -> forward)
+        table.update_visited_pages(10);
+        assert_eq!(1, table.validity_info.visited_pages.len(), "Visiting page didn't increment visited_pages member");
+        table.update_validity_info_for_crow(1);
+        assert_eq!(Direction::Forward, table.validity_info.direction, "Moving forward didn't switch Direction member");
+        assert_eq!(0, table.validity_info.visited_pages.len(), "Switching direction didn't clear visited_pages list");
+
+        // test ESE_MoveLast
+        table.update_visited_pages(10);
+        assert_eq!(1, table.validity_info.visited_pages.len(), "Visiting page didn't increment visited_pages member");
+        table.update_validity_info_for_crow(ESE_MoveLast);
+        assert_eq!(Direction::Backward, table.validity_info.direction, "ESE_MoveLast didn't set Direction member properly");
+        assert_eq!(0, table.validity_info.visited_pages.len(), "ESE_MovESE_MoveLasteFirst didn't clear visited_pages list");
+
+        // test continuing to move backward
+        table.update_visited_pages(10);
+        assert_eq!(1, table.validity_info.visited_pages.len(), "Visiting page didn't increment visited_pages member");
+        table.update_validity_info_for_crow(-1);
+        assert_eq!(Direction::Backward, table.validity_info.direction, "Moving in the same dirction switched Direction member");
+        assert_ne!(0, table.validity_info.visited_pages.len(), "Moving in the same dirction cleared out visited_pages list");
+    }
+
+    #[test]
+    fn test_update_visited_pages() {
+        let mut table = init_table();
+
+        assert_eq!(0, table.validity_info.visited_pages.len(), "Visited pages didn't start out empty");
+        assert_eq!(false, table.already_visited_page(15), "Returned true for a page we haven't visited");
+        table.update_visited_pages(15);
+        assert_eq!(1, table.validity_info.visited_pages.len(), "Incorrect visited_pages len");
+        assert_eq!(true, table.already_visited_page(15), "Returned false for a page we visited");
+        table.update_visited_pages(5);
+        assert_eq!(2, table.validity_info.visited_pages.len(), "Incorrect visited_pages len");
+        assert_eq!(true, table.already_visited_page(5), "Returned false for a page we visited");
+    }
+
+    #[test]
+    fn test_set_current_page() {
+        let mut table = init_table();
+        let page_header_old = PageHeaderOld {
+            xor_checksum: 12345,
+            page_number: 15,
+        };
+        let page_header_common = PageHeaderCommon {
+            database_modification_time: jet::DateTime {
+                seconds: 0,
+                minutes: 0,
+                hours: 0,
+                day: 0,
+                month: 0,
+                year: 0,
+                time_is_utc: 0,
+                os_snapshot: 0,
+            },
+            previous_page: 10,
+            next_page: 20,
+            father_data_page_object_identifier: 0,
+            available_data_size: 0,
+            available_uncommitted_data_size: 0,
+            available_data_offset: 0,
+            available_page_tag: 0,
+            page_flags: jet::PageFlags::IS_LEAF
+        };
+        let page_header = PageHeader::old(page_header_old, page_header_common);
+
+        let db_page = jet::DbPage {
+            page_number: 82,
+            page_size: 2048,
+            page_header,
+            page_tags: vec![]
+        };
+        assert_eq!(true, table.set_current_page(db_page.clone()).unwrap(), "set_current_page failed for a fresh page");
+        assert_eq!(
+            Err(SimpleError::new("Circular page reference identified for page_number: 82")),
+            table.set_current_page(db_page),
+            "set_current_page didn't error for a revisited page"
+        );
+    }
 }

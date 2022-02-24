@@ -71,7 +71,7 @@ pub trait EseDb {
     fn get_column(&self, table: u64, column: u32) -> Result< Option<Vec<u8>>, SimpleError>;
     fn get_column_mv(&self, table: u64, column: u32, multi_value_index: u32) -> Result< Option<Vec<u8>>, SimpleError>;
 
-    fn move_row(&self, table: u64, crow: i32) -> bool;
+    fn move_row(&self, table: u64, crow: i32) -> Result<bool, SimpleError>;
 
     fn get_column_date(&self, table: u64, column: u32) -> Result<Option<DateTime<Utc>>, SimpleError> {
 		let r = self.get_column(table, column)?;
