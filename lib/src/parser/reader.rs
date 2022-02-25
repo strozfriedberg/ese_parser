@@ -505,7 +505,11 @@ impl <T: ReadSeek> Reader<T>  {
                 db_page.flags())));
         }
 
-        if page_tag_index == 0 || page_tag_index >= pg_tags.len() {
+        if page_tag_index == 0 { // this indicates an empty table; this is ok
+            return Ok(None);
+        }
+
+        if page_tag_index >= pg_tags.len() {
             return Err(SimpleError::new(format!("wrong page tag index: {}", page_tag_index)));
         }
 
