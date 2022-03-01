@@ -89,7 +89,7 @@ pub trait EseDb {
             }
 		}
         else {
-		    Err(SimpleError::new(format!("can't decode date from {:?}", r)))
+		    Ok(None)
         }
 	}
 
@@ -111,11 +111,11 @@ pub trait EseDb {
 				}
 			}
 		}
-		Err(SimpleError::new(format!("can't decode string from {:?}", r)))
+        else {
+		    Ok(None)
+        }
 	}
 }
-
-
 
 pub trait FromBytes {
     fn from_bytes(bytes: &[u8]) -> Self;
