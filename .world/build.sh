@@ -6,6 +6,14 @@ if [[ "$Linkage" == 'static' || "$Target" != 'linux' ]]; then
   exit
 fi
 
+BASEDIR=$(pwd)
+
+PYTHON=python3
+VENV=venv
+VENVBIN=bin
+
+. "$VENV/$VENVBIN/activate"
+
 pushd lib
 cargo test --all-targets
 cargo test --all-targets --features nt_comparison
