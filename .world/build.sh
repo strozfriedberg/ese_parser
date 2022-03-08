@@ -7,12 +7,12 @@ if [[ "$Linkage" == 'static' || "$Target" != 'linux' ]]; then
 fi
 
 pushd lib
-cargo test --all-tragets
+cargo test --all-targets
 cargo test --all-targets --features nt_comparison
 popd
 
 pushd python
-maturin build --interpreter python3.9 --release
+maturin build --interpreter python3 --release
 
 pushd python
 python -m venv test
