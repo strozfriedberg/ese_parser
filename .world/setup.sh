@@ -6,4 +6,13 @@ if [[ "$Linkage" == 'static' || "$Target" != 'linux' ]]; then
   exit
 fi
 
-pip install maturin
+BASEDIR=$(pwd)
+
+PYTHON=python3
+VENV=venv
+VENVBIN=bin
+
+$PYTHON -m venv --clear $VENV
+. "$VENV/$VENVBIN/activate"
+pip install toml maturin
+deactivate
