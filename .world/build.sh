@@ -22,7 +22,6 @@ popd
 pushd python
 maturin build --interpreter python3 --release
 
-pushd python
 python -m venv test
 . test/bin/activate
 pip install --upgrade pip
