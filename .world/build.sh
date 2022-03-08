@@ -18,6 +18,7 @@ pushd python
 python -m venv test
 . test/bin/activate
 pip install --upgrade pip
-pip install --force-reinstall target/wheels/ese_parser-0.1.0-cp36-cp36m-manylinux*_x86_64.whl
+ls target/wheels
+pip install --force-reinstall target/wheels/ese_parser-0.1.0-*_x86_64.whl
 python py/test.py
 popd
