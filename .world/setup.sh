@@ -2,15 +2,20 @@
 
 . .world/build_config.sh
 
-if [[ "$Linkage" == 'static' || "$Target" != 'linux' ]]; then
+if [[ "$Linkage" == 'static' ]] || [[ "$Target" != 'linux' && "$Target" != 'windows_package' ]]; then
   exit
 fi
 
 BASEDIR=$(pwd)
 
-PYTHON=python3
 VENV=venv
-VENVBIN=bin
+if [[ "$Target" == 'linux' ]]; then
+  PYTHON=python3
+  VENVBIN=bin
+elif [[ "$Target" == 'windows_package' ]]; then
+  PYTHON=python
+  VENVBIN=Scripts
+fi
 
 $PYTHON -m venv --clear $VENV
 . "$VENV/$VENVBIN/activate"
