@@ -29,7 +29,6 @@ maturin build --interpreter $PYTHON --release
 
 python -m venv test
 . test/$VENVBIN/activate
-pip install --upgrade pip
 ls target/wheels
 pip install --force-reinstall target/wheels/ese_parser-0.1.0-*_x86_64.whl
 python py/test.py
