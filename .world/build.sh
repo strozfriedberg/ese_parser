@@ -25,7 +25,7 @@ cargo test --all-targets --features nt_comparison
 popd
 
 pushd python
-maturin build --interpreter python3 --release
+maturin build --interpreter $PYTHON --release
 
 python -m venv test
 . test/bin/activate
