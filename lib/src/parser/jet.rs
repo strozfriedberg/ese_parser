@@ -1,15 +1,15 @@
 //jet.rs
 #![allow(non_camel_case_types, dead_code)]
-use bitflags::bitflags;
-use chrono::naive::NaiveTime;
-use std::{fmt, mem};
-use strum::Display;
-use simple_error::SimpleError;
-use nom_derive::*;
 use crate::impl_read_struct;
 use crate::parser::ese_db;
 use crate::parser::ese_db::*;
-use crate::parser::reader::{Reader, ReadSeek};
+use crate::parser::reader::{ReadSeek, Reader};
+use bitflags::bitflags;
+use chrono::naive::NaiveTime;
+use nom_derive::*;
+use simple_error::SimpleError;
+use std::{fmt, mem};
+use strum::Display;
 
 pub type uint8_t = u8;
 pub type uint16_t = u16;
@@ -44,7 +44,7 @@ bitflags! {
 impl<'a> Parse<&'a [u8]> for PageFlags {
     fn parse(i: &'a [u8]) -> nom::IResult<&'a [u8], Self> {
         let (i, page_flags) = nom::number::complete::le_u32(i)?;
-        Ok((i, Self{ bits: page_flags }))
+        Ok((i, Self { bits: page_flags }))
     }
 }
 
@@ -97,8 +97,8 @@ pub enum ColumnType {
 // The tagged data type format definitions
 #[derive(PartialEq, Copy, Clone, Debug)]
 pub enum TaggedDataTypesFormats {
-	Linear = 0,
-	Index = 1,
+    Linear = 0,
+    Index = 1,
 }
 
 bitflags! {
@@ -253,7 +253,10 @@ pub struct DbPage {
 }
 
 impl DbPage {
-    pub fn new<T: ReadSeek>(reader: &Reader<T>, page_number: uint32_t) -> Result<DbPage, SimpleError> {
+    pub fn new<T: ReadSeek>(
+        reader: &Reader<T>,
+        page_number: uint32_t,
+    ) -> Result<DbPage, SimpleError> {
         let page_header = reader.load_page_header(page_number)?;
         let mut db_page = DbPage {
             page_number,
@@ -289,8 +292,9 @@ impl DbPage {
             PageHeader::old(old, common) => mem::size_of_val(&old) + mem::size_of_val(&common),
             PageHeader::x0b(x0b, common) => mem::size_of_val(&x0b) + mem::size_of_val(&common),
             PageHeader::x11(x11, common) => mem::size_of_val(&x11) + mem::size_of_val(&common),
-            PageHeader::x11_ext(x11_ext, common, ext) => mem::size_of_val(&x11_ext) + mem::size_of_val(&common) +
-                mem::size_of_val(&ext),
+            PageHeader::x11_ext(x11_ext, common, ext) => {
+                mem::size_of_val(&x11_ext) + mem::size_of_val(&common) + mem::size_of_val(&ext)
+            }
         }
     }
 
@@ -371,12 +375,12 @@ pub struct CatalogDefinition {
     pub size: uint32_t,
     pub codepage: uint32_t,
     pub lcmap_flags: uint32_t,
-    pub flags : uint32_t,
+    pub flags: uint32_t,
 
     pub name: String,
 
     pub template_name: Vec<u8>,
-    pub default_value: Vec<u8>
+    pub default_value: Vec<u8>,
 }
 
 #[derive(Clone)]
@@ -421,10 +425,32 @@ mod tests {
     use super::*;
 
     #[test]
-    fn test_read_impl(){
-        assert_eq!(DateTime::parse_le(&[5, 10, 5 , 10, 5, 21, 1, 0]).unwrap().1,
-        DateTime { seconds: 5, minutes: 10, hours: 5, day: 10, month: 5, year: 21, time_is_utc: 1, os_snapshot: 0 });
-        assert_eq!(DateTime::parse_le(&[0, 0, 0 , 0, 0, 0, 0, 0]).unwrap().1,
-        DateTime { seconds: 0, minutes: 0, hours: 0, day: 0, month: 0, year: 0, time_is_utc: 0, os_snapshot: 0 });
+    fn test_read_impl() {
+        assert_eq!(
+            DateTime::parse_le(&[5, 10, 5, 10, 5, 21, 1, 0]).unwrap().1,
+            DateTime {
+                seconds: 5,
+                minutes: 10,
+                hours: 5,
+                day: 10,
+                month: 5,
+                year: 21,
+                time_is_utc: 1,
+                os_snapshot: 0
+            }
+        );
+        assert_eq!(
+            DateTime::parse_le(&[0, 0, 0, 0, 0, 0, 0, 0]).unwrap().1,
+            DateTime {
+                seconds: 0,
+                minutes: 0,
+                hours: 0,
+                day: 0,
+                month: 0,
+                year: 0,
+                time_is_utc: 0,
+                os_snapshot: 0
+            }
+        );
     }
 }

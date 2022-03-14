@@ -6,8 +6,8 @@
     clippy::cast_ptr_alignment
 )]
 
-mod process_tables;
 mod compare_output;
+mod process_tables;
 
 use crate::process_tables::*;
 use std::env;

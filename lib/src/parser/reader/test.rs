@@ -1,23 +1,28 @@
 #![cfg(test)]
 
 use super::*;
-use std::collections::HashSet;
 use crate::ese_parser::EseParser;
 use crate::ese_trait::*;
+use std::collections::HashSet;
 use std::fs;
-use std::path::PathBuf;
 use std::fs::File;
 use std::io::BufReader;
+use std::path::PathBuf;
 
 #[cfg(all(feature = "nt_comparison", target_os = "windows"))]
 use crate::parser::reader::gen_db::*;
 
-pub fn prepare_db(filename: &str, _table: &str, _pg_size: usize, _record_size: usize, _records_cnt: usize) -> PathBuf {
+pub fn prepare_db(
+    filename: &str,
+    _table: &str,
+    _pg_size: usize,
+    _record_size: usize,
+    _records_cnt: usize,
+) -> PathBuf {
     let mut dst_path = PathBuf::from("testdata").canonicalize().unwrap();
     dst_path.push(filename);
     dst_path
 }
-
 
 #[test]
 pub fn caching_test() -> Result<(), SimpleError> {
@@ -32,14 +37,17 @@ pub fn caching_test() -> Result<(), SimpleError> {
 
     let mut reader = Reader::new(buf_reader, cache_size as usize)?;
     let page_size = reader.page_size as u64;
-    let num_of_pages = std::cmp::min(fs::metadata(&path).unwrap().len() / page_size, page_size) as usize;
+    let num_of_pages =
+        std::cmp::min(fs::metadata(&path).unwrap().len() / page_size, page_size) as usize;
     let full_cache_size = 6 * cache_size;
     let stride = num_of_pages / full_cache_size;
     let chunk_size = page_size as usize / num_of_pages;
     let mut chunks = Vec::<Vec<u8>>::with_capacity(stride as usize);
 
-    println!("cache_size: {}, page_size: {}, num_of_pages: {}, stride: {}, chunk_size: {}",
-        cache_size, page_size, num_of_pages, stride, chunk_size);
+    println!(
+        "cache_size: {}, page_size: {}, num_of_pages: {}, stride: {}, chunk_size: {}",
+        cache_size, page_size, num_of_pages, stride, chunk_size
+    );
 
     for pass in 1..3 {
         for pg_no in 1_u32..12_u32 {
@@ -78,14 +86,17 @@ pub fn caching_test_windows() -> Result<(), SimpleError> {
 
     let mut reader = Reader::new(buf_reader, cache_size as usize)?;
     let page_size = reader.page_size as u64;
-    let num_of_pages = std::cmp::min(fs::metadata(&path).unwrap().len() / page_size, page_size) as usize;
+    let num_of_pages =
+        std::cmp::min(fs::metadata(&path).unwrap().len() / page_size, page_size) as usize;
     let full_cache_size = 6 * cache_size;
     let stride = num_of_pages / full_cache_size;
     let chunk_size = page_size as usize / num_of_pages;
     let mut chunks = Vec::<Vec<u8>>::with_capacity(stride as usize);
 
-    println!("cache_size: {}, page_size: {}, num_of_pages: {}, stride: {}, chunk_size: {}",
-        cache_size, page_size, num_of_pages, stride, chunk_size);
+    println!(
+        "cache_size: {}, page_size: {}, num_of_pages: {}, stride: {}, chunk_size: {}",
+        cache_size, page_size, num_of_pages, stride, chunk_size
+    );
 
     for pass in 1..3 {
         for pg_no in 1_u32..12_u32 {
@@ -111,7 +122,11 @@ pub fn caching_test_windows() -> Result<(), SimpleError> {
     Ok(())
 }
 
-fn check_row<R: ReadSeek>(jdb: &mut EseParser<R>, table_id: u64, columns: &[ColumnInfo]) -> HashSet<String> {
+fn check_row<R: ReadSeek>(
+    jdb: &mut EseParser<R>,
+    table_id: u64,
+    columns: &[ColumnInfo],
+) -> HashSet<String> {
     let mut values = HashSet::<String>::new();
     for col in columns {
         match jdb.get_column_str(table_id, col.id, col.cp) {
@@ -121,7 +136,7 @@ fn check_row<R: ReadSeek>(jdb: &mut EseParser<R>, table_id: u64, columns: &[Colu
                 } else {
                     values.insert("".to_string());
                 }
-			},
+            }
             Err(e) => panic!("error: {}", e),
         }
     }
@@ -130,19 +145,19 @@ fn check_row<R: ReadSeek>(jdb: &mut EseParser<R>, table_id: u64, columns: &[Colu
 
 #[test]
 pub fn decompress_test_7bit() -> Result<(), SimpleError> {
-	// if record size < 1024 - 7 bit compression is used
-	run_decompress_test("decompress_test.edb", 10)?;
-	Ok(())
+    // if record size < 1024 - 7 bit compression is used
+    run_decompress_test("decompress_test.edb", 10)?;
+    Ok(())
 }
 
 #[test]
 pub fn decompress_test_lzxpress() -> Result<(), SimpleError> {
-	// if record size > 1024 - lzxpress compression is used
-	run_decompress_test("decompress_test2.edb", 2048)?;
-	Ok(())
+    // if record size > 1024 - lzxpress compression is used
+    run_decompress_test("decompress_test2.edb", 2048)?;
+    Ok(())
 }
 
-pub fn run_decompress_test(filename: &str, record_size : usize) -> Result<(), SimpleError> {
+pub fn run_decompress_test(filename: &str, record_size: usize) -> Result<(), SimpleError> {
     let table = "test_table";
     let path = prepare_db(filename, table, 1024 * 8, record_size, 10);
     //let mut jdb = EseParser::init(5);
@@ -159,13 +174,13 @@ pub fn run_decompress_test(filename: &str, record_size : usize) -> Result<(), Si
     assert!(jdb.move_row(table_id, ESE_MoveFirst)?);
 
     for i in 0.. {
-		let values = check_row(&mut jdb, table_id, &columns);
-		assert_eq!(values.len(), 1);
-		let v = format!("Record {number:>width$}", number=i, width=record_size);
-		assert!(values.contains(&v), "{}", true);
-		if !jdb.move_row(table_id, ESE_MoveNext)? {
-			break;
-		}
+        let values = check_row(&mut jdb, table_id, &columns);
+        assert_eq!(values.len(), 1);
+        let v = format!("Record {number:>width$}", number = i, width = record_size);
+        assert!(values.contains(&v), "{}", true);
+        if !jdb.move_row(table_id, ESE_MoveNext)? {
+            break;
+        }
     }
     Ok(())
 }
