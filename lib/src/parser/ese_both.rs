@@ -7,14 +7,14 @@
     clippy::cast_ptr_alignment
 )]
 
+use crate::ese_parser::*;
+use crate::ese_trait::*;
+use crate::esent::ese_api::*;
 use simple_error::SimpleError;
 use std::cell::RefCell;
 use std::fs::File;
 use std::io::BufReader;
 use std::path::Path;
-use crate::ese_parser::*;
-use crate::ese_trait::*;
-use crate::esent::ese_api::*;
 
 const CACHE_SIZE_ENTRIES: usize = 10;
 
@@ -128,14 +128,16 @@ impl EseDb for EseBoth {
         Ok(parser_columns)
     }
 
-    fn move_row(&self, table: u64, crow: i32) -> Result<bool, SimpleError>  {
+    fn move_row(&self, table: u64, crow: i32) -> Result<bool, SimpleError> {
         let (api_table, parser_table) = self.opened_tables.borrow()[table as usize];
         let r1 = self.api.move_row(api_table, crow)?;
         let r2 = self.parser.move_row(parser_table, crow)?;
         if r1 != r2 {
-            Err(SimpleError::new(format!("move_row return result different: EseAPI {} != EseParser {}", r1, r2)))
-        }
-        else {
+            Err(SimpleError::new(format!(
+                "move_row return result different: EseAPI {} != EseParser {}",
+                r1, r2
+            )))
+        } else {
             Ok(r1)
         }
     }

@@ -1,19 +1,23 @@
-
 #[cfg(test)]
 mod tests {
-    use md5;
-    use std::path::PathBuf;
-    use std::fs;
     use crate::process_tables::*;
+    use md5;
+    use std::fs;
+    use std::path::PathBuf;
     use std::string::String;
 
     fn md5_digest(input: Vec<u8>) -> String {
         let digest = md5::compute(input);
-        format!("{:x}",digest)
+        format!("{:x}", digest)
     }
 
     fn get_file_contents(file_path: &PathBuf, db_path: &PathBuf) -> Vec<u8> {
-        process_table(db_path.to_str().unwrap(), Some(file_path.clone()), Mode::EseParser, String::new());
+        process_table(
+            db_path.to_str().unwrap(),
+            Some(file_path.clone()),
+            Mode::EseParser,
+            String::new(),
+        );
         let contents = fs::read(file_path).unwrap();
         contents
     }

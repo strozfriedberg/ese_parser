@@ -2,9 +2,9 @@ use pyo3::types::{PyDateTime, PyString};
 use pyo3::ToPyObject;
 use pyo3::{PyObject, PyResult, Python};
 use pyo3_file::PyFileLikeObject;
+use std::cmp::Ordering;
 use std::io;
 use std::io::{Read, Seek, SeekFrom};
-use std::cmp::Ordering;
 
 use chrono::{DateTime, Datelike, Timelike, Utc};
 use widestring::U16String;

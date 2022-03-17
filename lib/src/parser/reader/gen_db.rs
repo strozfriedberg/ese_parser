@@ -1,11 +1,14 @@
 #![cfg(all(feature = "nt_comparison", target_os = "windows"))]
 #![cfg(test)]
 
-use std::{fs, str, ffi::CString, mem::size_of, os::raw, path::Path, ptr};
-use crate::esent::esent::*;
-use encoding::{all::{ASCII, UTF_16LE, UTF_8}, Encoding, EncoderTrap};
 use crate::ese_trait::ESE_CP;
+use crate::esent::esent::*;
+use encoding::{
+    all::{ASCII, UTF_16LE, UTF_8},
+    EncoderTrap, Encoding,
+};
 use std::convert::TryFrom;
+use std::{ffi::CString, fs, mem::size_of, os::raw, path::Path, ptr, str};
 
 macro_rules! jetcall {
     ($call:expr) => {
@@ -15,7 +18,7 @@ macro_rules! jetcall {
                 err => Err(err),
             }
         }
-    }
+    };
 }
 
 macro_rules! jettry {
@@ -40,36 +43,69 @@ impl EseAPI {
         EseAPI::set_system_parameter_l(JET_paramDisableCallbacks, true.into());
         EseAPI::set_system_parameter_sz(JET_paramRecovery, "Off");
 
-        let mut instance : JET_INSTANCE = 0;
-        jettry!(JetCreateInstanceA(&mut instance, instance_name.as_ptr() as *const i8));
+        let mut instance: JET_INSTANCE = 0;
+        jettry!(JetCreateInstanceA(
+            &mut instance,
+            instance_name.as_ptr() as *const i8
+        ));
         jettry!(JetInit(&mut instance));
 
-        let mut sesid : JET_SESID = 0;
-        jettry!(JetBeginSessionA(instance, &mut sesid, ptr::null(), ptr::null()));
+        let mut sesid: JET_SESID = 0;
+        jettry!(JetBeginSessionA(
+            instance,
+            &mut sesid,
+            ptr::null(),
+            ptr::null()
+        ));
 
-        EseAPI { instance, sesid, dbid: 0 }
+        EseAPI {
+            instance,
+            sesid,
+            dbid: 0,
+        }
     }
 
-    fn set_system_parameter_l(paramId : u32, lParam: u64) {
-        jettry!(JetSetSystemParameterA(ptr::null_mut(), 0, paramId, lParam, ptr::null_mut()));
+    fn set_system_parameter_l(paramId: u32, lParam: u64) {
+        jettry!(JetSetSystemParameterA(
+            ptr::null_mut(),
+            0,
+            paramId,
+            lParam,
+            ptr::null_mut()
+        ));
     }
 
-    fn set_system_parameter_sz(paramId : u32, szParam: &str) {
+    fn set_system_parameter_sz(paramId: u32, szParam: &str) {
         let strParam = CString::new(szParam).unwrap();
-        jettry!(JetSetSystemParameterA(ptr::null_mut(), 0, paramId, 0, strParam.as_ptr()));
+        jettry!(JetSetSystemParameterA(
+            ptr::null_mut(),
+            0,
+            paramId,
+            0,
+            strParam.as_ptr()
+        ));
     }
 
-    fn create_column(name: &str, col_type: JET_COLTYP, cp: ESE_CP, grbit: JET_GRBIT) -> JET_COLUMNCREATE_A {
+    fn create_column(
+        name: &str,
+        col_type: JET_COLTYP,
+        cp: ESE_CP,
+        grbit: JET_GRBIT,
+    ) -> JET_COLUMNCREATE_A {
         println!("create_column: {}", name);
 
-        JET_COLUMNCREATE_A{
+        JET_COLUMNCREATE_A {
             cbStruct: size_of::<JET_COLUMNCREATE_A>() as u32,
             szColumnName: CString::new(name).unwrap().into_raw(),
             coltyp: col_type,
             cbMax: 0,
             grbit,
             cp: cp as u32,
-            pvDefault: ptr::null_mut(), cbDefault: 0, columnid: 0, err: 0 }
+            pvDefault: ptr::null_mut(),
+            cbDefault: 0,
+            columnid: 0,
+            err: 0,
+        }
     }
 
     fn create_text_column(name: &str, cp: ESE_CP, grbit: JET_GRBIT) -> JET_COLUMNCREATE_A {
@@ -80,27 +116,32 @@ impl EseAPI {
         EseAPI::create_column(name, JET_coltypLongBinary, ESE_CP::None, grbit)
     }
 
-    fn create_table(self: &mut EseAPI,
-                    name: &str,
-                    columns: &mut Vec<JET_COLUMNCREATE_A>) -> JET_TABLEID {
-
-        let mut table_def =  JET_TABLECREATE_A{
-                    cbStruct: size_of::<JET_TABLECREATE_A>() as u32,
-                    szTableName: CString::new(name).unwrap().into_raw(),
-                    szTemplateTableName: ptr::null_mut(),
-                    ulPages: 0,
-                    ulDensity: 0,
-                    rgcolumncreate: columns.as_mut_ptr(),
-                    cColumns: columns.len() as raw::c_ulong,
-                    rgindexcreate: ptr::null_mut(),
-                    cIndexes: 0,
-                    grbit: 0,
-                    tableid: 0,
-                    cCreated: 0
-                };
+    fn create_table(
+        self: &mut EseAPI,
+        name: &str,
+        columns: &mut Vec<JET_COLUMNCREATE_A>,
+    ) -> JET_TABLEID {
+        let mut table_def = JET_TABLECREATE_A {
+            cbStruct: size_of::<JET_TABLECREATE_A>() as u32,
+            szTableName: CString::new(name).unwrap().into_raw(),
+            szTemplateTableName: ptr::null_mut(),
+            ulPages: 0,
+            ulDensity: 0,
+            rgcolumncreate: columns.as_mut_ptr(),
+            cColumns: columns.len() as raw::c_ulong,
+            rgindexcreate: ptr::null_mut(),
+            cIndexes: 0,
+            grbit: 0,
+            tableid: 0,
+            cCreated: 0,
+        };
 
         println!("create_table: {}", name);
-        jettry!(JetCreateTableColumnIndexA(self.sesid, self.dbid, &mut table_def ));
+        jettry!(JetCreateTableColumnIndexA(
+            self.sesid,
+            self.dbid,
+            &mut table_def
+        ));
         table_def.tableid
     }
 
@@ -126,7 +167,13 @@ impl Drop for EseAPI {
     }
 }
 
-pub fn prepare_db_gen(filename: &str, table: &str, pg_size: usize, record_size: usize, records_cnt: usize) -> std::path::PathBuf {
+pub fn prepare_db_gen(
+    filename: &str,
+    table: &str,
+    pg_size: usize,
+    record_size: usize,
+    records_cnt: usize,
+) -> std::path::PathBuf {
     let mut dst_path = std::env::temp_dir();
     dst_path.push(filename);
 
@@ -138,18 +185,39 @@ pub fn prepare_db_gen(filename: &str, table: &str, pg_size: usize, record_size: 
     let mut db_client = EseAPI::new(filename, pg_size);
 
     let dbpath = CString::new(dst_path.to_str().unwrap()).unwrap();
-    jettry!(JetCreateDatabaseA(db_client.sesid, dbpath.as_ptr(), ptr::null(), &mut db_client.dbid, 0));
+    jettry!(JetCreateDatabaseA(
+        db_client.sesid,
+        dbpath.as_ptr(),
+        ptr::null(),
+        &mut db_client.dbid,
+        0
+    ));
 
     let mut columns = Vec::<JET_COLUMNCREATE_A>::with_capacity(5);
-    columns.push(EseAPI::create_text_column("compressed_unicode", ESE_CP::Unicode, JET_bitColumnCompressed));
-    columns.push(EseAPI::create_text_column("compressed_ascii", ESE_CP::ASCII, JET_bitColumnCompressed));
-    columns.push(EseAPI::create_binary_column("compressed_binary", JET_bitColumnCompressed));
-    columns.push(EseAPI::create_text_column("usual_text", ESE_CP::None, JET_bitColumnTagged));
+    columns.push(EseAPI::create_text_column(
+        "compressed_unicode",
+        ESE_CP::Unicode,
+        JET_bitColumnCompressed,
+    ));
+    columns.push(EseAPI::create_text_column(
+        "compressed_ascii",
+        ESE_CP::ASCII,
+        JET_bitColumnCompressed,
+    ));
+    columns.push(EseAPI::create_binary_column(
+        "compressed_binary",
+        JET_bitColumnCompressed,
+    ));
+    columns.push(EseAPI::create_text_column(
+        "usual_text",
+        ESE_CP::None,
+        JET_bitColumnTagged,
+    ));
 
     let tableid = db_client.create_table(table, &mut columns);
 
     for i in 0..records_cnt {
-        let s = format!("Record {number:>width$}", number=i, width=record_size);
+        let s = format!("Record {number:>width$}", number = i, width = record_size);
 
         db_client.begin_transaction();
 
@@ -176,12 +244,21 @@ pub fn prepare_db_gen(filename: &str, table: &str, pg_size: usize, record_size: 
                 pvData: data.as_ptr() as *const raw::c_void,
                 cbData: data.len() as raw::c_ulong,
                 grbit: col.grbit,
-                ibLongValue: 0, itagSequence: 0, err: 0 };
+                ibLongValue: 0,
+                itagSequence: 0,
+                err: 0,
+            };
 
             jettry!(JetSetColumns(db_client.sesid, tableid, &mut setColumn, 1));
         }
 
-        jettry!(JetUpdate(db_client.sesid, tableid, ptr::null_mut(), 0, ptr::null_mut()));
+        jettry!(JetUpdate(
+            db_client.sesid,
+            tableid,
+            ptr::null_mut(),
+            0,
+            ptr::null_mut()
+        ));
         db_client.commit_transaction();
     }
 

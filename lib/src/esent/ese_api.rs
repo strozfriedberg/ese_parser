@@ -1,13 +1,12 @@
 #[cfg(all(feature = "nt_comparison", target_os = "windows"))]
-
 use crate::ese_trait::*;
 use crate::esent::esent::*;
 
 use simple_error::SimpleError;
 
 use std::ffi::CString;
-use std::os::raw::{c_void, c_ulong};
 use std::mem::{size_of, MaybeUninit};
+use std::os::raw::{c_ulong, c_void};
 use std::path::Path;
 
 #[derive(Debug)]
@@ -23,11 +22,20 @@ impl EseAPI {
         let col = CString::new(column).unwrap();
         let mut col_base = MaybeUninit::<JET_COLUMNBASE_A>::zeroed();
         unsafe {
-            let err = JetGetColumnInfoA(self.sesid, self.dbid, tbl.as_ptr(),
-                col.as_ptr(), col_base.as_mut_ptr() as *mut c_void, size_of::<JET_COLUMNBASE_A>() as c_ulong, JET_ColInfoBase);
+            let err = JetGetColumnInfoA(
+                self.sesid,
+                self.dbid,
+                tbl.as_ptr(),
+                col.as_ptr(),
+                col_base.as_mut_ptr() as *mut c_void,
+                size_of::<JET_COLUMNBASE_A>() as c_ulong,
+                JET_ColInfoBase,
+            );
             if err != 0 {
-                return Err(SimpleError::new(
-                    format!("JetOpenDatabaseA failed with error {}", self.error_to_string(err))));
+                return Err(SimpleError::new(format!(
+                    "JetOpenDatabaseA failed with error {}",
+                    self.error_to_string(err)
+                )));
             }
             Ok(col_base.assume_init())
         }
@@ -44,40 +52,64 @@ impl EseAPI {
 
             if JET_errSuccess == (err as u32) {
                 Ok(*db_info.as_ptr())
-            }
-            else {
-                Err(SimpleError::new(format!("JetGetDatabaseFileInfoA failed with error {}", err)))
+            } else {
+                Err(SimpleError::new(format!(
+                    "JetGetDatabaseFileInfoA failed with error {}",
+                    err
+                )))
             }
         }
     }
 
-    fn set_system_parameter_l(paramId : u32, lParam: u64) -> bool {
+    fn set_system_parameter_l(paramId: u32, lParam: u64) -> bool {
         unsafe {
-            let err = JetSetSystemParameterA(std::ptr::null_mut(), 0, paramId, lParam, std::ptr::null_mut()) as u32;
+            let err = JetSetSystemParameterA(
+                std::ptr::null_mut(),
+                0,
+                paramId,
+                lParam,
+                std::ptr::null_mut(),
+            ) as u32;
             err == JET_errSuccess
         }
     }
 
-    fn set_system_parameter_sz(paramId : u32, szParam: &str) -> bool {
+    fn set_system_parameter_sz(paramId: u32, szParam: &str) -> bool {
         let strParam = CString::new(szParam).unwrap();
         unsafe {
-            let err = JetSetSystemParameterA(std::ptr::null_mut(), 0, paramId, 0, strParam.as_ptr()) as u32;
+            let err = JetSetSystemParameterA(std::ptr::null_mut(), 0, paramId, 0, strParam.as_ptr())
+                as u32;
             err == JET_errSuccess
         }
     }
 
-    fn get_column_dyn_helper(&self, table: u64, column: u32, data: &mut[u8], size: usize)
-        -> Result<u32, SimpleError> {
-        let mut bytes : c_ulong = 0;
+    fn get_column_dyn_helper(
+        &self,
+        table: u64,
+        column: u32,
+        data: &mut [u8],
+        size: usize,
+    ) -> Result<u32, SimpleError> {
+        let mut bytes: c_ulong = 0;
         unsafe {
-            let err = JetRetrieveColumn(self.sesid, table, column, data.as_mut_ptr() as *mut c_void, size as u32,
-                &mut bytes, 0, std::ptr::null_mut());
+            let err = JetRetrieveColumn(
+                self.sesid,
+                table,
+                column,
+                data.as_mut_ptr() as *mut c_void,
+                size as u32,
+                &mut bytes,
+                0,
+                std::ptr::null_mut(),
+            );
             if err != 0 {
                 if err == JET_wrnColumnNull as i32 {
                     return Ok(0);
                 }
-                return Err(SimpleError::new(
-                    format!("JetRetrieveColumn failed with error {}", self.error_to_string(err))));
+                return Err(SimpleError::new(format!(
+                    "JetRetrieveColumn failed with error {}",
+                    self.error_to_string(err)
+                )));
             }
 
             Ok(bytes as u32)
@@ -85,46 +117,63 @@ impl EseAPI {
     }
 
     pub fn get_fixed_column<T>(&self, table: u64, column: u32) -> Result<Option<T>, SimpleError> {
-        let size : c_ulong = size_of::<T>() as u32;
+        let size: c_ulong = size_of::<T>() as u32;
         let mut v = MaybeUninit::<T>::zeroed();
 
         unsafe {
-            self.get_column_dyn_helper(table, column,
-                std::slice::from_raw_parts_mut::<u8>(v.as_mut_ptr() as *mut u8, size as usize), size as usize)?;
+            self.get_column_dyn_helper(
+                table,
+                column,
+                std::slice::from_raw_parts_mut::<u8>(v.as_mut_ptr() as *mut u8, size as usize),
+                size as usize,
+            )?;
             Ok(Some(v.assume_init()))
         }
     }
 
     pub fn load_from_path(filename: impl AsRef<Path>) -> Result<Self, SimpleError> {
         match filename.as_ref().to_str() {
-            None => Err(SimpleError::new(format!("Unable to convert {:?}", filename.as_ref()))),
+            None => Err(SimpleError::new(format!(
+                "Unable to convert {:?}",
+                filename.as_ref()
+            ))),
             Some(dbpath) => {
                 let dbinfo = EseAPI::get_database_file_info(dbpath)?;
                 EseAPI::set_system_parameter_l(JET_paramDatabasePageSize, dbinfo.cbPageSize as u64);
                 EseAPI::set_system_parameter_l(JET_paramDisableCallbacks, true as u64);
                 EseAPI::set_system_parameter_sz(JET_paramRecovery, "Off");
 
-                let mut instance : JET_INSTANCE = 0;
+                let mut instance: JET_INSTANCE = 0;
                 unsafe {
                     let err = JetCreateInstanceA(&mut instance, std::ptr::null());
                     if err != 0 {
-                        return Err(SimpleError::new(format!("JetCreateInstanceA failed with error: {}", err)));
+                        return Err(SimpleError::new(format!(
+                            "JetCreateInstanceA failed with error: {}",
+                            err
+                        )));
                     }
                 }
                 unsafe {
                     let err = JetInit(&mut instance);
                     if err != 0 {
                         JetTerm(instance);
-                        return Err(SimpleError::new(format!("JetInit failed with error {}", err)));
+                        return Err(SimpleError::new(format!(
+                            "JetInit failed with error {}",
+                            err
+                        )));
                     }
                 }
 
-                let mut sesid : JET_SESID = 0;
+                let mut sesid: JET_SESID = 0;
                 unsafe {
-                    let err = JetBeginSessionA(instance, &mut sesid, std::ptr::null(), std::ptr::null() );
+                    let err =
+                        JetBeginSessionA(instance, &mut sesid, std::ptr::null(), std::ptr::null());
                     if err != 0 {
                         JetTerm(instance);
-                        return Err(SimpleError::new(format!("JetBeginSessionA failed with error {}", err)));
+                        return Err(SimpleError::new(format!(
+                            "JetBeginSessionA failed with error {}",
+                            err
+                        )));
                     }
                 }
 
@@ -134,28 +183,38 @@ impl EseAPI {
                     if err != 0 {
                         JetEndSession(sesid, 0);
                         JetTerm(instance);
-                        return Err(SimpleError::new(format!("JetAttachDatabaseA failed with error {}", err)));
+                        return Err(SimpleError::new(format!(
+                            "JetAttachDatabaseA failed with error {}",
+                            err
+                        )));
                     }
                 }
 
-                let mut dbid : JET_DBID = 0;
+                let mut dbid: JET_DBID = 0;
                 unsafe {
-                    let err = JetOpenDatabaseA(sesid, dbpath.as_ptr(), std::ptr::null(), &mut dbid, JET_bitDbReadOnly);
+                    let err = JetOpenDatabaseA(
+                        sesid,
+                        dbpath.as_ptr(),
+                        std::ptr::null(),
+                        &mut dbid,
+                        JET_bitDbReadOnly,
+                    );
                     if err != 0 {
                         JetDetachDatabaseA(sesid, std::ptr::null());
                         JetEndSession(sesid, 0);
                         JetTerm(instance);
-                        return Err(SimpleError::new(format!("JetOpenDatabaseA failed with error {}", err)));
+                        return Err(SimpleError::new(format!(
+                            "JetOpenDatabaseA failed with error {}",
+                            err
+                        )));
                     }
                 }
 
-                Ok(
-                    EseAPI {
-                        instance,
-                        sesid,
-                        dbid
-                    }
-                )
+                Ok(EseAPI {
+                    instance,
+                    sesid,
+                    dbid,
+                })
             }
         }
     }
@@ -163,11 +222,17 @@ impl EseAPI {
 
 impl EseDb for EseAPI {
     fn error_to_string(&self, err: i32) -> String {
-        let mut v : Vec<u8> = Vec::new();
+        let mut v: Vec<u8> = Vec::new();
         v.resize(256, 0);
         unsafe {
-            let res = JetGetSystemParameterA(self.instance, self.sesid, JET_paramErrorToString,
-                err as *mut u64, v.as_mut_ptr() as *mut i8, v.len() as c_ulong);
+            let res = JetGetSystemParameterA(
+                self.instance,
+                self.sesid,
+                JET_paramErrorToString,
+                err as *mut u64,
+                v.as_mut_ptr() as *mut i8,
+                v.len() as c_ulong,
+            );
             if res != 0 {
                 std::str::from_utf8(&v).unwrap().to_string()
             } else {
@@ -178,12 +243,22 @@ impl EseDb for EseAPI {
 
     fn open_table(&self, table: &str) -> Result<u64, SimpleError> {
         let tbl = CString::new(table).unwrap();
-        let mut tableid : JET_TABLEID = 0;
+        let mut tableid: JET_TABLEID = 0;
         unsafe {
-            let err = JetOpenTableA(self.sesid, self.dbid, tbl.as_ptr(), std::ptr::null(), 0, JET_bitTableReadOnly,
-                &mut tableid);
+            let err = JetOpenTableA(
+                self.sesid,
+                self.dbid,
+                tbl.as_ptr(),
+                std::ptr::null(),
+                0,
+                JET_bitTableReadOnly,
+                &mut tableid,
+            );
             if err != 0 {
-                return Err(SimpleError::new(format!("JetOpenTableA failed with error {}", self.error_to_string(err))));
+                return Err(SimpleError::new(format!(
+                    "JetOpenTableA failed with error {}",
+                    self.error_to_string(err)
+                )));
             }
             Ok(tableid)
         }
@@ -196,30 +271,40 @@ impl EseDb for EseAPI {
         }
     }
 
-    fn get_column(&self, table: u64, column: u32) -> Result< Option<Vec<u8>>, SimpleError> {
-        let mut vres : Vec<u8> = Vec::new();
+    fn get_column(&self, table: u64, column: u32) -> Result<Option<Vec<u8>>, SimpleError> {
+        let mut vres: Vec<u8> = Vec::new();
 
         loop {
-            let mut v : Vec<u8> = Vec::new();
+            let mut v: Vec<u8> = Vec::new();
             let size: usize = 4096;
             v.resize(size, 0);
 
-            let mut bytes : c_ulong = 0;
+            let mut bytes: c_ulong = 0;
             unsafe {
                 let mut retinfo = JET_RETINFO {
                     cbStruct: size_of::<JET_RETINFO>() as c_ulong,
                     ibLongValue: vres.len() as c_ulong,
-                    itagSequence : 1,
-                    columnidNextTagged: 0
+                    itagSequence: 1,
+                    columnidNextTagged: 0,
                 };
-                let err = JetRetrieveColumn(self.sesid, table, column, v.as_mut_slice().as_mut_ptr() as *mut c_void, size as u32,
-                    &mut bytes, 0, &mut retinfo);
+                let err = JetRetrieveColumn(
+                    self.sesid,
+                    table,
+                    column,
+                    v.as_mut_slice().as_mut_ptr() as *mut c_void,
+                    size as u32,
+                    &mut bytes,
+                    0,
+                    &mut retinfo,
+                );
                 if err != 0 && err != JET_wrnBufferTruncated as i32 {
                     if err == JET_wrnColumnNull as i32 {
                         return Ok(None);
                     }
-                    return Err(SimpleError::new(
-                        format!("JetRetrieveColumn failed with error {}", self.error_to_string(err))));
+                    return Err(SimpleError::new(format!(
+                        "JetRetrieveColumn failed with error {}",
+                        self.error_to_string(err)
+                    )));
                 }
                 if bytes == 0 {
                     return Ok(None);
@@ -235,47 +320,61 @@ impl EseDb for EseAPI {
         Ok(Some(vres))
     }
 
-    fn get_column_mv(&self, table: u64, column: u32, multi_value_index: u32)
-        -> Result< Option<Vec<u8>>, SimpleError> {
-            let mut vres : Vec<u8> = Vec::new();
+    fn get_column_mv(
+        &self,
+        table: u64,
+        column: u32,
+        multi_value_index: u32,
+    ) -> Result<Option<Vec<u8>>, SimpleError> {
+        let mut vres: Vec<u8> = Vec::new();
 
-            loop {
-                let mut v : Vec<u8> = Vec::new();
-                let size: usize = 4096;
-                v.resize(size, 0);
+        loop {
+            let mut v: Vec<u8> = Vec::new();
+            let size: usize = 4096;
+            v.resize(size, 0);
 
-                let mut bytes : c_ulong = 0;
-                unsafe {
-                    let mut retinfo = JET_RETINFO {
-                        cbStruct: size_of::<JET_RETINFO>() as c_ulong,
-                        ibLongValue: vres.len() as c_ulong,
-                        itagSequence : multi_value_index,
-                        columnidNextTagged: 0
-                    };
-                    let err = JetRetrieveColumn(self.sesid, table, column, v.as_mut_slice().as_mut_ptr() as *mut c_void, size as u32,
-                        &mut bytes, 0, &mut retinfo);
-                    if err != 0 && err != JET_wrnBufferTruncated as i32 {
-                        if err == JET_wrnColumnNull as i32 {
-                            return Ok(None);
-                        }
-                        return Err(SimpleError::new(
-                            format!("JetRetrieveColumn failed with error {}", self.error_to_string(err))));
+            let mut bytes: c_ulong = 0;
+            unsafe {
+                let mut retinfo = JET_RETINFO {
+                    cbStruct: size_of::<JET_RETINFO>() as c_ulong,
+                    ibLongValue: vres.len() as c_ulong,
+                    itagSequence: multi_value_index,
+                    columnidNextTagged: 0,
+                };
+                let err = JetRetrieveColumn(
+                    self.sesid,
+                    table,
+                    column,
+                    v.as_mut_slice().as_mut_ptr() as *mut c_void,
+                    size as u32,
+                    &mut bytes,
+                    0,
+                    &mut retinfo,
+                );
+                if err != 0 && err != JET_wrnBufferTruncated as i32 {
+                    if err == JET_wrnColumnNull as i32 {
+                        return Ok(None);
                     }
+                    return Err(SimpleError::new(format!(
+                        "JetRetrieveColumn failed with error {}",
+                        self.error_to_string(err)
+                    )));
+                }
 
-                    v.truncate(bytes as usize);
-                    vres.append(v.as_mut());
+                v.truncate(bytes as usize);
+                vres.append(v.as_mut());
 
-                    if err == JET_wrnBufferTruncated as i32 {
-                        continue;
-                    } else {
-                        break;
-                    }
+                if err == JET_wrnBufferTruncated as i32 {
+                    continue;
+                } else {
+                    break;
                 }
             }
-            Ok(Some(vres))
+        }
+        Ok(Some(vres))
     }
 
-    fn move_row(&self, table: u64, crow: i32) -> Result<bool, SimpleError>  {
+    fn move_row(&self, table: u64, crow: i32) -> Result<bool, SimpleError> {
         unsafe {
             let err = JetMove(self.sesid, table, crow as std::os::raw::c_long, 0);
             Ok(err == 0)
@@ -288,13 +387,17 @@ impl EseDb for EseAPI {
 
         let table_id = self.open_table("MSysObjects")?;
 
-        let mut err : Vec<String> = Vec::new();
+        let mut err: Vec<String> = Vec::new();
         loop {
-            let name_str = self.get_column_str(table_id, c_name_info.columnid, c_name_info.cp)?.unwrap();
-            let type_word = self.get_fixed_column::<u16>(table_id, c_type_info.columnid)?.unwrap();
+            let name_str = self
+                .get_column_str(table_id, c_name_info.columnid, c_name_info.cp)?
+                .unwrap();
+            let type_word = self
+                .get_fixed_column::<u16>(table_id, c_type_info.columnid)?
+                .unwrap();
 
             if type_word == 1 {
-               err.push(name_str);
+                err.push(name_str);
             }
 
             if !self.move_row(table_id, ESE_MoveNext)? {
@@ -308,31 +411,49 @@ impl EseDb for EseAPI {
 
     fn get_columns(&self, table: &str) -> Result<Vec<ColumnInfo>, SimpleError> {
         let table_id = self.open_table(table)?;
-        let mut cols : Vec<ColumnInfo> = Vec::new();
+        let mut cols: Vec<ColumnInfo> = Vec::new();
         let mut col_list = MaybeUninit::<JET_COLUMNLIST>::zeroed();
         unsafe {
-            let err = JetGetTableColumnInfoA(self.sesid, table_id, std::ptr::null(),
-                col_list.as_mut_ptr() as *mut c_void, size_of::<JET_COLUMNLIST>() as c_ulong, JET_ColInfoList);
+            let err = JetGetTableColumnInfoA(
+                self.sesid,
+                table_id,
+                std::ptr::null(),
+                col_list.as_mut_ptr() as *mut c_void,
+                size_of::<JET_COLUMNLIST>() as c_ulong,
+                JET_ColInfoList,
+            );
             if err != 0 {
-                return Err(SimpleError::new(
-                    format!("JetGetTableColumnInfoA failed with error {}", self.error_to_string(err))));
+                return Err(SimpleError::new(format!(
+                    "JetGetTableColumnInfoA failed with error {}",
+                    self.error_to_string(err)
+                )));
             }
 
             let subtable_id = col_list.assume_init().tableid;
 
             loop {
-                let col_name = self.get_column_str(subtable_id, col_list.assume_init().columnidcolumnname, 0)?.unwrap();
-                let col_id = self.get_fixed_column::<u32>(subtable_id, col_list.assume_init().columnidcolumnid)?.unwrap();
-                let col_type = self.get_fixed_column::<u32>(subtable_id, col_list.assume_init().columnidcoltyp)?.unwrap();
-                let col_cbmax = self.get_fixed_column::<u32>(subtable_id, col_list.assume_init().columnidcbMax)?.unwrap();
-                let col_cp = self.get_fixed_column::<u16>(subtable_id, col_list.assume_init().columnidCp)?.unwrap();
+                let col_name = self
+                    .get_column_str(subtable_id, col_list.assume_init().columnidcolumnname, 0)?
+                    .unwrap();
+                let col_id = self
+                    .get_fixed_column::<u32>(subtable_id, col_list.assume_init().columnidcolumnid)?
+                    .unwrap();
+                let col_type = self
+                    .get_fixed_column::<u32>(subtable_id, col_list.assume_init().columnidcoltyp)?
+                    .unwrap();
+                let col_cbmax = self
+                    .get_fixed_column::<u32>(subtable_id, col_list.assume_init().columnidcbMax)?
+                    .unwrap();
+                let col_cp = self
+                    .get_fixed_column::<u16>(subtable_id, col_list.assume_init().columnidCp)?
+                    .unwrap();
 
                 cols.push(ColumnInfo {
                     name: col_name,
                     id: col_id,
                     typ: col_type,
                     cbmax: col_cbmax,
-                    cp: col_cp
+                    cp: col_cp,
                 });
 
                 if !self.move_row(subtable_id, ESE_MoveNext)? {

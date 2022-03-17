@@ -1,15 +1,15 @@
 extern crate ese_parser_lib;
 
+#[cfg(all(feature = "nt_comparison", target_os = "windows"))]
+use ese_parser_lib::parser::ese_both::*;
+use ese_parser_lib::{ese_parser::*, ese_trait::*, vartime::*};
 use simple_error::SimpleError;
-use std::mem::size_of;
 use std::convert::TryFrom;
 use std::fs::File;
 use std::io::{self, Error, Write};
+use std::mem::size_of;
 use std::path::PathBuf;
 use std::result::Result;
-use ese_parser_lib::{ese_parser::*, ese_trait::*, vartime::*};
-#[cfg(all(feature = "nt_comparison", target_os = "windows"))]
-use ese_parser_lib::parser::ese_both::*;
 
 #[derive(Debug)]
 struct Args {
@@ -17,19 +17,18 @@ struct Args {
     _output: Option<PathBuf>,
 }
 
-fn get_column<T: FromBytes>(jdb: &dyn EseDb, table: u64, column: u32) -> Result<Option<T>, SimpleError> {
-    match jdb.get_column(table, column)?
-    {
+fn get_column<T: FromBytes>(
+    jdb: &dyn EseDb,
+    table: u64,
+    column: u32,
+) -> Result<Option<T>, SimpleError> {
+    match jdb.get_column(table, column)? {
         Some(v) => Ok(Some(T::from_bytes(&v))),
-        None => Ok(None)
+        None => Ok(None),
     }
 }
 
-fn get_column_val(
-    jdb: &dyn EseDb,
-    table_id: u64,
-    c: &ColumnInfo,
-) -> Result<String, SimpleError> {
+fn get_column_val(jdb: &dyn EseDb, table_id: u64, c: &ColumnInfo) -> Result<String, SimpleError> {
     let val;
     match c.typ {
         ESE_coltypBit => {
@@ -111,10 +110,7 @@ fn get_column_val(
         }
         ESE_coltypBinary => match jdb.get_column(table_id, c.id)? {
             Some(v) => {
-                let s = v
-                    .iter()
-                    .map(|c| format!("{:x?} ", c))
-                    .collect::<String>();
+                let s = v.iter().map(|c| format!("{:x?} ", c)).collect::<String>();
                 val = format!("{} ", s);
             }
             None => {
@@ -143,10 +139,7 @@ fn get_column_val(
             Some(mut v) => {
                 let orig_size = v.len();
                 v.truncate(16);
-                let s = v
-                    .iter()
-                    .map(|c| format!("{:02x} ", c))
-                    .collect::<String>();
+                let s = v.iter().map(|c| format!("{:02x} ", c)).collect::<String>();
                 val = format!("{:4} bytes: {}...", orig_size, s);
             }
             None => {
@@ -170,10 +163,7 @@ fn get_column_val(
             match get_column::<u64>(jdb, table_id, c.id)? {
                 Some(filetime) => {
                     let datetime = get_date_time_from_filetime(filetime);
-                    val = format!(
-                        "{}",
-                        datetime
-                    );
+                    val = format!("{}", datetime);
                 }
                 None => val = (" ").to_string(),
             }
@@ -192,13 +182,7 @@ type Row = Vec<Vec<String>>;
 type Col = Vec<ColumnInfo>;
 type Table = (Col, Row);
 
-fn dump_table(
-    jdb: &dyn EseDb,
-    t: &str,
-) -> Result<
-    Option<Table>,
-    SimpleError,
-> {
+fn dump_table(jdb: &dyn EseDb, t: &str) -> Result<Option<Table>, SimpleError> {
     let table_id = jdb.open_table(t)?;
     let cols = jdb.get_columns(t)?;
     if !jdb.move_row(table_id, ESE_MoveFirst)? {
@@ -235,16 +219,15 @@ const CACHE_SIZE_ENTRIES: usize = 10;
 #[allow(unreachable_code)]
 #[cfg(target_os = "windows")]
 fn alloc_jdb(m: &Mode, dbpath: &str) -> Box<dyn EseDb> {
-    #[cfg(feature = "nt_comparison")] {
+    #[cfg(feature = "nt_comparison")]
+    {
         use ese_parser_lib::esent::ese_api::EseAPI;
 
         if *m == Mode::EseApi {
             return Box::new(EseAPI::load_from_path(dbpath).unwrap());
-        }
-        else if *m == Mode::EseParser {
+        } else if *m == Mode::EseParser {
             return Box::new(EseParser::load_from_path(CACHE_SIZE_ENTRIES, dbpath).unwrap());
-        }
-        else {
+        } else {
             return Box::new(EseBoth::load_from_path(dbpath).unwrap());
         }
     }
@@ -268,7 +251,11 @@ fn alloc_jdb_ese_parser(m: &Mode, dbpath: &str) -> Box<dyn EseDb> {
     Box::new(EseParser::load_from_path(CACHE_SIZE_ENTRIES, dbpath).unwrap())
 }
 
-fn print_table(cols: &[ColumnInfo], rows: &[Vec<String>], output_destination: &mut dyn std::io::Write) {
+fn print_table(
+    cols: &[ColumnInfo],
+    rows: &[Vec<String>],
+    output_destination: &mut dyn std::io::Write,
+) {
     let mut col_sp: Vec<usize> = Vec::new();
     for (i, col) in cols.iter().enumerate() {
         let mut col_max_sz = col.name.len();
@@ -285,7 +272,6 @@ fn print_table(cols: &[ColumnInfo], rows: &[Vec<String>], output_destination: &m
         nrow = format!("{}|{:2$}", nrow, col.name, col_sp[i]);
     }
     writeln!(output_destination, "{}|", nrow).unwrap();
-
 
     for r in rows.iter() {
         let mut row = String::new();
@@ -306,7 +292,7 @@ pub enum Mode {
 pub fn resolve_path(test_file: Option<PathBuf>) -> Result<Box<dyn Write>, Error> {
     match test_file {
         Some(ref path) => File::create(path).map(|f| Box::new(f) as Box<dyn Write>),
-        None => Ok(Box::new(io::stdout()))
+        None => Ok(Box::new(io::stdout())),
     }
 }
 
@@ -321,7 +307,7 @@ pub fn process_table(dbpath: &str, test_file: Option<PathBuf>, mode: Mode, table
         match dump_table(&*jdb, t) {
             Ok(opt) => match opt {
                 Some((cols, rows)) => print_table(&cols, &rows, &mut output_destination),
-                None => writeln!(output_destination, "table {} is empty.", &t).unwrap()
+                None => writeln!(output_destination, "table {} is empty.", &t).unwrap(),
             },
             Err(e) => writeln!(output_destination, "table {}: {}", &t, e).unwrap(),
         }
@@ -343,41 +329,61 @@ pub trait FromBytes {
 }
 
 impl FromBytes for i8 {
-    fn from_bytes(bytes: &[u8]) -> Self  { i8::from_le_bytes(bytes.try_into().unwrap()) }
+    fn from_bytes(bytes: &[u8]) -> Self {
+        i8::from_le_bytes(bytes.try_into().unwrap())
+    }
 }
 
 impl FromBytes for u8 {
-    fn from_bytes(bytes: &[u8]) -> Self  { u8::from_le_bytes(bytes.try_into().unwrap()) }
+    fn from_bytes(bytes: &[u8]) -> Self {
+        u8::from_le_bytes(bytes.try_into().unwrap())
+    }
 }
 
 impl FromBytes for i16 {
-    fn from_bytes(bytes: &[u8]) -> Self  { i16::from_le_bytes(bytes.try_into().unwrap()) }
+    fn from_bytes(bytes: &[u8]) -> Self {
+        i16::from_le_bytes(bytes.try_into().unwrap())
+    }
 }
 
 impl FromBytes for u16 {
-    fn from_bytes(bytes: &[u8]) -> Self  { u16::from_le_bytes(bytes.try_into().unwrap()) }
+    fn from_bytes(bytes: &[u8]) -> Self {
+        u16::from_le_bytes(bytes.try_into().unwrap())
+    }
 }
 
 impl FromBytes for i32 {
-    fn from_bytes(bytes: &[u8]) -> Self  { i32::from_le_bytes(bytes.try_into().unwrap()) }
+    fn from_bytes(bytes: &[u8]) -> Self {
+        i32::from_le_bytes(bytes.try_into().unwrap())
+    }
 }
 
 impl FromBytes for u32 {
-    fn from_bytes(bytes: &[u8]) -> Self  { u32::from_le_bytes(bytes.try_into().unwrap()) }
+    fn from_bytes(bytes: &[u8]) -> Self {
+        u32::from_le_bytes(bytes.try_into().unwrap())
+    }
 }
 
 impl FromBytes for i64 {
-    fn from_bytes(bytes: &[u8]) -> Self  { i64::from_le_bytes(bytes.try_into().unwrap()) }
+    fn from_bytes(bytes: &[u8]) -> Self {
+        i64::from_le_bytes(bytes.try_into().unwrap())
+    }
 }
 
 impl FromBytes for u64 {
-    fn from_bytes(bytes: &[u8]) -> Self  { u64::from_le_bytes(bytes.try_into().unwrap()) }
+    fn from_bytes(bytes: &[u8]) -> Self {
+        u64::from_le_bytes(bytes.try_into().unwrap())
+    }
 }
 
 impl FromBytes for f32 {
-    fn from_bytes(bytes: &[u8]) -> Self  { f32::from_le_bytes(bytes.try_into().unwrap()) }
+    fn from_bytes(bytes: &[u8]) -> Self {
+        f32::from_le_bytes(bytes.try_into().unwrap())
+    }
 }
 
 impl FromBytes for f64 {
-    fn from_bytes(bytes: &[u8]) -> Self  { f64::from_le_bytes(bytes.try_into().unwrap()) }
+    fn from_bytes(bytes: &[u8]) -> Self {
+        f64::from_le_bytes(bytes.try_into().unwrap())
+    }
 }
