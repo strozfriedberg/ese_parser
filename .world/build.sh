@@ -9,12 +9,12 @@ fi
 BASEDIR=$(pwd)
 
 VENV=venv
-if [[ "$Target" == 'linux' ]]; then
-  PYTHON=python3
-  VENVBIN=bin
-elif [[ "$Target" == 'windows_package' ]]; then
+if [[ "$Target" == 'windows_package' ]]; then
   PYTHON=python
   VENVBIN=Scripts
+else
+  PYTHON=python3
+  VENVBIN=bin
 fi
 
 . "$VENV/$VENVBIN/activate"
