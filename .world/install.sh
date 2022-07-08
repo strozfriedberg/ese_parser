@@ -11,6 +11,6 @@ cp python/target/wheels/* $INSTALL/lib/python/ese_parser
 
 if [[ "$Target" == 'windows_package' ]]; then
   pushd python
-  pip install . --use-feature=in-tree-build
+  pip install .
   popd
 fi
