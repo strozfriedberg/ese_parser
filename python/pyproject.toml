@@ -1,3 +1,19 @@
+[tool.poetry]
+name = "ese_parser"
+version = "0.1.0"
+authors = ["Kimberly Stone"]
+description = "Python bindings for ese_parser"
+
+[tool.poetry.dependencies]
+python = "^3.6"
+
+[tool.poetry.dev-dependencies]
+pytest = "^6.2.4"
+maturin = "^0.9.4"
+
 [build-system]
 requires = ["maturin==0.9.4"]
 build-backend = "maturin"
+
+[tool.maturin]
+sdist-include = ["ese_parser/**/*","Cargo.lock"]
