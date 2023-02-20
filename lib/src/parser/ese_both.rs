@@ -150,12 +150,21 @@ impl EseDb for EseBoth {
     ) -> Result<Option<String>, SimpleError> {
         let (api_table, parser_table) = self.opened_tables.borrow()[table as usize];
         let s1 = self.api.get_column_str(api_table, column, cp)?;
-        let s2 = self.parser.get_column_str(parser_table, column, cp)?;
-        if s1 != s2 {
-            return Err(SimpleError::new(format!(
-                r"table {}, column({}) EseAPI column '{:?}' not equal to EseParser '{:?}'",
-                table, column, s1, s2
-            )));
+        match self.parser.get_column_str(parser_table, column, cp) {
+            Ok(s2) => {
+                if s1 != s2 {
+                    return Err(SimpleError::new(format!(
+                        r"table {}, column({}) EseAPI column '{:?}' not equal to EseParser '{:?}'",
+                        table, column, s1, s2
+                    )));
+                }
+            },
+            Err(e) => {
+                return Err(SimpleError::new(format!(
+                    r"table {}, column({}) EseParser failed with error '{:?}', but EseAPI returned '{:?}'",
+                    table, column, e, s1
+                )));
+            }
         }
         Ok(s1)
     }
@@ -163,12 +172,21 @@ impl EseDb for EseBoth {
     fn get_column(&self, table: u64, column: u32) -> Result<Option<Vec<u8>>, SimpleError> {
         let (api_table, parser_table) = self.opened_tables.borrow()[table as usize];
         let s1 = self.api.get_column(api_table, column)?;
-        let s2 = self.parser.get_column(parser_table, column)?;
-        if s1 != s2 {
-            return Err(SimpleError::new(format!(
-                r"table {}, column({}) EseAPI column '{:?}' not equal to EseParser '{:?}'",
-                table, column, s1, s2
-            )));
+        match self.parser.get_column(parser_table, column) {
+            Ok(s2) => {
+                if s1 != s2 {
+                    return Err(SimpleError::new(format!(
+                        r"table {}, column({}) EseAPI column '{:?}' not equal to EseParser '{:?}'",
+                        table, column, s1, s2
+                    )));
+                }
+            },
+            Err(e) => {
+                return Err(SimpleError::new(format!(
+                    r"table {}, column({}) EseParser failed with error '{:?}', but EseAPI returned '{:?}'",
+                    table, column, e, s1
+                )));
+            }
         }
         Ok(s1)
     }
@@ -180,17 +198,22 @@ impl EseDb for EseBoth {
         multi_value_index: u32,
     ) -> Result<Option<Vec<u8>>, SimpleError> {
         let (api_table, parser_table) = self.opened_tables.borrow()[table as usize];
-        let s1 = self
-            .api
-            .get_column_mv(api_table, column, multi_value_index)?;
-        let s2 = self
-            .parser
-            .get_column_mv(parser_table, column, multi_value_index)?;
-        if s1 != s2 {
-            return Err(SimpleError::new(format!(
-                r"table {}, column({}) EseAPI column '{:?}' not equal to EseParser '{:?}'",
-                table, column, s1, s2
-            )));
+        let s1 = self.api.get_column_mv(api_table, column, multi_value_index)?;
+        match self.parser.get_column_mv(parser_table, column, multi_value_index) {
+            Ok(s2) => {
+                if s1 != s2 {
+                    return Err(SimpleError::new(format!(
+                        r"table {}, column({}) EseAPI column '{:?}' not equal to EseParser '{:?}'",
+                        table, column, s1, s2
+                    )));
+                }
+            },
+            Err(e) => {
+                return Err(SimpleError::new(format!(
+                    r"table {}, column({}) EseParser failed with error '{:?}', but EseAPI returned '{:?}'",
+                    table, column, e, s1
+                )));
+            }
         }
         Ok(s1)
     }
