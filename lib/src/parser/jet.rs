@@ -311,7 +311,7 @@ impl DbPage {
     }
 
     pub fn offset(&self) -> u64 {
-        ((self.page_number + 1) * self.page_size) as u64
+        (self.page_number as u64 + 1) * self.page_size as u64
     }
 }
 
