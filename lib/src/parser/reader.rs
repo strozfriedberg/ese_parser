@@ -850,7 +850,7 @@ impl<T: ReadSeek> Reader<T> {
         &self,
         offset: u64)
     -> Result<u64, SimpleError> {
-        let mut key : u64 = 0;
+        let key;
         let mut bytes = self.read_bytes(offset, 4)?;
         // if fLID64 is set, this is LVKEY64
         if bytes[3] & 0x80 > 0 {
@@ -1306,7 +1306,6 @@ macro_rules! impl_read_primitive {
 impl_read_primitive!(u8);
 impl_read_primitive!(u16);
 impl_read_primitive!(u32);
-impl_read_primitive!(u64);
 
 #[derive(Copy, Clone, Debug, Default)]
 pub struct TaggedDataState {
