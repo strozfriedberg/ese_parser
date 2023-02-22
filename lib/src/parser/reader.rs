@@ -846,6 +846,22 @@ impl<T: ReadSeek> Reader<T> {
         Ok(None)
     }
 
+    fn read_lv_key(
+        &self,
+        offset: u64)
+    -> Result<u64, SimpleError> {
+        let key;
+        let mut bytes = self.read_bytes(offset, 4)?;
+        // if fLID64 is set, this is LVKEY64
+        if bytes[3] & 0x80 > 0 {
+            bytes.append(&mut self.read_bytes(offset + 4, 4)?);
+            key = u64::from_bytes(&bytes);
+        } else {
+            key = u32::from_bytes(&bytes) as u64;
+        }
+        Ok(key)
+    }
+
     fn load_tagged_column(
         &self,
         lv_tags: &LV_tags,
@@ -864,8 +880,7 @@ impl<T: ReadSeek> Reader<T> {
         let compressed = col_flag.intersects(ColumnFlags::Compressed);
         let dtf = TaggedDataTypeFlag::from_bits_truncate(data_type_flags as u16);
         if dtf.intersects(TaggedDataTypeFlag::LONG_VALUE) {
-            let key = read_u32(self, offset)?;
-            v = self.load_lv_data(lv_tags, key, compressed)?;
+            v = self.load_lv_data(lv_tags, self.read_lv_key(offset)?, compressed)?;
         } else if dtf
             .intersects(TaggedDataTypeFlag::MULTI_VALUE | TaggedDataTypeFlag::MULTI_VALUE_OFFSET)
         {
@@ -953,8 +968,11 @@ impl<T: ReadSeek> Reader<T> {
             let (shift, (lv, size)) = mv_indexes[mv_index];
             let v;
             if lv {
-                let key = read_u32(self, offset + shift as u64)?;
-                v = self.load_lv_data(lv_tags, key, compressed)?;
+                v = self.load_lv_data(
+                        lv_tags,
+                        self.read_lv_key(offset + shift as u64)?,
+                        compressed
+                    )?;
             } else {
                 v = self.read_bytes(offset + shift as u64, size as usize)?;
                 if compressed {
@@ -1019,38 +1037,58 @@ impl<T: ReadSeek> Reader<T> {
             //let _skey: u32 = reader.read_struct(offset)?;
             //offset += 4;
             //let _total_size : u32 = reader.read_struct(offset)?;
+
             // TODO: handle? page_tags with skey & total_size only (seems don't need)
             Ok(None)
         } else {
             let mut page_key: Vec<u8> = vec![];
-            if common_page_key_size + local_page_key_size == 8 {
+            if common_page_key_size > 0 && local_page_key_size > 0 {
                 page_key.append(&mut res.common_page_key.clone());
                 page_key.append(&mut res.local_page_key.clone());
-            } else if local_page_key_size >= 4 {
+            } else if local_page_key_size > 0 {
                 page_key = res.local_page_key.clone();
-            } else if common_page_key_size >= 4 {
+            } else if common_page_key_size > 0 {
                 page_key = res.common_page_key.clone();
             }
 
-            let skey =
-                u32::from_le_bytes(page_key[0..4].try_into().map_err(|e: TryFromSliceError| {
-                    SimpleError::new(format!(
-                        "can't convert page_key {:?} into slice [0..4], error: {}",
-                        page_key, e
-                    ))
-                })?)
-                .to_be();
+            let skey : u64;
+            let mut seg_offset : u32 = 0;
+            // LVKEY64 (LID64, ULONG offset)
+            if page_key.len() == 12 {
+                skey =
+                    u64::from_le_bytes(page_key[0..8].try_into().map_err(|e: TryFromSliceError| {
+                        SimpleError::new(format!(
+                            "can't convert page_key {:?} into slice [0..8], error: {}",
+                            page_key, e
+                        ))
+                    })?)
+                    .to_be();
 
-            let mut seg_offset = 0;
-
-            if page_key.len() == 8 {
-                let segment_offset = u32::from_le_bytes(
-                    page_key[4..8]
+                seg_offset = u32::from_le_bytes(
+                    page_key[8..12]
                         .try_into()
                         .map_err(|e: TryFromSliceError| SimpleError::new(e.to_string()))?,
                 )
                 .to_be();
-                seg_offset = segment_offset;
+            } else {
+                // LVKEY32 (LID32, ULONG offset)
+                skey =
+                    u32::from_le_bytes(page_key[0..4].try_into().map_err(|e: TryFromSliceError| {
+                        SimpleError::new(format!(
+                            "can't convert page_key {:?} into slice [0..4], error: {}",
+                            page_key, e
+                        ))
+                    })?)
+                    .to_be() as u64;
+
+                if page_key.len() == 8 {
+                    seg_offset = u32::from_le_bytes(
+                        page_key[4..8]
+                            .try_into()
+                            .map_err(|e: TryFromSliceError| SimpleError::new(e.to_string()))?,
+                    )
+                    .to_be();
+                }
             }
 
             res.offset = offset;
@@ -1150,7 +1188,7 @@ impl<T: ReadSeek> Reader<T> {
     pub fn load_lv_data(
         &self,
         lv_tags: &LV_tags,
-        long_value_key: u32,
+        long_value_key: u64,
         compressed: bool,
     ) -> Result<Vec<u8>, SimpleError> {
         let mut res: Vec<u8> = vec![];
@@ -1179,7 +1217,7 @@ impl<T: ReadSeek> Reader<T> {
             Ok(res)
         } else {
             Err(SimpleError::new(format!(
-                "LV key {} not found",
+                "LV key 0x{:X} not found",
                 long_value_key
             )))
         }
@@ -1194,7 +1232,7 @@ pub struct LV_tag {
     pub size: u32,
 }
 
-pub type LV_tags = HashMap<u32 /*key*/, HashMap<u32 /*seg_offset*/, LV_tag>>;
+pub type LV_tags = HashMap<u64 /*key*/, HashMap<u32 /*seg_offset*/, LV_tag>>;
 
 fn merge_lv_tags(tags: &mut LV_tags, new_tags: LV_tags) {
     for (new_key, new_segs) in new_tags {

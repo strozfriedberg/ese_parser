@@ -402,12 +402,6 @@ impl<R: ReadSeek> EseDb for EseParser<R> {
                 t.lv_tags = reader
                     .load_lv_metadata(long_value_catalog_definition.father_data_page_number)?;
             }
-
-            // if t.cat.long_value_catalog_definition.is_some() {
-            // 	let reader = self.get_reader()?;
-            //     t.lv_tags = load_lv_metadata(reader,
-            //         t.cat.long_value_catalog_definition.as_ref().map_err(|e: std::num::TryFromIntError| SimpleError::new(e.to_string())).father_data_page_number)?;
-            // }
         }
         // ignore return result
         self.move_row_helper(index as u64, ESE_MoveFirst)?;
