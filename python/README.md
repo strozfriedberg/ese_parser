@@ -1,6 +1,6 @@
 # Python wrapper of ese_parser
 
-Export all `ese_trait` interface with python functions.
+Export all `ese_trait` interfaces with python functions.
 
 To build wheel, run `build_wheel.bat`.
 
@@ -27,7 +27,7 @@ JET_MovePrevious = -1;
 JET_MoveNext = 1;
 JET_MoveLast = 2147483647;
  ```
- - `get_row(table_id, column_info) -> Option<PyObject>>` - will return object or None, if field is NULL
+ - `get_row(table_id, column_info) -> Option<PyObject>` - will return object or None, if field is NULL
  - `get_row_mv(table_id, column_info, multi_value_index) -> PyResult<Option<PyObject>>` - will return multi-value object at index (itagSequence) or None, if field is NULL
 
 Python wrapper usage sample:
