@@ -1,17 +1,202 @@
-<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta http-equiv="X-UA-Compatible" content="IE=edge"><title>Log in - Stash</title><script>
-window.WRM=window.WRM||{};window.WRM._unparsedData=window.WRM._unparsedData||{};window.WRM._unparsedErrors=window.WRM._unparsedErrors||{};
-WRM._unparsedData["com.atlassian.plugins.atlassian-plugins-webresource-plugin:context-path.context-path"]="\u0022\u0022";
-WRM._unparsedData["com.atlassian.plugins.atlassian-clientside-extensions-runtime:runtime.atlassianDevMode"]="false";
-WRM._unparsedData["com.atlassian.bitbucket.server.bitbucket-webpack-INTERNAL:date-format-preference.data"]="\u0022\u0022";
-WRM._unparsedData["com.atlassian.bitbucket.server.bitbucket-webpack-INTERNAL:user-keyboard-shortcuts-enabled.data"]="true";
-WRM._unparsedData["com.atlassian.analytics.analytics-client:policy-update-init.policy-update-data-provider"]="false";
-WRM._unparsedData["com.atlassian.analytics.analytics-client:programmatic-analytics-init.programmatic-analytics-data-provider"]="false";
-WRM._unparsedData["com.atlassian.bitbucket.server.feature-wrm-data:user.time.zone.onboarding.data"]="true";
-if(window.WRM._dataArrived)window.WRM._dataArrived();</script>
-<link type="text/css" rel="stylesheet" href="/s/a5a11bec916c5983f403346cbdbd327d-CDN/2137032246/48684c7/1m8d5qm/550a9d71395279a35038517ca798b6cf/_/download/contextbatch/css/_super/batch.css" data-wrm-key="_super" data-wrm-batch-type="context" media="all">
-<link type="text/css" rel="stylesheet" href="/s/1003db24813cf73755307821ff9b5d61-CDN/2137032246/48684c7/1m8d5qm/8de01bb9ad31d2c5f8c2111acedea1ba/_/download/contextbatch/css/bitbucket.page.login,-_super/batch.css" data-wrm-key="bitbucket.page.login,-_super" data-wrm-batch-type="context" media="all">
-<link type="text/css" rel="stylesheet" href="/s/7a285e974d448be0811cd4af26d0ca05-CDN/2137032246/48684c7/1m8d5qm/81a9bb4b70b939335cf635c4adacda80/_/download/contextbatch/css/bitbucket.layout.focused,bitbucket.layout.base,atl.general,-_super/batch.css" data-wrm-key="bitbucket.layout.focused,bitbucket.layout.base,atl.general,-_super" data-wrm-batch-type="context" media="all">
-<script type="text/javascript" src="/s/76f92c098922e502a0603b3317e1172a-CDN/2137032246/48684c7/1m8d5qm/550a9d71395279a35038517ca798b6cf/_/download/contextbatch/js/_super/batch.js?locale=en-US" data-wrm-key="_super" data-wrm-batch-type="context" data-initially-rendered></script>
-<script type="text/javascript" src="/s/edcc9dbe167186e81042b1a59866eef3-CDN/2137032246/48684c7/1m8d5qm/8de01bb9ad31d2c5f8c2111acedea1ba/_/download/contextbatch/js/bitbucket.page.login,-_super/batch.js?locale=en-US" data-wrm-key="bitbucket.page.login,-_super" data-wrm-batch-type="context" data-initially-rendered></script>
-<script type="text/javascript" src="/s/0250a51d722b60cc878266385d5c576d-CDN/2137032246/48684c7/1m8d5qm/81a9bb4b70b939335cf635c4adacda80/_/download/contextbatch/js/bitbucket.layout.focused,bitbucket.layout.base,atl.general,-_super/batch.js?locale=en-US" data-wrm-key="bitbucket.layout.focused,bitbucket.layout.base,atl.general,-_super" data-wrm-batch-type="context" data-initially-rendered></script>
-<meta name="application-name" content="Bitbucket"><link rel="shortcut icon" type="image/x-icon" href="/s/2137032246/48684c7/1m8d5qm/1.0/_/download/resources/com.atlassian.bitbucket.server.bitbucket-webpack-INTERNAL:favicon/favicon.ico" /><link rel="search" href="https://stash.strozfriedberg.com/plugins/servlet/opensearch-descriptor" type="application/opensearchdescription+xml" title="Bitbucket code search"/></head><body class="aui-page-focused aui-page-focused-small aui-page-size-small bitbucket-theme user-login"><ul id="assistive-skip-links" class="assistive"><li><a href="#content">Skip to content</a></li></ul><div id="page"><!-- start #header --><header id="header" role="banner"><section class="notifications"></section><nav class="aui-header aui-dropdown2-trigger-group" aria-label="site"><div class="aui-header-inner"><div class="aui-header-before"><button class=" aui-dropdown2-trigger app-switcher-trigger aui-dropdown2-trigger-arrowless" aria-controls="app-switcher" aria-haspopup="true" role="button" data-aui-trigger href="#app-switcher"><span class="aui-icon aui-icon-small aui-iconfont-appswitcher">Linked Applications</span></button><div id="app-switcher" class="aui-dropdown2 aui-style-default" role="menu" hidden data-is-user-admin="false" data-is-switcher="true"><div class="app-switcher-loading">Loading&hellip;</div></div></div><div class="aui-header-primary"><span id="logo" class="aui-header-logo bitbucket-header-logo"><a href="https://stash.strozfriedberg.com"><img src="/s/2137032246/48684c7/1m8d5qm/1.0/_/download/resources/com.atlassian.bitbucket.server.bitbucket-webpack-INTERNAL:bitbucket-logo/images/logo/bitbucket.svg" alt="Bitbucket"/></a></span><ul class="aui-nav"><li class=""title="Activity Stream"><a href="/plugins/servlet/rss4stash/all" title="Activity Stream" data-web-item-key="ch.mibex.stash.rss4stash:rss4stash-latest-global-activities">Activity Stream</a></li></ul></div><div class="aui-header-secondary"><ul class="aui-nav"><li class=" help-link"title="Help"><a class=" aui-dropdown2-trigger aui-dropdown2-trigger-arrowless" aria-controls="com.atlassian.bitbucket.server.bitbucket-server-web-fragments-help-menu" aria-haspopup="true" role="button" tabindex="0" data-aui-trigger><span class="aui-icon aui-icon-small aui-icon-small aui-iconfont-question-circle">Help</span></a><div id="com.atlassian.bitbucket.server.bitbucket-server-web-fragments-help-menu" class="aui-dropdown2 aui-style-default" role="menu" hidden data-aui-dom-container="body"><div class="aui-dropdown2-section help-items-section"><ul class="aui-list-truncate" role="presentation"><li role="presentation"><a href="https://confluence.atlassian.com/display/BITBUCKETSERVER0721/Bitbucket+Data+Center+and+Server+documentation?utm_campaign=in-app-help&amp;amp;utm_medium=in-app-help&amp;amp;utm_source=stash" title="Go to the online documentation for Bitbucket" data-web-item-key="com.atlassian.bitbucket.server.bitbucket-server-web-fragments:general-help">Online help</a></li><li role="presentation"><a href="https://www.atlassian.com/git?utm_campaign=learn-git&amp;utm_medium=in-app-help&amp;utm_source=stash" title="Learn about Git commands &amp; workflows" data-web-item-key="com.atlassian.bitbucket.server.bitbucket-server-web-fragments:learn-git">Learn Git</a></li><li role="presentation"><a href="/getting-started" class="getting-started-page-link" title="Overview of Bitbucket features" data-web-item-key="com.atlassian.bitbucket.server.bitbucket-server-web-fragments:getting-started-page-help-link">Welcome to Bitbucket</a></li><li role="presentation"><a href="/#" class="keyboard-shortcut-link" title="Discover keyboard shortcuts in Bitbucket" data-web-item-key="com.atlassian.bitbucket.server.bitbucket-server-web-fragments:keyboard-shortcuts-help-link">Keyboard shortcuts</a></li><li role="presentation"><a href="https://go.atlassian.com/bitbucket-server-whats-new?utm_campaign=in-app-help&amp;utm_medium=in-app-help&amp;utm_source=stash" title="Learn about what&#39;s new in Bitbucket" data-web-item-key="com.atlassian.bitbucket.server.bitbucket-server-web-fragments:whats-new-link">What&#39;s new</a></li><li role="presentation"><a href="https://go.atlassian.com/bitbucket-server-community?utm_campaign=in-app-help&amp;utm_medium=in-app-help&amp;utm_source=stash" title="Explore the Atlassian community" data-web-item-key="com.atlassian.bitbucket.server.bitbucket-server-web-fragments:community-link">Community</a></li></ul></div></div></li><li class=" alerts-menu"title="View system alerts"><a href="#alerts" id="alerts-trigger" class="alerts-menu" title="View system alerts" data-web-item-key="com.atlassian.bitbucket.server.bitbucket-server-web-fragments:global-alerts-menu-item">Alerts</a></li></ul></div></div> <!-- End .aui-header-inner --></nav> <!-- End .aui-header --></header><!-- End #header --><!-- Start #content --><section id="content" role="main" tabindex="-1" data-timezone="300" ><div class="aui-page-panel content-body" ><div class="aui-page-panel-inner"><main role="main" id="main" class="aui-page-panel-content" ><h2>Log in</h2><form class="aui top-label prevent-double-submit " action="/j_atl_security_check" method="post" accept-charset="UTF-8"><div class="field-group"><label for="j_username" >Username</label><input class="text long-field" type="text" id="j_username"  name="j_username"  autofocus accesskey="u"/></div><div class="field-group"><label for="j_password" >Password</label><input class="text long-field" type="password" id="j_password"  name="j_password"  accesskey="p"/></div><div class="aui-group"><fieldset class="group checkbox"><div class="checkbox"><input class="checkbox" type="checkbox" id="_atl_remember_me"  name="_atl_remember_me"  checked="checked"  accesskey="r"/><label for="_atl_remember_me" >Keep me logged in</label></div></fieldset></div><div class="aui-group"><input name="next" type="hidden" value="/projects/ASDF/repos/notatin/raw/LICENSE?at=refs%2Fheads%2Fmain"/><input name="queryString" type="hidden" value="next=%2Fprojects%2FASDF%2Frepos%2Fnotatin%2Fraw%2FLICENSE%3Fat%3Drefs%252Fheads%252Fmain"/><input class="aui-button aui-button-primary" type="submit" id="submit"  name="submit"  value="Log in" accesskey="s"/><a id="forgot" class="aui-button aui-button-link"  name="forgot" href="/passwordreset" autocomplete="off" tabindex="0">Unable to access your account?</a></div></form></main></div></div></section><!-- End #content --><!-- Start #footer --><footer id="footer" role="contentinfo"><section class="notifications"></section><section class="footer-body"><ul><li data-key="footer.license.message">Git repository management for enterprise teams powered by <a href="https://www.atlassian.com/software/bitbucket/">Atlassian Bitbucket</a></li></ul><ul><li>Atlassian Bitbucket <span title="48684c7ff83b83ef0568523748b68ca08e022a01" id="product-version" data-commitid="48684c7ff83b83ef0568523748b68ca08e022a01" data-system-build-number="48684c7"> v7.21.3</span></li><li data-key="footer.links.documentation"><a href="https://confluence.atlassian.com/display/BITBUCKETSERVER0721/Bitbucket+Data+Center+and+Server+documentation?utm_campaign=in-app-help&amp;utm_medium=in-app-help&amp;utm_source=stash" target="_blank">Documentation</a></li><li data-key="footer.links.jac"><a href="https://jira.atlassian.com/browse/BSERV?utm_campaign=in-app-help&amp;utm_medium=in-app-help&amp;utm_source=stash" target="_blank">Request a feature</a></li><li data-key="footer.links.about"><a href="/about">About</a></li><li data-key="footer.links.contact.atlassian"><a href="https://www.atlassian.com/company/contact?utm_campaign=in-app-help&amp;utm_medium=in-app-help&amp;utm_source=stash" target="_blank">Contact Atlassian</a></li></ul><div id="footer-logo"><a href="https://www.atlassian.com/" target="_blank">Atlassian</a></div></section></footer><!-- End #footer --></div><script>require('bitbucket/internal/layout/base/base').onReady(null, "Stash" ); require('bitbucket/internal/widget/keyboard-shortcuts/keyboard-shortcuts').onReady();</script><script type="text/javascript">require('bitbucket/internal/page/login/login').onReady();</script></body></html>
+
+                                 Apache License
+                           Version 2.0, January 2004
+                        http://www.apache.org/licenses/
+
+   TERMS AND CONDITIONS FOR USE, REPRODUCTION, AND DISTRIBUTION
+
+   1. Definitions.
+
+      "License" shall mean the terms and conditions for use, reproduction,
+      and distribution as defined by Sections 1 through 9 of this document.
+
+      "Licensor" shall mean the copyright owner or entity authorized by
+      the copyright owner that is granting the License.
+
+      "Legal Entity" shall mean the union of the acting entity and all
+      other entities that control, are controlled by, or are under common
+      control with that entity. For the purposes of this definition,
+      "control" means (i) the power, direct or indirect, to cause the
+      direction or management of such entity, whether by contract or
+      otherwise, or (ii) ownership of fifty percent (50%) or more of the
+      outstanding shares, or (iii) beneficial ownership of such entity.
+
+      "You" (or "Your") shall mean an individual or Legal Entity
+      exercising permissions granted by this License.
+
+      "Source" form shall mean the preferred form for making modifications,
+      including but not limited to software source code, documentation
+      source, and configuration files.
+
+      "Object" form shall mean any form resulting from mechanical
+      transformation or translation of a Source form, including but
+      not limited to compiled object code, generated documentation,
+      and conversions to other media types.
+
+      "Work" shall mean the work of authorship, whether in Source or
+      Object form, made available under the License, as indicated by a
+      copyright notice that is included in or attached to the work
+      (an example is provided in the Appendix below).
+
+      "Derivative Works" shall mean any work, whether in Source or Object
+      form, that is based on (or derived from) the Work and for which the
+      editorial revisions, annotations, elaborations, or other modifications
+      represent, as a whole, an original work of authorship. For the purposes
+      of this License, Derivative Works shall not include works that remain
+      separable from, or merely link (or bind by name) to the interfaces of,
+      the Work and Derivative Works thereof.
+
+      "Contribution" shall mean any work of authorship, including
+      the original version of the Work and any modifications or additions
+      to that Work or Derivative Works thereof, that is intentionally
+      submitted to Licensor for inclusion in the Work by the copyright owner
+      or by an individual or Legal Entity authorized to submit on behalf of
+      the copyright owner. For the purposes of this definition, "submitted"
+      means any form of electronic, verbal, or written communication sent
+      to the Licensor or its representatives, including but not limited to
+      communication on electronic mailing lists, source code control systems,
+      and issue tracking systems that are managed by, or on behalf of, the
+      Licensor for the purpose of discussing and improving the Work, but
+      excluding communication that is conspicuously marked or otherwise
+      designated in writing by the copyright owner as "Not a Contribution."
+
+      "Contributor" shall mean Licensor and any individual or Legal Entity
+      on behalf of whom a Contribution has been received by Licensor and
+      subsequently incorporated within the Work.
+
+   2. Grant of Copyright License. Subject to the terms and conditions of
+      this License, each Contributor hereby grants to You a perpetual,
+      worldwide, non-exclusive, no-charge, royalty-free, irrevocable
+      copyright license to reproduce, prepare Derivative Works of,
+      publicly display, publicly perform, sublicense, and distribute the
+      Work and such Derivative Works in Source or Object form.
+
+   3. Grant of Patent License. Subject to the terms and conditions of
+      this License, each Contributor hereby grants to You a perpetual,
+      worldwide, non-exclusive, no-charge, royalty-free, irrevocable
+      (except as stated in this section) patent license to make, have made,
+      use, offer to sell, sell, import, and otherwise transfer the Work,
+      where such license applies only to those patent claims licensable
+      by such Contributor that are necessarily infringed by their
+      Contribution(s) alone or by combination of their Contribution(s)
+      with the Work to which such Contribution(s) was submitted. If You
+      institute patent litigation against any entity (including a
+      cross-claim or counterclaim in a lawsuit) alleging that the Work
+      or a Contribution incorporated within the Work constitutes direct
+      or contributory patent infringement, then any patent licenses
+      granted to You under this License for that Work shall terminate
+      as of the date such litigation is filed.
+
+   4. Redistribution. You may reproduce and distribute copies of the
+      Work or Derivative Works thereof in any medium, with or without
+      modifications, and in Source or Object form, provided that You
+      meet the following conditions:
+
+      (a) You must give any other recipients of the Work or
+          Derivative Works a copy of this License; and
+
+      (b) You must cause any modified files to carry prominent notices
+          stating that You changed the files; and
+
+      (c) You must retain, in the Source form of any Derivative Works
+          that You distribute, all copyright, patent, trademark, and
+          attribution notices from the Source form of the Work,
+          excluding those notices that do not pertain to any part of
+          the Derivative Works; and
+
+      (d) If the Work includes a "NOTICE" text file as part of its
+          distribution, then any Derivative Works that You distribute must
+          include a readable copy of the attribution notices contained
+          within such NOTICE file, excluding those notices that do not
+          pertain to any part of the Derivative Works, in at least one
+          of the following places: within a NOTICE text file distributed
+          as part of the Derivative Works; within the Source form or
+          documentation, if provided along with the Derivative Works; or,
+          within a display generated by the Derivative Works, if and
+          wherever such third-party notices normally appear. The contents
+          of the NOTICE file are for informational purposes only and
+          do not modify the License. You may add Your own attribution
+          notices within Derivative Works that You distribute, alongside
+          or as an addendum to the NOTICE text from the Work, provided
+          that such additional attribution notices cannot be construed
+          as modifying the License.
+
+      You may add Your own copyright statement to Your modifications and
+      may provide additional or different license terms and conditions
+      for use, reproduction, or distribution of Your modifications, or
+      for any such Derivative Works as a whole, provided Your use,
+      reproduction, and distribution of the Work otherwise complies with
+      the conditions stated in this License.
+
+   5. Submission of Contributions. Unless You explicitly state otherwise,
+      any Contribution intentionally submitted for inclusion in the Work
+      by You to the Licensor shall be under the terms and conditions of
+      this License, without any additional terms or conditions.
+      Notwithstanding the above, nothing herein shall supersede or modify
+      the terms of any separate license agreement you may have executed
+      with Licensor regarding such Contributions.
+
+   6. Trademarks. This License does not grant permission to use the trade
+      names, trademarks, service marks, or product names of the Licensor,
+      except as required for reasonable and customary use in describing the
+      origin of the Work and reproducing the content of the NOTICE file.
+
+   7. Disclaimer of Warranty. Unless required by applicable law or
+      agreed to in writing, Licensor provides the Work (and each
+      Contributor provides its Contributions) on an "AS IS" BASIS,
+      WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or
+      implied, including, without limitation, any warranties or conditions
+      of TITLE, NON-INFRINGEMENT, MERCHANTABILITY, or FITNESS FOR A
+      PARTICULAR PURPOSE. You are solely responsible for determining the
+      appropriateness of using or redistributing the Work and assume any
+      risks associated with Your exercise of permissions under this License.
+
+   8. Limitation of Liability. In no event and under no legal theory,
+      whether in tort (including negligence), contract, or otherwise,
+      unless required by applicable law (such as deliberate and grossly
+      negligent acts) or agreed to in writing, shall any Contributor be
+      liable to You for damages, including any direct, indirect, special,
+      incidental, or consequential damages of any character arising as a
+      result of this License or out of the use or inability to use the
+      Work (including but not limited to damages for loss of goodwill,
+      work stoppage, computer failure or malfunction, or any and all
+      other commercial damages or losses), even if such Contributor
+      has been advised of the possibility of such damages.
+
+   9. Accepting Warranty or Additional Liability. While redistributing
+      the Work or Derivative Works thereof, You may choose to offer,
+      and charge a fee for, acceptance of support, warranty, indemnity,
+      or other liability obligations and/or rights consistent with this
+      License. However, in accepting such obligations, You may act only
+      on Your own behalf and on Your sole responsibility, not on behalf
+      of any other Contributor, and only if You agree to indemnify,
+      defend, and hold each Contributor harmless for any liability
+      incurred by, or claims asserted against, such Contributor by reason
+      of your accepting any such warranty or additional liability.
+
+   END OF TERMS AND CONDITIONS
+
+   APPENDIX: How to apply the Apache License to your work.
+
+      To apply the Apache License to your work, attach the following
+      boilerplate notice, with the fields enclosed by brackets "[]"
+      replaced with your own identifying information. (Don't include
+      the brackets!)  The text should be enclosed in the appropriate
+      comment syntax for the file format. We also recommend that a
+      file or class name and description of purpose be included on the
+      same "printed page" as the copyright notice for easier
+      identification within third-party archives.
+
+   Copyright [yyyy] [name of copyright owner]
+
+   Licensed under the Apache License, Version 2.0 (the "License");
+   you may not use this file except in compliance with the License.
+   You may obtain a copy of the License at
+
+       http://www.apache.org/licenses/LICENSE-2.0
+
+   Unless required by applicable law or agreed to in writing, software
+   distributed under the License is distributed on an "AS IS" BASIS,
+   WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+   See the License for the specific language governing permissions and
+   limitations under the License.

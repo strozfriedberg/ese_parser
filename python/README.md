@@ -1,6 +1,6 @@
 # Python wrapper of ese_parser
 
-Export all `ese_trait` interfaces with python functions.
+Exports all `ese_trait` interfaces with python functions.
 
 To build wheel, run `build_wheel.bat`.
 

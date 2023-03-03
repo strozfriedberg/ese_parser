@@ -24,7 +24,7 @@ This library implements the `ese_trait` trait, which provides the following feat
 An example program, `ese_parser`, is included in the project. This executable will dump all (or selected) tables from an ESE database to the console.
 
 When compiled with the `nt_comparison` feature for Windows (`cargo build --example ese_parser --features nt_comparison`), this program has three modes:
-* `EseParser` - accesses database using our own parser
+* `EseParser` - accesses database using this parser
 * `EseApi` - accesses database using MS esent.dll
 * `Both` - parses using both methods, compares the results, and reports any differences.
 ```
@@ -43,7 +43,7 @@ There are a couple of ways to run `ese_parser`:
   * `cargo build --example ese_parser --features nt_comparison`
     * `./target/debug/examples/ese_parser /m both testdata/decompress_test.edb`
 
-To ensure that the unit tests for `ese_parser` are run, make sure to specify `--all-targets` when running the cargo test: `cargo test --all-targets`.
+To ensure that the unit tests for all sub-projects are run, make sure to specify `--all-targets` when running cargo test: `cargo test --all-targets`.
 
 ### [EDB format  specification](https://github.com/libyal/libesedb/blob/main/documentation/Extensible%20Storage%20Engine%20(ESE)%20Database%20File%20(EDB)%20format.asciidoc)
 ### [Open Source Microsoft ESE reader](https://github.com/microsoft/Extensible-Storage-Engine)
