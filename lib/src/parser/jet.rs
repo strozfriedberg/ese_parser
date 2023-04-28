@@ -143,7 +143,7 @@ bitflags! {
     }
 }
 
-#[derive(Copy, Clone, Display, Debug, Nom)]
+#[derive(Copy, Clone, Display, Debug, Eq, PartialEq, Nom)]
 #[repr(u32)]
 pub enum DbState {
     impossible = 0,
