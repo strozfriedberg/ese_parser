@@ -376,6 +376,10 @@ impl<R: ReadSeek> EseDb for EseParser<R> {
         format!("EseParser: error {}", err)
     }
 
+    fn is_dirty(&self) -> bool {
+        self.reader.is_dirty()
+    }
+
     fn get_tables(&self) -> Result<Vec<String>, SimpleError> {
         let mut tables: Vec<String> = vec![];
         for i in &self.tables {

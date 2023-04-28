@@ -36,6 +36,7 @@ pub struct Reader<T: ReadSeek> {
     format_version: jet::FormatVersion,
     format_revision: jet::FormatRevision,
     page_size: u32,
+    dirty: bool,
 }
 
 impl<T: ReadSeek> Reader<T> {
@@ -91,12 +92,6 @@ impl<T: ReadSeek> Reader<T> {
             )));
         }
 
-        if db_file_header.database_state == jet::DbState::DirtyShutdown {
-            eprintln!("WARNING: The database state is dirty.");
-            eprintln!("Please use EseUtil which helps check the status (/MH) of a database and perform a soft (/R) or hard (/P) recovery.");
-            eprintln!("Results could be inaccurate and unstable work (even crash) is possible.\n");
-        }
-
         Ok(db_file_header)
     }
 
@@ -107,16 +102,21 @@ impl<T: ReadSeek> Reader<T> {
             page_size: 2 * 1024, //just to read header
             format_version: 0,
             format_revision: 0,
+            dirty: false,
         };
 
         let db_fh = reader.load_db_file_header()?;
         reader.format_version = db_fh.format_version;
         reader.format_revision = db_fh.format_revision;
         reader.page_size = db_fh.page_size;
-
+        reader.dirty = db_fh.database_state == jet::DbState::DirtyShutdown;
         reader.cache.get_mut().clear();
 
         Ok(reader)
+    }
+
+    pub fn is_dirty(&self) -> bool {
+        self.dirty
     }
 
     fn read(&self, offset: u64, buf: &mut [u8]) -> Result<(), SimpleError> {
