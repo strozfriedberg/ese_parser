@@ -91,6 +91,12 @@ impl<T: ReadSeek> Reader<T> {
             )));
         }
 
+        if db_file_header.database_state == jet::DbState::DirtyShutdown {
+            eprintln!("WARNING: The database state is dirty.");
+            eprintln!("Please use EseUtil which helps check the status (/MH) of a database and perform a soft (/R) or hard (/P) recovery.");
+            eprintln!("Results could be inaccurate and unstable work (even crash) is possible.\n");
+        }
+
         Ok(db_file_header)
     }
 
@@ -846,10 +852,7 @@ impl<T: ReadSeek> Reader<T> {
         Ok(None)
     }
 
-    fn read_lv_key(
-        &self,
-        offset: u64)
-    -> Result<u64, SimpleError> {
+    fn read_lv_key(&self, offset: u64) -> Result<u64, SimpleError> {
         let key;
         let mut bytes = self.read_bytes(offset, 4)?;
         // if fLID64 is set, this is LVKEY64
@@ -969,10 +972,10 @@ impl<T: ReadSeek> Reader<T> {
             let v;
             if lv {
                 v = self.load_lv_data(
-                        lv_tags,
-                        self.read_lv_key(offset + shift as u64)?,
-                        compressed
-                    )?;
+                    lv_tags,
+                    self.read_lv_key(offset + shift as u64)?,
+                    compressed,
+                )?;
             } else {
                 v = self.read_bytes(offset + shift as u64, size as usize)?;
                 if compressed {
@@ -1051,18 +1054,19 @@ impl<T: ReadSeek> Reader<T> {
                 page_key = res.common_page_key.clone();
             }
 
-            let skey : u64;
-            let mut seg_offset : u32 = 0;
+            let skey: u64;
+            let mut seg_offset: u32 = 0;
             // LVKEY64 (LID64, ULONG offset)
             if page_key.len() == 12 {
-                skey =
-                    u64::from_le_bytes(page_key[0..8].try_into().map_err(|e: TryFromSliceError| {
+                skey = u64::from_le_bytes(page_key[0..8].try_into().map_err(
+                    |e: TryFromSliceError| {
                         SimpleError::new(format!(
                             "can't convert page_key {:?} into slice [0..8], error: {}",
                             page_key, e
                         ))
-                    })?)
-                    .to_be();
+                    },
+                )?)
+                .to_be();
 
                 seg_offset = u32::from_le_bytes(
                     page_key[8..12]
@@ -1072,14 +1076,15 @@ impl<T: ReadSeek> Reader<T> {
                 .to_be();
             } else {
                 // LVKEY32 (LID32, ULONG offset)
-                skey =
-                    u32::from_le_bytes(page_key[0..4].try_into().map_err(|e: TryFromSliceError| {
+                skey = u32::from_le_bytes(page_key[0..4].try_into().map_err(
+                    |e: TryFromSliceError| {
                         SimpleError::new(format!(
                             "can't convert page_key {:?} into slice [0..4], error: {}",
                             page_key, e
                         ))
-                    })?)
-                    .to_be() as u64;
+                    },
+                )?)
+                .to_be() as u64;
 
                 if page_key.len() == 8 {
                     seg_offset = u32::from_le_bytes(
