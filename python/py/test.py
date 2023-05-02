@@ -14,6 +14,7 @@ class TestEseDbMethods(unittest.TestCase):
 		f = open("../lib/testdata/test.edb", "rb")
 		edb = ese_parser.PyEseDb(f)
 		self._test_db(edb)
+		f.close()
 
 	def _test_db(self, edb):
 		tables = edb.get_tables()
@@ -96,6 +97,8 @@ class TestEseDbMethods(unittest.TestCase):
 		edb.move_row(tbl, 1)  # move to the second row
 		total_access = edb.get_value(tbl, edb.get_column(t, "TotalAccesses"))
 		self.assertEqual(total_access, 101)
+
+		edb.close_table(tbl)
 
 if __name__ == '__main__':
     unittest.main()
