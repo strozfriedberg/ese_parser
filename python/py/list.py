@@ -18,7 +18,7 @@ for t in tables:
 	while True:
 		print("|", end='')
 		for c in columns:
-			i = edb.get_row(tbl, c)
+			i = edb.get_value(tbl, c)
 			if c.typ == 8: # datetime
 				i = datetime.utcfromtimestamp(i)
 			print(" {} |".format(i), end='')
