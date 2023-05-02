@@ -27,8 +27,8 @@ JET_MovePrevious = -1;
 JET_MoveNext = 1;
 JET_MoveLast = 2147483647;
  ```
- - `get_row(table_id, column_info) -> Option<PyObject>` - will return object or None, if field is NULL
- - `get_row_mv(table_id, column_info, multi_value_index) -> PyResult<Option<PyObject>>` - will return multi-value object at index (itagSequence) or None, if field is NULL
+ - `get_value(table_id, column_info) -> Option<PyObject>` - will return object or None, if field is NULL
+ - `get_value_mv(table_id, column_info, multi_value_index) -> PyResult<Option<PyObject>>` - will return multi-value object at index (itagSequence) or None, if field is NULL
 
 Python wrapper usage sample:
 ```
@@ -51,7 +51,7 @@ for t in tables:
 	while True:
 		print("|", end='')
 		for c in columns:
-			i = edb.get_row(tbl, c)
+			i = edb.get_value(tbl, c)
 			print(" {} |".format(i), end='')
 		print("")
 		if not edb.move_row(tbl, 1):

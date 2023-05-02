@@ -303,6 +303,21 @@ impl PyEseDb {
             }
         }
     }
+
+    // ASDF-5542: new name for same API
+    fn get_value(&self, table: u64, column: &PyColumnInfo) -> PyResult<Option<PyObject>> {
+        self.get_row(table, column)
+    }
+
+    // ASDF-5542: new name for same API
+    fn get_value_mv(
+        &self,
+        table: u64,
+        column: &PyColumnInfo,
+        multi_value_index: u32,
+    ) -> PyResult<Option<PyObject>> {
+        self.get_row_mv(table, column, multi_value_index)
+    }
 }
 
 #[pymodule]
