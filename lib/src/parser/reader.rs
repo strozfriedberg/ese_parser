@@ -1,5 +1,4 @@
 //reader.rs
-use byteorder::*;
 use cache_2q::Cache;
 use simple_error::SimpleError;
 use std::array::TryFromSliceError;
@@ -16,6 +15,7 @@ use crate::parser::decomp::*;
 use crate::parser::ese_db;
 use crate::parser::ese_db::*;
 use crate::parser::jet;
+use crate::utils::*;
 
 #[cfg(all(feature = "nt_comparison", target_os = "windows"))]
 mod gen_db;
@@ -39,13 +39,11 @@ pub struct Reader<T: ReadSeek> {
 }
 
 impl<T: ReadSeek> Reader<T> {
-    fn load_db_file_header(&mut self) -> Result<ese_db::FileHeader, SimpleError> {
-        fn calc_crc32(buffer: &[u8]) -> u32 {
-            let mut buf32: Vec<u32> = vec![0; buffer.len() / mem::size_of::<u32>()];
-            LittleEndian::read_u32_into(buffer, &mut buf32);
-            buf32.iter().skip(1).fold(0x89abcdef, |crc, &val| crc ^ val)
-        }
+    fn is_small_page(&self) -> bool {
+        self.page_size <= 1024 * 8
+    }
 
+    fn load_db_file_header(&mut self) -> Result<ese_db::FileHeader, SimpleError> {
         let (mut db_file_header, buffer) = ese_db::FileHeader::read(self, 0)?;
 
         if db_file_header.signature != ESEDB_FILE_SIGNATURE {
@@ -178,30 +176,85 @@ impl<T: ReadSeek> Reader<T> {
 
     pub(crate) fn load_page_header(&self, page_number: u32) -> Result<PageHeader, SimpleError> {
         let page_offset = (page_number + 1) as u64 * (self.page_size) as u64;
+        let page_data = self.read_bytes(page_offset, self.page_size as usize)?;
+
+        fn calc_new_checksum_cmp_with(
+            buffer: &[u8],
+            page_number: u32,
+            checksum: u64,
+            skip_header: bool,
+        ) -> Result<(), SimpleError> {
+            let calc_checksum: u64 = calc_new_crc(buffer, page_number, skip_header);
+            if calc_checksum != checksum {
+                return Err(SimpleError::new(format!(
+                            "Page number: {}, calculated checksum 0x{:X} doesn't equal to stored page header checksum 0x{:X}",
+                            page_number, calc_checksum, checksum)));
+            }
+            Ok(())
+        }
+
+        let checksum = read_u64(self, page_offset)?;
+        let page_flags = read_u32(self, page_offset + 36)?;
+        if jet::PageFlags::from_bits_truncate(page_flags)
+            .intersects(jet::PageFlags::IS_NEW_RECORD_FORMAT)
+        {
+            let mut block_len = page_data.len();
+            if !self.is_small_page() {
+                block_len = page_data.len() / 4;
+                let ext = PageHeaderExt0x11::read(self, page_offset + 40 as u64)?;
+
+                if ext.page_number != page_number as u64 {
+                    return Err(SimpleError::new(format!(
+                            "Page number: {} doesn't equal to stored page number {} in extended page header",
+                            page_number, {ext.page_number})));
+                }
+
+                calc_new_checksum_cmp_with(
+                    &page_data[block_len..block_len * 2],
+                    page_number,
+                    ext.checksum1,
+                    false,
+                )?;
+                calc_new_checksum_cmp_with(
+                    &page_data[block_len * 2..block_len * 3],
+                    page_number,
+                    ext.checksum2,
+                    false,
+                )?;
+                calc_new_checksum_cmp_with(
+                    &page_data[block_len * 3..],
+                    page_number,
+                    ext.checksum3,
+                    false,
+                )?;
+            }
+            calc_new_checksum_cmp_with(&page_data[..block_len], page_number, checksum, true)?;
+        } else {
+            let checksum = ((page_number as u64) << 32) | (calc_crc32(&page_data) as u64);
+            if checksum != checksum {
+                return Err(SimpleError::new(format!(
+                        "Page number: {}, calculated checksum 0x{:X} doesn't equal to stored page header checksum 0x{:X}",
+                        page_number, checksum, checksum)));
+            }
+        }
 
         if self.format_revision < ESEDB_FORMAT_REVISION_NEW_RECORD_FORMAT {
             let header = PageHeaderOld::read(self, page_offset)?;
-            let common = PageHeaderCommon::read(self, page_offset)?;
-
-            //let TODO_checksum = 0;
+            let common =
+                PageHeaderCommon::read(self, page_offset + mem::size_of_val(&header) as u64)?;
             Ok(PageHeader::old(header, common))
         } else if self.format_revision < ESEDB_FORMAT_REVISION_EXTENDED_PAGE_HEADER {
             let header = PageHeader0x0b::read(self, page_offset)?;
             let common =
                 PageHeaderCommon::read(self, page_offset + mem::size_of_val(&header) as u64)?;
-
-            //TODO: verify checksum
             Ok(PageHeader::x0b(header, common))
         } else {
             let header = PageHeader0x11::read(self, page_offset)?;
             let common =
                 PageHeaderCommon::read(self, page_offset + mem::size_of_val(&header) as u64)?;
-
-            //TODO: verify checksum
-            if self.page_size > 8 * 1024 {
+            if !self.is_small_page() {
                 let offs = mem::size_of_val(&header) + mem::size_of_val(&common);
                 let ext = PageHeaderExt0x11::read(self, page_offset + offs as u64)?;
-
                 Ok(PageHeader::x11_ext(header, common, ext))
             } else {
                 Ok(PageHeader::x11(header, common))
@@ -846,10 +899,7 @@ impl<T: ReadSeek> Reader<T> {
         Ok(None)
     }
 
-    fn read_lv_key(
-        &self,
-        offset: u64)
-    -> Result<u64, SimpleError> {
+    fn read_lv_key(&self, offset: u64) -> Result<u64, SimpleError> {
         let key;
         let mut bytes = self.read_bytes(offset, 4)?;
         // if fLID64 is set, this is LVKEY64
@@ -969,10 +1019,10 @@ impl<T: ReadSeek> Reader<T> {
             let v;
             if lv {
                 v = self.load_lv_data(
-                        lv_tags,
-                        self.read_lv_key(offset + shift as u64)?,
-                        compressed
-                    )?;
+                    lv_tags,
+                    self.read_lv_key(offset + shift as u64)?,
+                    compressed,
+                )?;
             } else {
                 v = self.read_bytes(offset + shift as u64, size as usize)?;
                 if compressed {
@@ -1051,18 +1101,19 @@ impl<T: ReadSeek> Reader<T> {
                 page_key = res.common_page_key.clone();
             }
 
-            let skey : u64;
-            let mut seg_offset : u32 = 0;
+            let skey: u64;
+            let mut seg_offset: u32 = 0;
             // LVKEY64 (LID64, ULONG offset)
             if page_key.len() == 12 {
-                skey =
-                    u64::from_le_bytes(page_key[0..8].try_into().map_err(|e: TryFromSliceError| {
+                skey = u64::from_le_bytes(page_key[0..8].try_into().map_err(
+                    |e: TryFromSliceError| {
                         SimpleError::new(format!(
                             "can't convert page_key {:?} into slice [0..8], error: {}",
                             page_key, e
                         ))
-                    })?)
-                    .to_be();
+                    },
+                )?)
+                .to_be();
 
                 seg_offset = u32::from_le_bytes(
                     page_key[8..12]
@@ -1072,14 +1123,15 @@ impl<T: ReadSeek> Reader<T> {
                 .to_be();
             } else {
                 // LVKEY32 (LID32, ULONG offset)
-                skey =
-                    u32::from_le_bytes(page_key[0..4].try_into().map_err(|e: TryFromSliceError| {
+                skey = u32::from_le_bytes(page_key[0..4].try_into().map_err(
+                    |e: TryFromSliceError| {
                         SimpleError::new(format!(
                             "can't convert page_key {:?} into slice [0..4], error: {}",
                             page_key, e
                         ))
-                    })?)
-                    .to_be() as u64;
+                    },
+                )?)
+                .to_be() as u64;
 
                 if page_key.len() == 8 {
                     seg_offset = u32::from_le_bytes(
@@ -1306,6 +1358,7 @@ macro_rules! impl_read_primitive {
 impl_read_primitive!(u8);
 impl_read_primitive!(u16);
 impl_read_primitive!(u32);
+impl_read_primitive!(u64);
 
 #[derive(Copy, Clone, Debug, Default)]
 pub struct TaggedDataState {
