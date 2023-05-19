@@ -1,6 +1,7 @@
 use crate::parser::ese_db::*;
 use std::char::DecodeUtf16Error;
 use std::mem;
+use simple_error::SimpleError;
 
 pub fn calc_crc32(buffer: &[u8]) -> u32 {
     let buf32 = unsafe {
@@ -15,11 +16,16 @@ pub fn calc_crc32(buffer: &[u8]) -> u32 {
 // translated from
 // https://github.com/microsoft/Extensible-Storage-Engine/blob/933dc839b5a97b9a5b3e04824bdd456daf75a57d/dev/ese/src/_esefile/xsum.cxx#L887
 // ChecksumNewFormat
-pub fn calc_new_crc(pb: &[u8], pgno: u32, skip_header: bool) -> u64 {
+pub fn calc_new_crc(pb: &[u8], pgno: u32, skip_header: bool) -> Result<u64, SimpleError> {
     let cb = pb.len() as u32;
     let cdw = (cb / 4) as usize;
     let pdw = pb.as_ptr() as *const u32;
+
     let pdw = unsafe { std::slice::from_raw_parts(pdw, cdw) };
+
+    if pdw.len() < 8 {
+        return Err(SimpleError::new("calc_new_crc failed; array too small"));
+    }
     let mut p: u32 = 0;
     let mut p0: u32 = 0;
     let mut p1: u32 = 0;
@@ -30,7 +36,10 @@ pub fn calc_new_crc(pb: &[u8], pgno: u32, skip_header: bool) -> u64 {
         let mut i = 0;
         let mut pT0: u32 = 0;
         let mut pT1: u32 = 0;
+
+
         loop {
+
             // skip first 8 bytes
             if i > 0 || !skip_header {
                 pT0 = pdw[i + 0];
@@ -96,7 +105,7 @@ pub fn calc_new_crc(pb: &[u8], pgno: u32, skip_header: bool) -> u64 {
 
     let eccChecksum = p & 0xffe0ffe0 & mask | r & 0x001f001f;
     let xorChecksum = r2;
-    MakeChecksumFromECCXORAndPgno(eccChecksum, xorChecksum, pgno)
+    Ok(MakeChecksumFromECCXORAndPgno(eccChecksum, xorChecksum, pgno))
 }
 
 fn MakeChecksumFromECCXORAndPgno(eccChecksum: u32, xorChecksum: u32, pgno: u32) -> u64 {
@@ -142,19 +151,44 @@ pub fn from_utf16(v: &[u8]) -> Result<String, DecodeUtf16Error> {
     std::char::decode_utf16(iter).collect::<Result<String, _>>()
 }
 
-#[test]
-fn test_from_utf16() {
-    let expected = vec!["Record          #", "Record", "Flowers "];
-    let tests = [
-        vec![
-            82, 0, 101, 0, 99, 0, 111, 0, 114, 0, 100, 0, 32, 0, 32, 0, 32, 0, 32, 0, 32, 0, 32, 0,
-            32, 0, 32, 0, 32, 0, 32, 0, 35, 0,
-        ],
-        vec![82, 0, 101, 0, 99, 0, 111, 0, 114, 0, 100, 0, 32],
-        vec![70, 0, 108, 0, 111, 0, 119, 0, 101, 0, 114, 0, 115, 0, 32, 0],
-    ];
-    for et in tests.iter().zip(expected.iter()) {
-        let (t, expected) = et;
-        assert_eq!(expected, &&from_utf16(t).unwrap());
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::parser::ese_db::*;
+    use std::collections::HashMap;
+    use std::fs;
+
+    #[test]
+    fn test_from_utf16() {
+        let expected = vec!["Record          #", "Record", "Flowers "];
+        let tests = [
+            vec![
+                82, 0, 101, 0, 99, 0, 111, 0, 114, 0, 100, 0, 32, 0, 32, 0, 32, 0, 32, 0, 32, 0, 32, 0,
+                32, 0, 32, 0, 32, 0, 32, 0, 35, 0,
+            ],
+            vec![82, 0, 101, 0, 99, 0, 111, 0, 114, 0, 100, 0, 32],
+            vec![70, 0, 108, 0, 111, 0, 119, 0, 101, 0, 114, 0, 115, 0, 32, 0],
+        ];
+        for et in tests.iter().zip(expected.iter()) {
+            let (t, expected) = et;
+            assert_eq!(expected, &&from_utf16(t).unwrap());
+        }
     }
+
+    #[test]
+    fn test_calc_new_crc_good() {
+        let input = fs::read("testdata/checksum_buffer_12050322830504531039.bin").unwrap();
+        assert_eq!(12050322830504531039, calc_new_crc(&input[..], 1793, true).unwrap());
+    }
+
+    #[test]
+    fn test_calc_new_crc_too_small() {
+        assert_eq!(Err(SimpleError::new("calc_new_crc failed; array too small")), calc_new_crc(&[0; 4], 0, false));
+    }
+
+    #[test]
+    fn test_calc_new_crc_good_empty() {
+        assert_eq!(Ok(0), calc_new_crc(&[0; 32], 0, false));
+    }
+
 }

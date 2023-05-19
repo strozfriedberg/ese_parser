@@ -184,7 +184,7 @@ impl<T: ReadSeek> Reader<T> {
             checksum: u64,
             skip_header: bool,
         ) -> Result<(), SimpleError> {
-            let calc_checksum: u64 = calc_new_crc(buffer, page_number, skip_header);
+            let calc_checksum: u64 = calc_new_crc(buffer, page_number, skip_header)?;
             if calc_checksum != checksum {
                 return Err(SimpleError::new(format!(
                             "Page number: {}, calculated checksum 0x{:X} doesn't equal to stored page header checksum 0x{:X}",
