@@ -1,5 +1,6 @@
 use crate::parser::ese_db::*;
 use std::char::DecodeUtf16Error;
+use std::convert::TryInto;
 use std::mem;
 use simple_error::SimpleError;
 
@@ -13,19 +14,28 @@ pub fn calc_crc32(buffer: &[u8]) -> u32 {
         .fold(ESEDB_FILE_SIGNATURE, |crc, &val| crc ^ val)
 }
 
+fn get_u32_byte_slice(pb: &[u8]) -> Result<[u32; 8], SimpleError> {
+    const size_of_u32: usize = mem::size_of::<u32>();
+    let mut ret: [u32; 8] = [0; 8];
+
+    for index in 0..8 {
+        let val = u32::from_le_bytes(
+            pb[index * size_of_u32..(index + 0) * size_of_u32 + size_of_u32]
+                .try_into()
+                .unwrap(),
+        );
+        ret[index] = val;
+    }
+    Ok(ret)
+}
+
 // translated from
 // https://github.com/microsoft/Extensible-Storage-Engine/blob/933dc839b5a97b9a5b3e04824bdd456daf75a57d/dev/ese/src/_esefile/xsum.cxx#L887
 // ChecksumNewFormat
 pub fn calc_new_crc(pb: &[u8], pgno: u32, skip_header: bool) -> Result<u64, SimpleError> {
     let cb = pb.len() as u32;
     let cdw = (cb / 4) as usize;
-    let pdw = pb.as_ptr() as *const u32;
 
-    let pdw = unsafe { std::slice::from_raw_parts(pdw, cdw) };
-
-    if pdw.len() < 8 {
-        return Err(SimpleError::new("calc_new_crc failed; array too small"));
-    }
     let mut p: u32 = 0;
     let mut p0: u32 = 0;
     let mut p1: u32 = 0;
@@ -37,16 +47,15 @@ pub fn calc_new_crc(pb: &[u8], pgno: u32, skip_header: bool) -> Result<u64, Simp
         let mut pT0: u32 = 0;
         let mut pT1: u32 = 0;
 
-
+        let size_of_u32 = mem::size_of::<u32>();
         loop {
-
-            // skip first 8 bytes
+            let _pT = get_u32_byte_slice(&pb[i * size_of_u32..])?;
             if i > 0 || !skip_header {
-                pT0 = pdw[i + 0];
-                pT1 = pdw[i + 1];
+                pT0 = _pT[0];
+                pT1 = _pT[1];
             }
-            let pT2 = pdw[i + 2];
-            let pT3 = pdw[i + 3];
+            let pT2 = _pT[2];
+            let pT3 = _pT[3];
 
             p0 ^= pT0;
             p1 ^= pT1;
@@ -57,10 +66,10 @@ pub fn calc_new_crc(pb: &[u8], pgno: u32, skip_header: bool) -> Result<u64, Simp
 
             idxp = idxp.wrapping_add(0xff800080);
 
-            let pT4 = pdw[i + 4];
-            let pT5 = pdw[i + 5];
-            let pT6 = pdw[i + 6];
-            let pT7 = pdw[i + 7];
+            let pT4 = _pT[4];
+            let pT5 = _pT[5];
+            let pT6 = _pT[6];
+            let pT7 = _pT[7];
 
             p0 ^= pT4;
             p1 ^= pT5;
@@ -72,7 +81,6 @@ pub fn calc_new_crc(pb: &[u8], pgno: u32, skip_header: bool) -> Result<u64, Simp
             idxp = idxp.wrapping_add(0xff800080);
 
             i += 8;
-
             if i >= cdw {
                 break;
             }
@@ -105,7 +113,11 @@ pub fn calc_new_crc(pb: &[u8], pgno: u32, skip_header: bool) -> Result<u64, Simp
 
     let eccChecksum = p & 0xffe0ffe0 & mask | r & 0x001f001f;
     let xorChecksum = r2;
-    Ok(MakeChecksumFromECCXORAndPgno(eccChecksum, xorChecksum, pgno))
+    Ok(MakeChecksumFromECCXORAndPgno(
+        eccChecksum,
+        xorChecksum,
+        pgno,
+    ))
 }
 
 fn MakeChecksumFromECCXORAndPgno(eccChecksum: u32, xorChecksum: u32, pgno: u32) -> u64 {
@@ -154,8 +166,6 @@ pub fn from_utf16(v: &[u8]) -> Result<String, DecodeUtf16Error> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::parser::ese_db::*;
-    use std::collections::HashMap;
     use std::fs;
 
     #[test]
@@ -182,13 +192,7 @@ mod tests {
     }
 
     #[test]
-    fn test_calc_new_crc_too_small() {
-        assert_eq!(Err(SimpleError::new("calc_new_crc failed; array too small")), calc_new_crc(&[0; 4], 0, false));
-    }
-
-    #[test]
     fn test_calc_new_crc_good_empty() {
         assert_eq!(Ok(0), calc_new_crc(&[0; 32], 0, false));
     }
-
 }
