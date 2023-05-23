@@ -1,8 +1,8 @@
 use crate::parser::ese_db::*;
+use simple_error::SimpleError;
 use std::char::DecodeUtf16Error;
 use std::convert::TryInto;
 use std::mem;
-use simple_error::SimpleError;
 
 pub fn calc_crc32(buffer: &[u8]) -> u32 {
     let buf32 = unsafe {
@@ -173,8 +173,8 @@ mod tests {
         let expected = vec!["Record          #", "Record", "Flowers "];
         let tests = [
             vec![
-                82, 0, 101, 0, 99, 0, 111, 0, 114, 0, 100, 0, 32, 0, 32, 0, 32, 0, 32, 0, 32, 0, 32, 0,
-                32, 0, 32, 0, 32, 0, 32, 0, 35, 0,
+                82, 0, 101, 0, 99, 0, 111, 0, 114, 0, 100, 0, 32, 0, 32, 0, 32, 0, 32, 0, 32, 0,
+                32, 0, 32, 0, 32, 0, 32, 0, 32, 0, 35, 0,
             ],
             vec![82, 0, 101, 0, 99, 0, 111, 0, 114, 0, 100, 0, 32],
             vec![70, 0, 108, 0, 111, 0, 119, 0, 101, 0, 114, 0, 115, 0, 32, 0],
@@ -188,7 +188,10 @@ mod tests {
     #[test]
     fn test_calc_new_crc_good() {
         let input = fs::read("testdata/checksum_buffer_12050322830504531039.bin").unwrap();
-        assert_eq!(12050322830504531039, calc_new_crc(&input[..], 1793, true).unwrap());
+        assert_eq!(
+            12050322830504531039,
+            calc_new_crc(&input[..], 1793, true).unwrap()
+        );
     }
 
     #[test]
