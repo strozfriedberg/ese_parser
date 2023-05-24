@@ -106,10 +106,9 @@ pub fn calc_new_crc(pb: &[u8], pgno: u32, skip_header: bool) -> Result<u64, Simp
     let mut r: u32 = 0;
     let mut idxr: u32 = 0xffff0000;
     for i in 0u32..32u32 {
-        let mask: u32 = if (r2 & (1u32 << i)) > 0 {
-            0xFFFFFFFF
-        } else {
-            0
+        let mask = match r2 & (1 << i) {
+            0 => 0,
+            _ => 0xFFFFFFFF
         };
         r ^= mask & idxr;
         idxr = idxr.wrapping_add(0xffff0001);
