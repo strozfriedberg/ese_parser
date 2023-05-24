@@ -7,7 +7,7 @@ use std::{
     cell::RefCell,
     convert::TryInto,
     io,
-    io::{Read, Seek, SeekFrom},
+    io::{Read, Seek},
     mem,
 };
 
@@ -24,7 +24,7 @@ mod test;
 
 pub trait ReadSeek: Read + Seek {
     fn tell(&mut self) -> io::Result<u64> {
-        self.seek(SeekFrom::Current(0))
+        self.stream_position()
     }
 }
 
@@ -201,7 +201,7 @@ impl<T: ReadSeek> Reader<T> {
             let mut block_len = page_data.len();
             if !self.is_small_page() {
                 block_len = page_data.len() / 4;
-                let ext = PageHeaderExt0x11::read(self, page_offset + 40 as u64)?;
+                let ext = PageHeaderExt0x11::read(self, page_offset + 40)?;
 
                 if ext.page_number != page_number as u64 {
                     return Err(SimpleError::new(format!(
@@ -230,8 +230,8 @@ impl<T: ReadSeek> Reader<T> {
             }
             calc_new_checksum_cmp_with(&page_data[..block_len], page_number, checksum, true)?;
         } else {
-            let checksum = ((page_number as u64) << 32) | (calc_crc32(&page_data) as u64);
-            if checksum != checksum {
+            let calc_checksum = ((page_number as u64) << 32) | (calc_crc32(&page_data) as u64);
+            if calc_checksum != checksum {
                 return Err(SimpleError::new(format!(
                         "Page number: {}, calculated checksum 0x{:X} doesn't equal to stored page header checksum 0x{:X}",
                         page_number, checksum, checksum)));
@@ -264,7 +264,7 @@ impl<T: ReadSeek> Reader<T> {
 
     pub fn load_page_tags(&self, db_page: &jet::DbPage) -> Result<Vec<PageTag>, SimpleError> {
         let page_offset = db_page.offset();
-        let mut tags_offset = (page_offset + self.page_size as u64) as u64;
+        let mut tags_offset = page_offset + self.page_size as u64;
         let tags_cnt = db_page.get_available_page_tag();
         let mut tags = Vec::<PageTag>::with_capacity(tags_cnt);
 
@@ -477,12 +477,12 @@ impl<T: ReadSeek> Reader<T> {
         let ddh = ese_db::DataDefinitionHeader::read(self, offset_ddh)?;
         offset += mem::size_of::<ese_db::DataDefinitionHeader>() as u64;
 
-        let number_of_variable_size_data_types: u32;
+        let number_of_variable_size_data_types: u32 =
         if ddh.last_variable_size_data_type > 127 {
-            number_of_variable_size_data_types = ddh.last_variable_size_data_type as u32 - 127;
+            ddh.last_variable_size_data_type as u32 - 127
         } else {
-            number_of_variable_size_data_types = 0;
-        }
+            0
+        };
 
         let mut cat_def = jet::CatalogDefinition::default();
         let data_def = ese_db::DataDefinition::read(self, offset)?;
@@ -516,13 +516,12 @@ impl<T: ReadSeek> Reader<T> {
                     read_u16(self, offset_ddh + variable_size_data_types_offset as u64)?;
                 variable_size_data_types_offset += 2;
 
-                let data_type_size: u16;
+                let data_type_size: u16 =
                 if variable_size_data_type_size & 0x8000 != 0 {
-                    data_type_size = 0;
+                    0
                 } else {
-                    data_type_size =
-                        variable_size_data_type_size - previous_variable_size_data_type_size;
-                }
+                    variable_size_data_type_size - previous_variable_size_data_type_size
+                };
                 if data_type_size > 0 {
                     match data_type_number {
                         128 => {
@@ -669,13 +668,12 @@ impl<T: ReadSeek> Reader<T> {
                 )?;
             }
 
-            let number_of_variable_size_data_types: u16;
+            let number_of_variable_size_data_types: u16 =
             if lls.ddh.last_variable_size_data_type > 127 {
-                number_of_variable_size_data_types =
-                    lls.ddh.last_variable_size_data_type as u16 - 127;
+                    lls.ddh.last_variable_size_data_type as u16 - 127
             } else {
-                number_of_variable_size_data_types = 0;
-            }
+                    0
+            };
 
             lls.var_state.current_type = 127;
             lls.var_state.type_offset = lls.ddh.variable_size_data_types_offset;
@@ -842,14 +840,14 @@ impl<T: ReadSeek> Reader<T> {
                 tag_state.remaining_definition_data_size -= 4;
             }
 
-            let tagged_data_type_offset_bitmask: u16;
+            let tagged_data_type_offset_bitmask: u16 =
             if self.format_revision >= ESEDB_FORMAT_REVISION_EXTENDED_PAGE_HEADER
                 && self.page_size >= 16384
             {
-                tagged_data_type_offset_bitmask = 0x7fff;
+                0x7fff
             } else {
-                tagged_data_type_offset_bitmask = 0x3fff;
-            }
+                0x3fff
+            };
             let masked_previous_tagged_data_type_offset: u16 =
                 previous_tagged_data_type_offset & tagged_data_type_offset_bitmask;
             let masked_tagged_data_type_offset =
@@ -900,15 +898,14 @@ impl<T: ReadSeek> Reader<T> {
     }
 
     fn read_lv_key(&self, offset: u64) -> Result<u64, SimpleError> {
-        let key;
         let mut bytes = self.read_bytes(offset, 4)?;
         // if fLID64 is set, this is LVKEY64
-        if bytes[3] & 0x80 > 0 {
+        let key = if bytes[3] & 0x80 > 0 {
             bytes.append(&mut self.read_bytes(offset + 4, 4)?);
-            key = u64::from_bytes(&bytes);
+            u64::from_bytes(&bytes)
         } else {
-            key = u32::from_bytes(&bytes) as u64;
-        }
+            u32::from_bytes(&bytes) as u64
+        };
         Ok(key)
     }
 
@@ -1307,7 +1304,7 @@ macro_rules! impl_read_struct {
     ($struct_type: ident) => {
         impl $struct_type {
             pub(crate) fn read<T: ReadSeek>(
-                reader: &crate::parser::reader::Reader<T>,
+                reader: &$crate::parser::reader::Reader<T>,
                 page_offset: u64,
             ) -> Result<Self, simple_error::SimpleError> {
                 let buffer = reader.read_bytes(page_offset, std::mem::size_of::<$struct_type>())?;
@@ -1327,7 +1324,7 @@ macro_rules! impl_read_struct_buffer {
     ($struct_type: ident) => {
         impl $struct_type {
             pub(crate) fn read<T: ReadSeek>(
-                reader: &crate::parser::reader::Reader<T>,
+                reader: &$crate::parser::reader::Reader<T>,
                 page_offset: u64,
             ) -> Result<(Self, Vec<u8>), simple_error::SimpleError> {
                 let buffer = reader.read_bytes(page_offset, std::mem::size_of::<$struct_type>())?;
@@ -1346,7 +1343,7 @@ macro_rules! impl_read_struct_buffer {
 macro_rules! impl_read_primitive {
     ($primitive_type: ident) => {
         paste::item! {
-            pub(crate) fn [<read_ $primitive_type>]<T: ReadSeek>(reader: &crate::parser::reader::Reader<T>, page_offset: u64) -> Result<$primitive_type, simple_error::SimpleError> {
+            pub(crate) fn [<read_ $primitive_type>]<T: ReadSeek>(reader: &$crate::parser::reader::Reader<T>, page_offset: u64) -> Result<$primitive_type, simple_error::SimpleError> {
                 let size = std::mem::size_of::<$primitive_type>();
                 let buffer = reader.read_bytes(page_offset, size)?;
                 let arr = buffer[..].try_into().map_err(|e: std::array::TryFromSliceError| simple_error::SimpleError::new(e.to_string()))?;

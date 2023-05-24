@@ -17,36 +17,36 @@ pub const ESEDB_FORMAT_REVISION_EXTENDED_PAGE_HEADER: uint32_t = 0x11;
 pub struct FileHeader {
     pub checksum: uint32_t,
     pub signature: uint32_t,
-    #[nom(Parse = "{ |i| jet::FormatVersion::parse_le(i) }")]
+    #[nom(Parse = "{ jet::FormatVersion::parse_le }")]
     pub format_version: jet::FormatVersion,
-    #[nom(Parse = "{ |i| jet::FileType::parse_le(i) }")]
+    #[nom(Parse = "{ jet::FileType::parse_le }")]
     pub file_type: jet::FileType,
-    #[nom(Parse = "{ |i| jet::DbTime::parse_le(i) }")]
+    #[nom(Parse = "{ jet::DbTime::parse_le }")]
     pub database_time: jet::DbTime,
-    #[nom(Parse = "{ |i| jet::Signature::parse_le(i) }")]
+    #[nom(Parse = "{ jet::Signature::parse_le }")]
     pub database_signature: jet::Signature,
-    #[nom(Parse = "{ |i| jet::DbState::parse_le(i) }")]
+    #[nom(Parse = "{ jet::DbState::parse_le }")]
     pub database_state: jet::DbState,
-    #[nom(Parse = "{ |i| jet::LgPos::parse_le(i) }")]
+    #[nom(Parse = "{ jet::LgPos::parse_le }")]
     pub consistent_postition: jet::LgPos,
-    #[nom(Parse = "{ |i| jet::DateTime::parse_le(i) }")]
+    #[nom(Parse = "{ jet::DateTime::parse_le }")]
     pub consistent_time: jet::DateTime,
-    #[nom(Parse = "{ |i| jet::DateTime::parse_le(i) }")]
+    #[nom(Parse = "{ jet::DateTime::parse_le }")]
     pub attach_time: jet::DateTime,
-    #[nom(Parse = "{ |i| jet::LgPos::parse_le(i) }")]
+    #[nom(Parse = "{ jet::LgPos::parse_le }")]
     pub attach_postition: jet::LgPos,
-    #[nom(Parse = "{ |i| jet::DateTime::parse_le(i) }")]
+    #[nom(Parse = "{ jet::DateTime::parse_le }")]
     pub detach_time: jet::DateTime,
-    #[nom(Parse = "{ |i| jet::LgPos::parse_le(i) }")]
+    #[nom(Parse = "{ jet::LgPos::parse_le }")]
     pub detach_postition: jet::LgPos,
     pub dbid: uint32_t,
-    #[nom(Parse = "{ |i| jet::Signature::parse_le(i) }")]
+    #[nom(Parse = "{ jet::Signature::parse_le }")]
     pub log_signature: jet::Signature,
-    #[nom(Parse = "{ |i| jet::BackupInfo::parse_le(i) }")]
+    #[nom(Parse = "{ jet::BackupInfo::parse_le }")]
     pub previous_full_backup: jet::BackupInfo,
-    #[nom(Parse = "{ |i| jet::BackupInfo::parse_le(i) }")]
+    #[nom(Parse = "{ jet::BackupInfo::parse_le }")]
     pub previous_incremental_backup: jet::BackupInfo,
-    #[nom(Parse = "{ |i| jet::BackupInfo::parse_le(i) }")]
+    #[nom(Parse = "{ jet::BackupInfo::parse_le }")]
     pub current_full_backup: jet::BackupInfo,
     pub shadowing_disabled: uint32_t,
     pub last_object_identifier: uint32_t,
@@ -58,40 +58,40 @@ pub struct FileHeader {
     pub format_revision: jet::FormatRevision,
     pub page_size: uint32_t,
     pub repair_count: uint32_t,
-    #[nom(Parse = "{ |i| jet::DateTime::parse_le(i) }")]
+    #[nom(Parse = "{ jet::DateTime::parse_le }")]
     pub repair_time: jet::DateTime,
-    #[nom(Parse = "{ |i| jet::Signature::parse_le(i) }")]
+    #[nom(Parse = "{ jet::Signature::parse_le }")]
     pub unknown2: jet::Signature,
-    #[nom(Parse = "{ |i| jet::DateTime::parse_le(i) }")]
+    #[nom(Parse = "{ jet::DateTime::parse_le }")]
     pub scrub_database_time: jet::DateTime,
-    #[nom(Parse = "{ |i| jet::DateTime::parse_le(i) }")]
+    #[nom(Parse = "{ jet::DateTime::parse_le }")]
     pub scrub_time: jet::DateTime,
     pub required_log: [uint8_t; 8],
     pub upgrade_exchange5_format: uint32_t,
     pub upgrade_free_pages: uint32_t,
     pub upgrade_space_map_pages: uint32_t,
-    #[nom(Parse = "{ |i| jet::BackupInfo::parse_le(i) }")]
+    #[nom(Parse = "{ jet::BackupInfo::parse_le }")]
     pub current_shadow_volume_backup: jet::BackupInfo,
     pub creation_format_version: uint32_t,
     pub creation_format_revision: uint32_t,
     pub unknown3: [uint8_t; 16],
     pub old_repair_count: uint32_t,
     pub ecc_fix_success_count: uint32_t,
-    #[nom(Parse = "{ |i| jet::DateTime::parse_le(i) }")]
+    #[nom(Parse = "{ jet::DateTime::parse_le }")]
     pub ecc_fix_success_time: jet::DateTime,
     pub old_ecc_fix_success_count: uint32_t,
     pub ecc_fix_error_count: uint32_t,
-    #[nom(Parse = "{ |i| jet::DateTime::parse_le(i) }")]
+    #[nom(Parse = "{ jet::DateTime::parse_le }")]
     pub ecc_fix_error_time: jet::DateTime,
     pub old_ecc_fix_error_count: uint32_t,
     pub bad_checksum_error_count: uint32_t,
-    #[nom(Parse = "{ |i| jet::DateTime::parse_le(i) }")]
+    #[nom(Parse = "{ jet::DateTime::parse_le }")]
     pub bad_checksum_error_time: jet::DateTime,
     pub old_bad_checksum_error_count: uint32_t,
     pub committed_log: uint32_t,
-    #[nom(Parse = "{ |i| jet::BackupInfo::parse_le(i) }")]
+    #[nom(Parse = "{ jet::BackupInfo::parse_le }")]
     pub previous_shadow_volume_backup: jet::BackupInfo,
-    #[nom(Parse = "{ |i| jet::BackupInfo::parse_le(i) }")]
+    #[nom(Parse = "{ jet::BackupInfo::parse_le }")]
     pub previous_differential_backup: jet::BackupInfo,
     pub unknown4_1: [uint8_t; 20],
     pub unknown4_2: [uint8_t; 40 - 20],
@@ -133,7 +133,7 @@ impl_read_struct!(PageHeader0x11);
 #[repr(packed)]
 #[derive(Copy, Clone, Debug, Eq, PartialEq, Nom)]
 pub struct PageHeaderCommon {
-    #[nom(Parse = "{ |i| jet::DateTime::parse_le(i) }")]
+    #[nom(Parse = "{ jet::DateTime::parse_le }")]
     pub database_modification_time: jet::DateTime,
     pub previous_page: uint32_t,
     pub next_page: uint32_t,
@@ -142,7 +142,7 @@ pub struct PageHeaderCommon {
     pub available_uncommitted_data_size: uint16_t,
     pub available_data_offset: uint16_t,
     pub available_page_tag: uint16_t,
-    #[nom(Parse = "{ |i| jet::PageFlags::parse_le(i) }")]
+    #[nom(Parse = "{ jet::PageFlags::parse_le }")]
     pub page_flags: PageFlags,
 }
 impl_read_struct!(PageHeaderCommon);
@@ -282,7 +282,7 @@ pub struct DataDefinition {
     pub identifier: uint32_t,
 
     // Data type identifier: 4 (ColtypOrPgnoFDP)
-    #[nom(Parse = "{ |i| ColtypOrPgnoFDP::parse_le(i) }")]
+    #[nom(Parse = "{ ColtypOrPgnoFDP::parse_le }")]
     pub coltyp_or_fdp: ColtypOrPgnoFDP,
 
     // Data type identifier: 5 (SpaceUsage)
@@ -292,7 +292,7 @@ pub struct DataDefinition {
     // Data type identifier: 6 (Flags)
     // Flags
     pub flags: uint32_t,
-    #[nom(Parse = "{ |i| PagesOrLocale::parse_le(i) }")]
+    #[nom(Parse = "{ PagesOrLocale::parse_le }")]
     pub pages_or_locale: PagesOrLocale,
 
     // Data type identifier: 8 (RootFlag)

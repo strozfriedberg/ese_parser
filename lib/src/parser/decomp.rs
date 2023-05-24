@@ -21,20 +21,20 @@ fn seven_bit_decompress_buf(compressed_data: &[u8]) -> Result<Vec<u8>, SimpleErr
         return Err(SimpleError::new("compressed data size is 0"));
     }
 
-    let mut uncompressed_data = Vec::<u8>::with_capacity(decompressed_size as usize);
+    let mut uncompressed_data = Vec::<u8>::with_capacity(decompressed_size);
     let mut compressed_index = 1usize;
     let mut compressed_bit = 0u8;
     for _ in 0..decompressed_size {
-        let byte;
+        let byte =
         if compressed_bit <= 1 {
-            byte = (compressed_data[compressed_index] >> compressed_bit) & 0x7f;
+            (compressed_data[compressed_index] >> compressed_bit) & 0x7f
         } else {
             let compressed_word = u16::from_ne_bytes([
                 compressed_data[compressed_index],
                 compressed_data[compressed_index + 1],
             ]) as u32;
-            byte = ((compressed_word >> compressed_bit) & 0x7f) as u8;
-        }
+            ((compressed_word >> compressed_bit) & 0x7f) as u8
+        };
         uncompressed_data.push(byte);
         compressed_bit += 7;
         if compressed_bit >= 8 {
@@ -153,7 +153,7 @@ pub fn decompress_buf(
             }
         }
         _ => {
-            return Err(SimpleError::new(format!("bad identifier: {}", identifier)));
+            Err(SimpleError::new(format!("bad identifier: {}", identifier)))
         }
     }
 }

@@ -1,6 +1,5 @@
 use crate::parser::ese_db::*;
 use simple_error::SimpleError;
-use std::array::TryFromSliceError;
 use std::char::DecodeUtf16Error;
 use std::convert::TryInto;
 use std::mem;
@@ -119,7 +118,7 @@ fn MakeChecksumFromECCXORAndPgno(eccChecksum: u32, xorChecksum: u32, pgno: u32) 
 }
 
 fn lParityMask(dw: u32) -> u32 {
-    static parityLookupTable: &'static [i32] = &[
+    static parityLookupTable: &[i32] = &[
         0, -1, -1, 0, -1, 0, 0, -1, -1, 0, 0, -1, 0, -1, -1, 0, // 0x0x
         -1, 0, 0, -1, 0, -1, -1, 0, 0, -1, -1, 0, -1, 0, 0, -1, // 0x1x
         -1, 0, 0, -1, 0, -1, -1, 0, 0, -1, -1, 0, -1, 0, 0, -1, // 0x2x
