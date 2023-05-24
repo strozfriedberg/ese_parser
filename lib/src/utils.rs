@@ -5,34 +5,27 @@ use std::char::DecodeUtf16Error;
 use std::convert::TryInto;
 use std::mem;
 
-pub fn calc_crc32(buffer: &[u8]) -> u32 {
-    let buf32 = unsafe {
-        std::slice::from_raw_parts(buffer.as_ptr() as *const u32, (buffer.len() / 4) as usize)
-    };
-    buf32
-        .iter()
-        .skip(1)
-        .fold(ESEDB_FILE_SIGNATURE, |crc, &val| crc ^ val)
+fn iter_u32(bytes: &[u8]) -> impl Iterator<Item=u32> + '_ {
+    bytes.chunks_exact(4).map(|chunk| u32::from_le_bytes([chunk[0], chunk[1], chunk[2], chunk[3]]))
 }
 
-fn get_u32_byte_slice(pb: &[u8]) -> Result<[u32; 8], SimpleError> {
-    const size_of_u32: usize = mem::size_of::<u32>();
-    let mut ret: [u32; 8] = [0; 8];
+pub fn calc_crc32(buffer: &[u8]) -> u32 {
+    // could assert the length is % 4 here if wanted
+    iter_u32(buffer).skip(1).fold(ESEDB_FILE_SIGNATURE, |crc, val| crc ^ val)
+}
 
-    for index in 0..8 {
-        let val = u32::from_le_bytes(
-            pb[index * size_of_u32..(index * size_of_u32) + size_of_u32]
-                .try_into()
-                .map_err(|e: TryFromSliceError| {
-                    SimpleError::new(format!(
-                        "can't get_u32_byte_slice for calc_new_crc. error: {}",
-                        e
-                    ))
-                })?,
-        );
-        ret[index] = val;
-    }
-    Ok(ret)
+fn get_u32_byte_array(pb: &[u8]) -> Result<[u32; 8], SimpleError> {
+    let array: [u32; 8] = iter_u32(pb)
+        .take(8)
+        .collect::<Vec<u32>>()
+        .try_into()
+        .map_err(|e| {
+            SimpleError::new(format!(
+                "can't get_u32_byte_array for calc_new_crc. input: {:#?}",
+                e
+            ))
+        })?;
+    Ok(array)
 }
 
 // translated from
@@ -54,7 +47,7 @@ pub fn calc_new_crc(pb: &[u8], pgno: u32, skip_header: bool) -> Result<u64, Simp
 
         let size_of_u32 = mem::size_of::<u32>();
         for i in (0..cdw).step_by(8) {
-            let _pT = get_u32_byte_slice(&pb[i * size_of_u32..])?;
+            let _pT = get_u32_byte_array(&pb[i * size_of_u32..])?;
             if i > 0 || !skip_header {
                 pT0 = _pT[0];
                 pT1 = _pT[1];
@@ -196,5 +189,32 @@ mod tests {
     #[test]
     fn test_calc_new_crc_good_empty() {
         assert_eq!(Ok(0), calc_new_crc(&[0; 32], 0, false));
+    }
+
+    #[test]
+    fn test_iter_u32() {
+        let bytes: &[u8] = &[1, 2, 3, 4, 5, 6, 7, 8];
+        let u32_bytes: &[u32] = &[0x04030201, 0x08070605];
+        for (i, val) in iter_u32(bytes).enumerate() {
+            assert_eq!(u32_bytes[i], val);
+        }
+    }
+
+    #[test]
+    fn test_fold() {
+        let bytes: &[u8] = &[2, 3, 4, 5, 1, 0, 0, 0, 2, 0, 0, 0, 3, 0, 0, 0, 4, 0, 0, 0];
+        // skip 0x05040302 and sum 0x0001,0x0002,0x0003,0x0004
+        let z = iter_u32(bytes).skip(1).fold(0, |a, b| a+b);
+        assert_eq!(10, z);
+    }
+
+    #[test]
+    fn test_collect_as_slice() {
+        // if you needed a &[u32] or Vec<u32> for some reason, you can create one
+        let bytes: &[u8] = &[1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12];
+        let expected_slice: &[u32] = &[0x04030201, 0x08070605, 0x0C0B0A09];
+        let converted = iter_u32(bytes).collect::<Vec<_>>();
+        assert_eq!(expected_slice, &converted);
+        assert_eq!(expected_slice, converted); // also works because Vec<T> impls AsRef<[T]> and &Vec[T] coerces to &[T]
     }
 }
