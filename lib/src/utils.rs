@@ -1,5 +1,6 @@
 use crate::parser::ese_db::*;
 use simple_error::SimpleError;
+use std::array::TryFromSliceError;
 use std::char::DecodeUtf16Error;
 use std::convert::TryInto;
 use std::mem;
@@ -20,9 +21,14 @@ fn get_u32_byte_slice(pb: &[u8]) -> Result<[u32; 8], SimpleError> {
 
     for index in 0..8 {
         let val = u32::from_le_bytes(
-            pb[index * size_of_u32..(index + 0) * size_of_u32 + size_of_u32]
+            pb[index * size_of_u32..(index * size_of_u32) + size_of_u32]
                 .try_into()
-                .unwrap(),
+                .map_err(|e: TryFromSliceError| {
+                    SimpleError::new(format!(
+                        "can't get_u32_byte_slice for calc_new_crc. error: {}",
+                        e
+                    ))
+                })?,
         );
         ret[index] = val;
     }
