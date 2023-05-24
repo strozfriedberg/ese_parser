@@ -49,12 +49,11 @@ pub fn calc_new_crc(pb: &[u8], pgno: u32, skip_header: bool) -> Result<u64, Simp
     let mut p3: u32 = 0;
     {
         let mut idxp: u32 = 0xff800000;
-        let mut i = 0;
         let mut pT0: u32 = 0;
         let mut pT1: u32 = 0;
 
         let size_of_u32 = mem::size_of::<u32>();
-        loop {
+        for i in (0..cdw).step_by(8) {
             let _pT = get_u32_byte_slice(&pb[i * size_of_u32..])?;
             if i > 0 || !skip_header {
                 pT0 = _pT[0];
@@ -85,11 +84,6 @@ pub fn calc_new_crc(pb: &[u8], pgno: u32, skip_header: bool) -> Result<u64, Simp
             p ^= idxp & lParityMask(pT4 ^ pT5 ^ pT6 ^ pT7);
 
             idxp = idxp.wrapping_add(0xff800080);
-
-            i += 8;
-            if i >= cdw {
-                break;
-            }
         }
     }
 
