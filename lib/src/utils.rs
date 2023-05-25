@@ -4,13 +4,17 @@ use std::char::DecodeUtf16Error;
 use std::convert::TryInto;
 use std::mem;
 
-fn iter_u32(bytes: &[u8]) -> impl Iterator<Item=u32> + '_ {
-    bytes.chunks_exact(4).map(|chunk| u32::from_le_bytes([chunk[0], chunk[1], chunk[2], chunk[3]]))
+fn iter_u32(bytes: &[u8]) -> impl Iterator<Item = u32> + '_ {
+    bytes
+        .chunks_exact(4)
+        .map(|chunk| u32::from_le_bytes([chunk[0], chunk[1], chunk[2], chunk[3]]))
 }
 
 pub fn calc_crc32(buffer: &[u8]) -> u32 {
     // could assert the length is % 4 here if wanted
-    iter_u32(buffer).skip(1).fold(ESEDB_FILE_SIGNATURE, |crc, val| crc ^ val)
+    iter_u32(buffer)
+        .skip(1)
+        .fold(ESEDB_FILE_SIGNATURE, |crc, val| crc ^ val)
 }
 
 fn get_u32_byte_array(pb: &[u8]) -> Result<[u32; 8], SimpleError> {
@@ -94,7 +98,7 @@ pub fn calc_new_crc(pb: &[u8], pgno: u32, skip_header: bool) -> Result<u64, Simp
     for i in 0u32..32u32 {
         let mask = match r2 & (1 << i) {
             0 => 0,
-            _ => 0xFFFFFFFF
+            _ => 0xFFFFFFFF,
         };
         r ^= mask & idxr;
         idxr = idxr.wrapping_add(0xffff0001);
@@ -203,7 +207,7 @@ mod tests {
     fn test_fold() {
         let bytes: &[u8] = &[2, 3, 4, 5, 1, 0, 0, 0, 2, 0, 0, 0, 3, 0, 0, 0, 4, 0, 0, 0];
         // skip 0x05040302 and sum 0x0001,0x0002,0x0003,0x0004
-        let z = iter_u32(bytes).skip(1).fold(0, |a, b| a+b);
+        let z = iter_u32(bytes).skip(1).fold(0, |a, b| a + b);
         assert_eq!(10, z);
     }
 

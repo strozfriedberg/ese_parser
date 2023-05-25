@@ -477,8 +477,7 @@ impl<T: ReadSeek> Reader<T> {
         let ddh = ese_db::DataDefinitionHeader::read(self, offset_ddh)?;
         offset += mem::size_of::<ese_db::DataDefinitionHeader>() as u64;
 
-        let number_of_variable_size_data_types: u32 =
-        if ddh.last_variable_size_data_type > 127 {
+        let number_of_variable_size_data_types: u32 = if ddh.last_variable_size_data_type > 127 {
             ddh.last_variable_size_data_type as u32 - 127
         } else {
             0
@@ -516,8 +515,7 @@ impl<T: ReadSeek> Reader<T> {
                     read_u16(self, offset_ddh + variable_size_data_types_offset as u64)?;
                 variable_size_data_types_offset += 2;
 
-                let data_type_size: u16 =
-                if variable_size_data_type_size & 0x8000 != 0 {
+                let data_type_size: u16 = if variable_size_data_type_size & 0x8000 != 0 {
                     0
                 } else {
                     variable_size_data_type_size - previous_variable_size_data_type_size
@@ -669,11 +667,11 @@ impl<T: ReadSeek> Reader<T> {
             }
 
             let number_of_variable_size_data_types: u16 =
-            if lls.ddh.last_variable_size_data_type > 127 {
+                if lls.ddh.last_variable_size_data_type > 127 {
                     lls.ddh.last_variable_size_data_type as u16 - 127
-            } else {
+                } else {
                     0
-            };
+                };
 
             lls.var_state.current_type = 127;
             lls.var_state.type_offset = lls.ddh.variable_size_data_types_offset;
@@ -840,8 +838,8 @@ impl<T: ReadSeek> Reader<T> {
                 tag_state.remaining_definition_data_size -= 4;
             }
 
-            let tagged_data_type_offset_bitmask: u16 =
-            if self.format_revision >= ESEDB_FORMAT_REVISION_EXTENDED_PAGE_HEADER
+            let tagged_data_type_offset_bitmask: u16 = if self.format_revision
+                >= ESEDB_FORMAT_REVISION_EXTENDED_PAGE_HEADER
                 && self.page_size >= 16384
             {
                 0x7fff

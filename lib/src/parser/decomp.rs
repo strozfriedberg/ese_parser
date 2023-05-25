@@ -25,8 +25,7 @@ fn seven_bit_decompress_buf(compressed_data: &[u8]) -> Result<Vec<u8>, SimpleErr
     let mut compressed_index = 1usize;
     let mut compressed_bit = 0u8;
     for _ in 0..decompressed_size {
-        let byte =
-        if compressed_bit <= 1 {
+        let byte = if compressed_bit <= 1 {
             (compressed_data[compressed_index] >> compressed_bit) & 0x7f
         } else {
             let compressed_word = u16::from_ne_bytes([
@@ -152,9 +151,7 @@ pub fn decompress_buf(
                 }
             }
         }
-        _ => {
-            Err(SimpleError::new(format!("bad identifier: {}", identifier)))
-        }
+        _ => Err(SimpleError::new(format!("bad identifier: {}", identifier))),
     }
 }
 

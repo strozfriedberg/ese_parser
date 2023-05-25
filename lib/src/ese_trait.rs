@@ -123,22 +123,18 @@ pub trait EseDb {
                 LittleEndian::read_u16_into(&v, &mut vec16);
                 match String::from_utf16(&vec16[..]) {
                     Ok(s) => Ok(Some(s)),
-                    Err(e) => {
-                        Err(SimpleError::new(format!(
-                            "String::from_utf16 failed: {}",
-                            e
-                        )))
-                    }
+                    Err(e) => Err(SimpleError::new(format!(
+                        "String::from_utf16 failed: {}",
+                        e
+                    ))),
                 }
             } else {
                 match std::str::from_utf8(&v) {
                     Ok(s) => Ok(Some(s.to_string())),
-                    Err(e) => {
-                        Err(SimpleError::new(format!(
-                            "std::str::from_utf8 failed: {}",
-                            e
-                        )))
-                    }
+                    Err(e) => Err(SimpleError::new(format!(
+                        "std::str::from_utf8 failed: {}",
+                        e
+                    ))),
                 }
             }
         } else {
