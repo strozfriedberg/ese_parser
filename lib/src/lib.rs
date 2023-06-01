@@ -8,6 +8,8 @@
 )]
 pub mod parser;
 
+pub use parser::win;
+
 #[cfg(all(feature = "nt_comparison", target_os = "windows"))]
 pub mod esent;
 

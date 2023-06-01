@@ -2,10 +2,10 @@
 use byteorder::*;
 use cache_2q::Cache;
 use simple_error::SimpleError;
-use std::array::TryFromSliceError;
-use std::collections::{hash_map::Entry, BTreeSet, HashMap};
 use std::{
+    array::TryFromSliceError,
     cell::RefCell,
+    collections::{hash_map::Entry, BTreeSet, HashMap},
     convert::TryInto,
     io,
     io::{Read, Seek, SeekFrom},
@@ -17,10 +17,10 @@ use crate::parser::ese_db;
 use crate::parser::ese_db::*;
 use crate::parser::jet;
 
-#[cfg(all(feature = "nt_comparison", target_os = "windows"))]
-mod gen_db;
-
-mod test;
+// #[cfg(all(feature = "nt_comparison", target_os = "windows"))]
+// mod gen_db;
+//
+// mod test;
 
 pub trait ReadSeek: Read + Seek {
     fn tell(&mut self) -> io::Result<u64> {
@@ -29,6 +29,25 @@ pub trait ReadSeek: Read + Seek {
 }
 
 impl<T: Read + Seek> ReadSeek for T {}
+
+use bitvec::vec::BitVec;
+use once_cell::sync::Lazy;
+
+static mut USED_PLACE: Lazy<BitVec> = Lazy::new(|| BitVec::new());
+
+pub fn init_monitor(size: usize) {
+    unsafe{ Lazy::force_mut(&mut USED_PLACE).resize(size, false) };
+}
+
+pub fn mark_used(offset: usize, size: usize) {
+    let bits = unsafe{ Lazy::get_mut(&mut USED_PLACE).unwrap() };
+    bits[offset..(offset + size)].fill(true);
+}
+
+pub fn get_used() -> &'static BitVec {
+    unsafe{ Lazy::get_mut(&mut USED_PLACE).unwrap() }
+}
+
 
 pub struct Reader<T: ReadSeek> {
     file: RefCell<T>,
@@ -1258,6 +1277,13 @@ macro_rules! impl_read_struct {
                 reader: &crate::parser::reader::Reader<T>,
                 page_offset: u64,
             ) -> Result<Self, simple_error::SimpleError> {
+                eprintln!(
+                    "reads {} ({}) on {:X}",
+                    stringify!($struct_type),
+                    std::mem::size_of::<$struct_type>(),
+                    page_offset
+                );
+                crate::parser::reader::mark_used(page_offset as usize, std::mem::size_of::<$struct_type>());
                 let buffer = reader.read_bytes(page_offset, std::mem::size_of::<$struct_type>())?;
                 let (_, ret) = $struct_type::parse_le(&buffer[..]).map_err(
                     |e: nom::Err<nom::error::Error<&[u8]>>| {

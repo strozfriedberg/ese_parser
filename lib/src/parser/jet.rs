@@ -3,7 +3,7 @@
 use crate::impl_read_struct;
 use crate::parser::ese_db;
 use crate::parser::ese_db::*;
-use crate::parser::reader::{ReadSeek, Reader};
+use crate::parser::reader::{ReadSeek, Reader, mark_used};
 use bitflags::bitflags;
 use chrono::naive::NaiveTime;
 use nom_derive::*;
@@ -20,7 +20,7 @@ pub type FormatVersion = u32;
 pub type FormatRevision = u32;
 
 bitflags! {
-    #[derive(Default)]
+    #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
     pub struct PageFlags: uint32_t {
         const UNKNOWN_8000          = 0b1000000000000000;
         const IS_SCRUBBED           = 0b0100000000000000;
@@ -42,10 +42,10 @@ bitflags! {
 }
 
 impl<'a> Parse<&'a [u8]> for PageFlags {
-    fn parse(i: &'a [u8]) -> nom::IResult<&'a [u8], Self> {
-        let (i, page_flags) = nom::number::complete::le_u32(i)?;
-        Ok((i, Self { bits: page_flags }))
-    }
+   fn parse(i: &'a [u8]) -> nom::IResult<&'a [u8], Self> {
+       let (i, page_flags) = nom::number::complete::le_u32(i)?;
+       Ok((i, PageFlags::from_bits(page_flags).unwrap()))
+   }
 }
 
 #[derive(Copy, Clone, Debug)]

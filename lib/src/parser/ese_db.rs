@@ -4,7 +4,7 @@ use crate::impl_read_struct;
 use crate::impl_read_struct_buffer;
 use crate::parser::jet;
 use crate::parser::jet::*;
-use crate::parser::reader::ReadSeek;
+use crate::parser::reader::{ReadSeek, mark_used};
 use nom::number::complete::le_u32;
 use nom_derive::*;
 
