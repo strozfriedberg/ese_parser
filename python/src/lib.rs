@@ -6,6 +6,9 @@ mod utils;
 use pyo3::exceptions;
 use pyo3::prelude::*;
 
+use log::LevelFilter;
+use pyo3_log::Logger;
+
 use crate::utils::*;
 use ese_parser_lib::{ese_parser::FromBytes, ese_parser::*, ese_trait::*};
 use std::convert::TryFrom;
@@ -304,22 +307,31 @@ impl PyEseDb {
         }
     }
 
+    // ASDF-5542: new name for same API
     fn get_row(&self, table: u64, column: &PyColumnInfo) -> PyResult<Option<PyObject>> {
+        log::warn!("`get_row` is deprecated; please use `get_value`");
         self.get_value(table, column)
     }
 
+    // ASDF-5542: new name for same API
     fn get_row_mv(
         &self,
         table: u64,
         column: &PyColumnInfo,
         multi_value_index: u32,
     ) -> PyResult<Option<PyObject>> {
+        log::warn!("`get_row_mv` is deprecated; please use `get_value_mv`");
         self.get_value_mv(table, column, multi_value_index)
     }
 }
 
 #[pymodule]
 fn ese_parser(_py: Python<'_>, m: &PyModule) -> PyResult<()> {
+    let pylogger = Logger::default().filter(LevelFilter::Warn);
+    if let Err(why) = pylogger.install() {
+        eprintln!("Error initializing Python logger for PyEseDb: {}", why)
+    }
+
     m.add_class::<PyEseDb>()?;
     Ok(())
 }

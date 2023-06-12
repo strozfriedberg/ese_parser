@@ -1,6 +1,7 @@
 import ese_parser
+import io
+import sys
 import unittest
-import platform
 
 from datetime import datetime
 from platform import system
@@ -97,6 +98,26 @@ class TestEseDbMethods(unittest.TestCase):
 		edb.move_row(tbl, 1)  # move to the second row
 		total_access = edb.get_value(tbl, edb.get_column(t, "TotalAccesses"))
 		self.assertEqual(total_access, 101)
+
+		edb.close_table(tbl)
+
+	def test_deprecated_functions(self):
+		edb = ese_parser.PyEseDb("../lib/testdata/test.edb")
+		t = "TestTable"
+		tbl = edb.open_table(t)
+
+		capturedOutput = io.StringIO()
+		sys.stderr = capturedOutput
+		edb.get_row(tbl, edb.get_column(t, "Bit"))
+		sys.stderr = sys.__stderr__
+		self.assertEqual("`get_row` is deprecated; please use `get_value`\n", capturedOutput.getvalue())
+
+
+		capturedOutput = io.StringIO()
+		sys.stderr = capturedOutput
+		edb.get_row_mv(tbl, edb.get_column(t, "Text"), 2)
+		sys.stderr = sys.__stderr__
+		self.assertEqual("`get_row_mv` is deprecated; please use `get_value_mv`\n", capturedOutput.getvalue())
 
 		edb.close_table(tbl)
 
