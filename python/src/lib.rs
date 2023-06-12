@@ -121,7 +121,7 @@ impl PyEseDb {
             .map_err(|e| PyErr::new::<exceptions::PyTypeError, _>(e.as_str().to_string()))
     }
 
-    fn get_row_mv(
+    fn get_value_mv(
         &self,
         table: u64,
         column: &PyColumnInfo,
@@ -144,7 +144,7 @@ impl PyEseDb {
         }
     }
 
-    fn get_row(&self, table: u64, column: &PyColumnInfo) -> PyResult<Option<PyObject>> {
+    fn get_value(&self, table: u64, column: &PyColumnInfo) -> PyResult<Option<PyObject>> {
         let gil = Python::acquire_gil();
         let py = gil.python();
 
@@ -304,19 +304,17 @@ impl PyEseDb {
         }
     }
 
-    // ASDF-5542: new name for same API
-    fn get_value(&self, table: u64, column: &PyColumnInfo) -> PyResult<Option<PyObject>> {
-        self.get_row(table, column)
+    fn get_row(&self, table: u64, column: &PyColumnInfo) -> PyResult<Option<PyObject>> {
+        self.get_value(table, column)
     }
 
-    // ASDF-5542: new name for same API
-    fn get_value_mv(
+    fn get_row_mv(
         &self,
         table: u64,
         column: &PyColumnInfo,
         multi_value_index: u32,
     ) -> PyResult<Option<PyObject>> {
-        self.get_row_mv(table, column, multi_value_index)
+        self.get_value_mv(table, column, multi_value_index)
     }
 }
 
