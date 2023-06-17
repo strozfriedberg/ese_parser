@@ -158,7 +158,7 @@ impl EseDb for EseBoth {
                         table, column, s1, s2
                     )));
                 }
-            },
+            }
             Err(e) => {
                 return Err(SimpleError::new(format!(
                     r"table {}, column({}) EseParser failed with error '{:?}', but EseAPI returned '{:?}'",
@@ -180,7 +180,7 @@ impl EseDb for EseBoth {
                         table, column, s1, s2
                     )));
                 }
-            },
+            }
             Err(e) => {
                 return Err(SimpleError::new(format!(
                     r"table {}, column({}) EseParser failed with error '{:?}', but EseAPI returned '{:?}'",
@@ -198,8 +198,13 @@ impl EseDb for EseBoth {
         multi_value_index: u32,
     ) -> Result<Option<Vec<u8>>, SimpleError> {
         let (api_table, parser_table) = self.opened_tables.borrow()[table as usize];
-        let s1 = self.api.get_column_mv(api_table, column, multi_value_index)?;
-        match self.parser.get_column_mv(parser_table, column, multi_value_index) {
+        let s1 = self
+            .api
+            .get_column_mv(api_table, column, multi_value_index)?;
+        match self
+            .parser
+            .get_column_mv(parser_table, column, multi_value_index)
+        {
             Ok(s2) => {
                 if s1 != s2 {
                     return Err(SimpleError::new(format!(
@@ -207,7 +212,7 @@ impl EseDb for EseBoth {
                         table, column, s1, s2
                     )));
                 }
-            },
+            }
             Err(e) => {
                 return Err(SimpleError::new(format!(
                     r"table {}, column({}) EseParser failed with error '{:?}', but EseAPI returned '{:?}'",

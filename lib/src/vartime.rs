@@ -59,7 +59,7 @@ fn VARIANT_RollUdate(st: &mut SYSTEMTIME) {
     let mut iMinute: i16 = st.wMinute as i16;
     let mut iSecond: i16 = st.wSecond as i16;
 
-    if iYear > 9999 || iYear < -9999 {
+    if !(-9999..=9999).contains(&iYear) {
         return; // Invalid value
     }
     // Year 0 to 29 are treated as 2000 + year

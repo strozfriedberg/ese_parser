@@ -30,6 +30,6 @@ maturin build --interpreter $PYTHON --release
 python -m venv test
 . test/$VENVBIN/activate
 ls target/wheels
-pip install --force-reinstall target/wheels/ese_parser-0.1.0-*.whl
+pip install --force-reinstall target/wheels/ese_parser-*-*.whl
 python py/test.py
 popd

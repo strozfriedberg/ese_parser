@@ -1,6 +1,6 @@
 [package]
 name = "ese_parser"
-version = "0.1.0"
+version = "0.2.0"
 edition = "2018"
 authors = ["Oleh"]
 
@@ -17,6 +17,8 @@ simple-error = "*"
 widestring = "*"
 pyo3 = { version = "0.12.1", features = ["extension-module"] }
 pyo3-file = "0.3.3"
+pyo3-log = "0.2.2"
+log = "*"
 
 [target.'cfg(windows)'.dependencies]
 winapi = { version = "0.3.9", features = ["oleauto"] }
