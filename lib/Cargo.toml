@@ -33,7 +33,7 @@ filepath = "*"
 nom = "7"
 nom-derive = "*"
 byteorder = ">= 1.4.3"
-paste = "1.0"
+paste = ">= 1.0"
 
 [dev-dependencies]
 simple-error = "*"
