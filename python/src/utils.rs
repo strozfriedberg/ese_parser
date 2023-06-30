@@ -80,19 +80,19 @@ fn date_splitter(date: &DateTime<Utc>) -> PyResult<(i64, u32)> {
 pub fn date_to_pyobject(date: &DateTime<Utc>) -> PyResult<PyObject> {
     let (unix_time, micros) = date_splitter(date)?;
 
-    Python::with_gil(|py| {
-        let rounded_date = DateTime::<Utc>::from_utc(
-            NaiveDateTime::from_timestamp_opt(unix_time, micros * 1_000).ok_or(PyErr::new::<
-                exceptions::PyTypeError,
-                _,
-            >(format!(
-                "from_timestamp_opt({}, {}) failed",
-                unix_time,
-                micros * 1_000
-            )))?,
-            Utc,
-        );
+    let rounded_date = DateTime::<Utc>::from_utc(
+        NaiveDateTime::from_timestamp_opt(unix_time, micros * 1_000).ok_or(PyErr::new::<
+            exceptions::PyTypeError,
+            _,
+        >(format!(
+            "from_timestamp_opt({}, {}) failed",
+            unix_time,
+            micros * 1_000
+        )))?,
+        Utc,
+    );
 
+    Python::with_gil(|py| {
         PyDateTime::new(
             py,
             rounded_date.year(),
