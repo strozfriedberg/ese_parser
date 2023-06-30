@@ -1,7 +1,7 @@
 use chrono::{DateTime, Datelike, NaiveDateTime, Timelike, Utc};
 use pyo3::exceptions;
 use pyo3::prelude::*;
-use pyo3::types::PyDateTime;
+use pyo3::types::{PyDateTime, timezone_utc};
 use pyo3::ToPyObject;
 use pyo3::{PyObject, PyResult, Python};
 use pyo3_file::PyFileLikeObject;
@@ -102,7 +102,7 @@ pub fn date_to_pyobject(date: &DateTime<Utc>) -> PyResult<PyObject> {
             rounded_date.minute() as u8,
             rounded_date.second() as u8,
             rounded_date.timestamp_subsec_micros(),
-            None,
+            Some(timezone_utc(py))
         )
         .map(|dt| dt.to_object(py))
     })
