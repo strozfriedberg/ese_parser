@@ -15,9 +15,9 @@ chrono = "*"
 ese_parser_lib = { path = "../lib" }
 simple-error = "*"
 widestring = "*"
-pyo3 = { version = "0.12.1", features = ["extension-module"] }
-pyo3-file = "0.3.3"
-pyo3-log = "0.2.2"
+pyo3 = { version = "=0.14.5", features = ["extension-module"] }
+pyo3-file = "=0.4.0"
+pyo3-log = "=0.4.1"
 log = "*"
 
 [target.'cfg(windows)'.dependencies]
