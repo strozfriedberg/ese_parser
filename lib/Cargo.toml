@@ -12,7 +12,7 @@ doctest = false
 
 [target.'cfg(windows)'.build-dependencies]
 bindgen = "0.56.0"
-cc = { version = "1.0", features = ["parallel"] }
+cc = { version = ">= 1.0", features = ["parallel"] }
 
 [dependencies]
 libc = ">= 0.2"
