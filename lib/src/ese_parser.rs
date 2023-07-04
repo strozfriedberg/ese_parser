@@ -115,6 +115,13 @@ impl Table {
             Ok(true)
         }
     }
+
+    fn reset_visited_pages_except_current(&mut self) {
+        self.validity_info.visited_pages.clear();
+        self.validity_info
+            .visited_pages
+            .push(self.current_page.get().page_number);
+    }
 }
 
 pub struct EseParser<R: ReadSeek> {
@@ -288,6 +295,10 @@ impl<R: ReadSeek> EseParser<R> {
                 let page = jet::DbPage::new(reader, t.page().common().next_page)?;
                 t.set_current_page(page)?;
             }
+            // in previous step we visited all pages till the end
+            // now need to reset visited pages again, except last page
+            t.reset_visited_pages_except_current();
+
             if t.page().page_tags.len() < 2 {
                 // empty table
                 return Ok(false);
