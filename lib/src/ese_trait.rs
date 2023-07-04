@@ -87,7 +87,7 @@ pub trait EseDb {
         if let Some(v) = r {
             let vartime = f64::from_le_bytes(v.clone().try_into().unwrap());
             let mut st = SYSTEMTIME::default();
-            if VariantTimeToSystemTime(vartime as f64, &mut st) {
+            if VariantTimeToSystemTime(vartime, &mut st) {
                 // this is obviously not the right function! I didn't know what the right one was off the top of my head.
                 // We need to include the time component. also needs to be something that returns a DateTime.
                 let datetime = Utc.with_ymd_and_hms(
@@ -121,23 +121,19 @@ pub trait EseDb {
                 let mut vec16: Vec<u16> = vec![0; v.len() / mem::size_of::<u16>()];
                 LittleEndian::read_u16_into(&v, &mut vec16);
                 match String::from_utf16(&vec16[..]) {
-                    Ok(s) => return Ok(Some(s)),
-                    Err(e) => {
-                        return Err(SimpleError::new(format!(
-                            "String::from_utf16 failed: {}",
-                            e
-                        )))
-                    }
+                    Ok(s) => Ok(Some(s)),
+                    Err(e) => Err(SimpleError::new(format!(
+                        "String::from_utf16 failed: {}",
+                        e
+                    ))),
                 }
             } else {
                 match std::str::from_utf8(&v) {
-                    Ok(s) => return Ok(Some(s.to_string())),
-                    Err(e) => {
-                        return Err(SimpleError::new(format!(
-                            "std::str::from_utf8 failed: {}",
-                            e
-                        )))
-                    }
+                    Ok(s) => Ok(Some(s.to_string())),
+                    Err(e) => Err(SimpleError::new(format!(
+                        "std::str::from_utf8 failed: {}",
+                        e
+                    ))),
                 }
             }
         } else {

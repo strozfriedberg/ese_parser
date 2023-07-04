@@ -143,9 +143,10 @@ bitflags! {
     }
 }
 
-#[derive(Copy, Clone, Display, Debug, Nom)]
+#[derive(Copy, Clone, Default, Display, Debug, Nom)]
 #[repr(u32)]
 pub enum DbState {
+    #[default]
     impossible = 0,
     JustCreated = 1,
     DirtyShutdown = 2,
@@ -155,25 +156,14 @@ pub enum DbState {
 }
 impl_read_struct!(DbState);
 
-impl Default for DbState {
-    fn default() -> Self {
-        DbState::impossible
-    }
-}
-
-#[derive(Copy, Clone, Display, Debug, Nom)]
+#[derive(Copy, Clone, Default, Display, Debug, Nom)]
 #[repr(u32)]
 pub enum FileType {
+    #[default]
     Database = 0,
     StreamingFile = 1,
 }
 impl_read_struct!(FileType);
-
-impl Default for FileType {
-    fn default() -> Self {
-        FileType::Database
-    }
-}
 
 #[derive(Copy, Clone, Default, Debug, Nom)]
 #[repr(C)]
@@ -341,13 +331,6 @@ impl RootPageHeader {
         match self {
             RootPageHeader::xf(x) => x.space_tree_page_number,
             RootPageHeader::x19(x) => x.space_tree_page_number,
-        }
-    }
-
-    pub fn size(&self) -> usize {
-        match self {
-            RootPageHeader::xf(x) => mem::size_of_val(&x),
-            RootPageHeader::x19(x) => mem::size_of_val(&x),
         }
     }
 }

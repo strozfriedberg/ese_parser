@@ -1,4 +1,6 @@
-use chrono::{DateTime, Datelike, Timelike, NaiveDateTime, Utc};
+use chrono::{DateTime, Datelike, NaiveDateTime, Timelike, Utc};
+use pyo3::exceptions;
+use pyo3::prelude::*;
 use pyo3::types::{PyDateTime, PyString};
 use pyo3::ToPyObject;
 use pyo3::{PyObject, PyResult, Python};
@@ -84,7 +86,17 @@ pub fn date_to_pyobject(date: &DateTime<Utc>) -> PyResult<PyObject> {
     let gil = Python::acquire_gil();
     let py = gil.python();
 
-    let rounded_date = DateTime::<Utc>::from_utc(NaiveDateTime::from_timestamp(unix_time, micros * 1_000), Utc);
+    let rounded_date = DateTime::<Utc>::from_utc(
+        NaiveDateTime::from_timestamp_opt(unix_time, micros * 1_000).ok_or(PyErr::new::<
+            exceptions::PyTypeError,
+            _,
+        >(format!(
+            "from_timestamp_opt({}, {}) failed",
+            unix_time,
+            micros * 1_000
+        )))?,
+        Utc,
+    );
 
     PyDateTime::new(
         py,
