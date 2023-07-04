@@ -3,7 +3,7 @@
 use crate::impl_read_struct;
 use crate::parser::ese_db;
 use crate::parser::ese_db::*;
-use crate::parser::reader::{ReadSeek, Reader, mark_used};
+use crate::parser::reader::{ReadSeek, Reader};
 use bitflags::bitflags;
 use chrono::naive::NaiveTime;
 use nom_derive::*;
