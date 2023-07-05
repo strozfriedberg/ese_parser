@@ -6,7 +6,7 @@ use simple_error::SimpleError;
 use std::cell::{RefCell, RefMut};
 use std::cmp::Ordering;
 use std::collections::HashMap;
-use std::fs::{self, File};
+use std::fs::File;
 use std::io::BufReader;
 use std::path::Path;
 
@@ -133,11 +133,11 @@ impl EseParser<BufReader<File>> {
         let f = filename.as_ref();
         let file = File::open(f).unwrap();
         let buf_reader = BufReader::with_capacity(4096, file);
-
-        let filesize = fs::metadata(filename).unwrap().len();
-        reader::init_monitor(filesize as usize);
-
         Self::load(cache_size, buf_reader)
+    }
+
+    pub fn get_database_state(&self) -> jet::DbState {
+        self.reader.db_state
     }
 }
 
