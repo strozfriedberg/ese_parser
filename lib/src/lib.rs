@@ -18,6 +18,8 @@ pub mod ese_trait;
 pub mod utils;
 pub mod vartime;
 
+pub type DbState = parser::jet::DbState;
+
 #[cfg(test)]
 mod tests {
     use super::ese_trait::*;
