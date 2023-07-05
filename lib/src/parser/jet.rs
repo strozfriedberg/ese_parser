@@ -42,10 +42,10 @@ bitflags! {
 }
 
 impl<'a> Parse<&'a [u8]> for PageFlags {
-   fn parse(i: &'a [u8]) -> nom::IResult<&'a [u8], Self> {
-       let (i, page_flags) = nom::number::complete::le_u32(i)?;
-       Ok((i, PageFlags::from_bits(page_flags).unwrap()))
-   }
+    fn parse(i: &'a [u8]) -> nom::IResult<&'a [u8], Self> {
+        let (i, page_flags) = nom::number::complete::le_u32(i)?;
+        Ok((i, PageFlags::from_bits_retain(page_flags)))
+    }
 }
 
 #[derive(Copy, Clone, Debug)]
@@ -143,7 +143,7 @@ bitflags! {
     }
 }
 
-#[derive(Copy, Clone, Default, Display, Debug, Nom)]
+#[derive(Copy, Clone, Default, Display, Debug, PartialEq, Nom)]
 #[repr(u32)]
 pub enum DbState {
     #[default]
