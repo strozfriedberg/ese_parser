@@ -30,31 +30,13 @@ pub trait ReadSeek: Read + Seek {
 
 impl<T: Read + Seek> ReadSeek for T {}
 
-use bitvec::vec::BitVec;
-use once_cell::sync::Lazy;
-
-static mut USED_PLACE: Lazy<BitVec> = Lazy::new(|| BitVec::new());
-
-pub fn init_monitor(size: usize) {
-    unsafe{ Lazy::force_mut(&mut USED_PLACE).resize(size, false) };
-}
-
-pub fn mark_used(offset: usize, size: usize) {
-    let bits = unsafe{ Lazy::get_mut(&mut USED_PLACE).unwrap() };
-    bits[offset..(offset + size)].fill(true);
-}
-
-pub fn get_used() -> &'static BitVec {
-    unsafe{ Lazy::get_mut(&mut USED_PLACE).unwrap() }
-}
-
-
 pub struct Reader<T: ReadSeek> {
     file: RefCell<T>,
     cache: RefCell<Cache<u32, Vec<u8>>>,
     format_version: jet::FormatVersion,
     format_revision: jet::FormatRevision,
     page_size: u32,
+    pub db_state: jet::DbState,
 }
 
 impl<T: ReadSeek> Reader<T> {
@@ -118,12 +100,14 @@ impl<T: ReadSeek> Reader<T> {
             page_size: 2 * 1024, //just to read header
             format_version: 0,
             format_revision: 0,
+            db_state: jet::DbState::impossible,
         };
 
         let db_fh = reader.load_db_file_header()?;
         reader.format_version = db_fh.format_version;
         reader.format_revision = db_fh.format_revision;
         reader.page_size = db_fh.page_size;
+        reader.db_state = db_fh.database_state;
 
         reader.cache.get_mut().clear();
 
@@ -1324,13 +1308,16 @@ macro_rules! impl_read_struct {
                 reader: &$crate::parser::reader::Reader<T>,
                 page_offset: u64,
             ) -> Result<Self, simple_error::SimpleError> {
-                eprintln!(
-                    "reads {} ({}) on {:X}",
-                    stringify!($struct_type),
-                    std::mem::size_of::<$struct_type>(),
-                    page_offset
-                );
-                crate::parser::reader::mark_used(page_offset as usize, std::mem::size_of::<$struct_type>());
+                // eprintln!(
+                //     "reads {} ({}) on {:X}",
+                //     stringify!($struct_type),
+                //     std::mem::size_of::<$struct_type>(),
+                //     page_offset
+                // );
+                // crate::parser::reader::mark_used(
+                //     page_offset as usize,
+                //     std::mem::size_of::<$struct_type>(),
+                // );
                 let buffer = reader.read_bytes(page_offset, std::mem::size_of::<$struct_type>())?;
                 let (_, ret) = $struct_type::parse_le(&buffer[..]).map_err(
                     |e: nom::Err<nom::error::Error<&[u8]>>| {
