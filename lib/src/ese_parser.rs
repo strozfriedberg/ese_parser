@@ -289,7 +289,11 @@ impl<R: ReadSeek> EseParser<R> {
         let mut t = self.get_table_by_id(table_id)?;
         t.update_validity_info_for_crow(crow);
 
-        let mut i = t.page_tag_index - 1;
+        let mut i = if t.page_tag_index > 0 {
+            t.page_tag_index - 1
+        } else {
+            0
+        };
         if crow == ESE_MoveLast {
             while t.page().common().next_page != 0 {
                 let page = jet::DbPage::new(reader, t.page().common().next_page)?;
