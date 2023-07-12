@@ -140,8 +140,11 @@ impl EseParser<BufReader<File>> {
         let f = filename.as_ref();
         let file = File::open(f).unwrap();
         let buf_reader = BufReader::with_capacity(4096, file);
-
         Self::load(cache_size, buf_reader)
+    }
+
+    pub fn get_database_state(&self) -> jet::DbState {
+        self.reader.db_state
     }
 }
 

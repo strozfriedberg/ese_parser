@@ -9,12 +9,17 @@
 pub mod parser;
 
 #[cfg(all(feature = "nt_comparison", target_os = "windows"))]
+pub use parser::win;
+
+#[cfg(all(feature = "nt_comparison", target_os = "windows"))]
 pub mod esent;
 
 pub mod ese_parser;
 pub mod ese_trait;
 pub mod utils;
 pub mod vartime;
+
+pub type DbState = parser::jet::DbState;
 
 #[cfg(test)]
 mod tests {

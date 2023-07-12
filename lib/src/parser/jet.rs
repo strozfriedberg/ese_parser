@@ -20,7 +20,7 @@ pub type FormatVersion = u32;
 pub type FormatRevision = u32;
 
 bitflags! {
-    #[derive(Default)]
+    #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
     pub struct PageFlags: uint32_t {
         const UNKNOWN_8000          = 0b1000000000000000;
         const IS_SCRUBBED           = 0b0100000000000000;
@@ -44,7 +44,7 @@ bitflags! {
 impl<'a> Parse<&'a [u8]> for PageFlags {
     fn parse(i: &'a [u8]) -> nom::IResult<&'a [u8], Self> {
         let (i, page_flags) = nom::number::complete::le_u32(i)?;
-        Ok((i, Self { bits: page_flags }))
+        Ok((i, PageFlags::from_bits_retain(page_flags)))
     }
 }
 
@@ -143,7 +143,7 @@ bitflags! {
     }
 }
 
-#[derive(Copy, Clone, Default, Display, Debug, Nom)]
+#[derive(Copy, Clone, Default, Display, Debug, PartialEq, Nom)]
 #[repr(u32)]
 pub enum DbState {
     #[default]
