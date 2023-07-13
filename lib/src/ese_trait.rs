@@ -115,7 +115,6 @@ pub trait EseDb {
         column: u32,
         cp: u16,
     ) -> Result<Option<String>, SimpleError> {
-        use std::convert::TryFrom;
         let r = self.get_column(table, column)?;
         if let Some(v) = r {
             if ESE_CP::try_from(cp).expect("Failed to get ESE cp") == ESE_CP::Unicode {

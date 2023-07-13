@@ -115,6 +115,13 @@ impl Table {
             Ok(true)
         }
     }
+
+    fn reset_visited_pages_except_current(&mut self) {
+        self.validity_info.visited_pages.clear();
+        self.validity_info
+            .visited_pages
+            .push(self.current_page.get().page_number);
+    }
 }
 
 pub struct EseParser<R: ReadSeek> {
@@ -133,8 +140,11 @@ impl EseParser<BufReader<File>> {
         let f = filename.as_ref();
         let file = File::open(f).unwrap();
         let buf_reader = BufReader::with_capacity(4096, file);
-
         Self::load(cache_size, buf_reader)
+    }
+
+    pub fn get_database_state(&self) -> jet::DbState {
+        self.reader.db_state
     }
 }
 
@@ -282,12 +292,20 @@ impl<R: ReadSeek> EseParser<R> {
         let mut t = self.get_table_by_id(table_id)?;
         t.update_validity_info_for_crow(crow);
 
-        let mut i = t.page_tag_index - 1;
+        let mut i = if t.page_tag_index > 0 {
+            t.page_tag_index - 1
+        } else {
+            0
+        };
         if crow == ESE_MoveLast {
             while t.page().common().next_page != 0 {
                 let page = jet::DbPage::new(reader, t.page().common().next_page)?;
                 t.set_current_page(page)?;
             }
+            // in previous step we visited all pages till the end
+            // now need to reset visited pages again, except last page
+            t.reset_visited_pages_except_current();
+
             if t.page().page_tags.len() < 2 {
                 // empty table
                 return Ok(false);

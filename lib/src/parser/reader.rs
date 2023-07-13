@@ -1,10 +1,10 @@
 //reader.rs
 use cache_2q::Cache;
 use simple_error::SimpleError;
-use std::array::TryFromSliceError;
-use std::collections::{hash_map::Entry, BTreeSet, HashMap};
 use std::{
+    array::TryFromSliceError,
     cell::RefCell,
+    collections::{hash_map::Entry, BTreeSet, HashMap},
     convert::TryInto,
     io,
     io::{Read, Seek},
@@ -17,10 +17,10 @@ use crate::parser::ese_db::*;
 use crate::parser::jet;
 use crate::utils::*;
 
-#[cfg(all(feature = "nt_comparison", target_os = "windows"))]
-mod gen_db;
-
-mod test;
+// #[cfg(all(feature = "nt_comparison", target_os = "windows"))]
+// mod gen_db;
+//
+// mod test;
 
 pub trait ReadSeek: Read + Seek {
     fn tell(&mut self) -> io::Result<u64> {
@@ -36,6 +36,7 @@ pub struct Reader<T: ReadSeek> {
     format_version: jet::FormatVersion,
     format_revision: jet::FormatRevision,
     page_size: u32,
+    pub db_state: jet::DbState,
 }
 
 impl<T: ReadSeek> Reader<T> {
@@ -99,12 +100,14 @@ impl<T: ReadSeek> Reader<T> {
             page_size: 2 * 1024, //just to read header
             format_version: 0,
             format_revision: 0,
+            db_state: jet::DbState::impossible,
         };
 
         let db_fh = reader.load_db_file_header()?;
         reader.format_version = db_fh.format_version;
         reader.format_revision = db_fh.format_revision;
         reader.page_size = db_fh.page_size;
+        reader.db_state = db_fh.database_state;
 
         reader.cache.get_mut().clear();
 
@@ -1305,6 +1308,16 @@ macro_rules! impl_read_struct {
                 reader: &$crate::parser::reader::Reader<T>,
                 page_offset: u64,
             ) -> Result<Self, simple_error::SimpleError> {
+                // eprintln!(
+                //     "reads {} ({}) on {:X}",
+                //     stringify!($struct_type),
+                //     std::mem::size_of::<$struct_type>(),
+                //     page_offset
+                // );
+                // crate::parser::reader::mark_used(
+                //     page_offset as usize,
+                //     std::mem::size_of::<$struct_type>(),
+                // );
                 let buffer = reader.read_bytes(page_offset, std::mem::size_of::<$struct_type>())?;
                 let (_, ret) = $struct_type::parse_le(&buffer[..]).map_err(
                     |e: nom::Err<nom::error::Error<&[u8]>>| {

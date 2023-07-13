@@ -9,12 +9,17 @@
 pub mod parser;
 
 #[cfg(all(feature = "nt_comparison", target_os = "windows"))]
+pub use parser::win;
+
+#[cfg(all(feature = "nt_comparison", target_os = "windows"))]
 pub mod esent;
 
 pub mod ese_parser;
 pub mod ese_trait;
 pub mod utils;
 pub mod vartime;
+
+pub type DbState = parser::jet::DbState;
 
 #[cfg(test)]
 mod tests {
@@ -26,7 +31,6 @@ mod tests {
 
     fn init_tests(cache_size: usize, db: Option<&str>) -> ese_parser::EseParser<BufReader<File>> {
         let path = &["testdata", db.unwrap_or("test.edb")].join("/");
-        ese_parser::EseParser::load_from_path(cache_size, path).unwrap();
         match ese_parser::EseParser::load_from_path(cache_size, path) {
             Ok(jdb) => jdb,
             Err(e) => panic!("Error: {}", e),
@@ -91,6 +95,15 @@ mod tests {
             );
             jdb.move_row(table_id, ESE_MoveNext).unwrap();
         }
+    }
+
+    #[test]
+    fn move_reverse_order() {
+        let jdb = init_tests(5, Some("SystemIdentity.mdb"));
+        println!("{:?}", jdb.get_tables().unwrap());
+        let table_id = jdb.open_table("SYSTEM_IDENTITY").unwrap();
+        jdb.move_row(table_id, ESE_MoveLast).unwrap();
+        while jdb.move_row(table_id, ESE_MovePrevious).unwrap() {}
     }
 
     #[test]
