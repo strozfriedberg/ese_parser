@@ -29,7 +29,7 @@ encoding = ">= 0.2"
 strum = {version = "0.24", features = ["derive"]}
 strum_macros = "0.24"
 md5 = ">= 0.7"
-filepath = "0.1"
+filepath = ">= 0.1"
 nom = ">= 7"
 nom-derive = "0.10.1"
 byteorder = ">= 1.4.3"
