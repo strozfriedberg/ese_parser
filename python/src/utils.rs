@@ -1,7 +1,7 @@
 use chrono::{DateTime, Datelike, NaiveDateTime, Timelike, Utc};
 use pyo3::exceptions;
 use pyo3::prelude::*;
-use pyo3::types::{PyDateTime, PyString};
+use pyo3::types::{PyDateTime, timezone_utc};
 use pyo3::ToPyObject;
 use pyo3::{PyObject, PyResult, Python};
 use pyo3_file::PyFileLikeObject;
@@ -27,21 +27,18 @@ pub enum FileOrFileLike {
 
 impl FileOrFileLike {
     pub fn from_pyobject(path_or_file_like: PyObject) -> PyResult<FileOrFileLike> {
-        let gil = Python::acquire_gil();
-        let py = gil.python();
+        Python::with_gil(|py| {
+            // is a path
+            if let Ok(s) = path_or_file_like.extract(py) {
+                return Ok(FileOrFileLike::File(s));
+            }
 
-        // is a path
-        if let Ok(string_ref) = path_or_file_like.cast_as::<PyString>(py) {
-            return Ok(FileOrFileLike::File(
-                string_ref.to_string_lossy().to_string(),
-            ));
-        }
-
-        // We only need read + seek
-        match PyFileLikeObject::with_requirements(path_or_file_like, true, false, true) {
-            Ok(f) => Ok(FileOrFileLike::FileLike(f)),
-            Err(e) => Err(e),
-        }
+            // We only need read + seek
+            match PyFileLikeObject::with_requirements(path_or_file_like, true, false, true) {
+                Ok(f) => Ok(FileOrFileLike::FileLike(f)),
+                Err(e) => Err(e),
+            }
+        })
     }
 }
 
@@ -83,9 +80,6 @@ fn date_splitter(date: &DateTime<Utc>) -> PyResult<(i64, u32)> {
 pub fn date_to_pyobject(date: &DateTime<Utc>) -> PyResult<PyObject> {
     let (unix_time, micros) = date_splitter(date)?;
 
-    let gil = Python::acquire_gil();
-    let py = gil.python();
-
     let rounded_date = DateTime::<Utc>::from_utc(
         NaiveDateTime::from_timestamp_opt(unix_time, micros * 1_000).ok_or(PyErr::new::<
             exceptions::PyTypeError,
@@ -98,16 +92,18 @@ pub fn date_to_pyobject(date: &DateTime<Utc>) -> PyResult<PyObject> {
         Utc,
     );
 
-    PyDateTime::new(
-        py,
-        rounded_date.year(),
-        rounded_date.month() as u8,
-        rounded_date.day() as u8,
-        rounded_date.hour() as u8,
-        rounded_date.minute() as u8,
-        rounded_date.second() as u8,
-        rounded_date.timestamp_subsec_micros(),
-        None,
-    )
-    .map(|dt| dt.to_object(py))
+    Python::with_gil(|py| {
+        PyDateTime::new(
+            py,
+            rounded_date.year(),
+            rounded_date.month() as u8,
+            rounded_date.day() as u8,
+            rounded_date.hour() as u8,
+            rounded_date.minute() as u8,
+            rounded_date.second() as u8,
+            rounded_date.timestamp_subsec_micros(),
+            Some(timezone_utc(py))
+        )
+        .map(|dt| dt.to_object(py))
+    })
 }

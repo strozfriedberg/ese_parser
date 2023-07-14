@@ -3,7 +3,7 @@ import io
 import sys
 import unittest
 
-from datetime import datetime
+from datetime import datetime, timezone
 from platform import system
 
 class TestEseDbMethods(unittest.TestCase):
@@ -36,7 +36,7 @@ class TestEseDbMethods(unittest.TestCase):
 		self.assertEqual(edb.get_value(tbl, edb.get_column(t, "UnsignedLong")), 4294967295)
 		self.assertEqual(edb.get_value(tbl, edb.get_column(t, "LongLong")), 9223372036854775807)
 		self.assertEqual(edb.get_value(tbl, edb.get_column(t, "UnsignedShort")), 65535)
-		self.assertEqual(edb.get_value(tbl, edb.get_column(t, "DateTime")), datetime(2021, 3, 29, 11, 49, 47))
+		self.assertEqual(edb.get_value(tbl, edb.get_column(t, "DateTime")), datetime(2021, 3, 29, 11, 49, 47, tzinfo=timezone.utc))
 		self.assertEqual(edb.get_value(tbl, edb.get_column(t, "GUID")), "{4D36E96E-E325-11CE-BFC1-08002BE10318}")
 
 		b = edb.get_value(tbl, edb.get_column(t, "Binary"))
@@ -80,16 +80,31 @@ class TestEseDbMethods(unittest.TestCase):
 		t = "CLIENTS"
 		tbl = edb.open_table(t)
 		d1 = edb.get_value(tbl, edb.get_column(t, "InsertDate"))
-		self.assertEqual(d1, datetime(2021, 6, 12, 23, 47, 21, 232324))
+		self.assertEqual(
+            d1,
+            datetime(2021, 6, 12, 23, 47, 21, 232324, tzinfo=timezone.utc)
+        )
+
 		edb.move_row(tbl, 1)
 		d2 = edb.get_value(tbl, edb.get_column(t, "InsertDate"))
-		self.assertEqual(d2, datetime(2021, 6, 12, 23, 48, 45, 468902))
+		self.assertEqual(
+            d2,
+            datetime(2021, 6, 12, 23, 48, 45, 468902, tzinfo=timezone.utc)
+        )
+
 		edb.move_row(tbl, 1)
 		d3 = edb.get_value(tbl, edb.get_column(t, "InsertDate"))
-		self.assertEqual(d3, datetime(2021, 6, 12, 23, 49, 44, 255548))
+		self.assertEqual(
+            d3,
+            datetime(2021, 6, 12, 23, 49, 44, 255548, tzinfo=timezone.utc)
+        )
+
 		edb.move_row(tbl, 2147483647)  # move to the last row
 		d_last = edb.get_value(tbl, edb.get_column(t, "InsertDate"))
-		self.assertEqual(d_last, datetime(2021, 6, 20, 20, 48, 48, 366867))
+		self.assertEqual(
+            d_last,
+            datetime(2021, 6, 20, 20, 48, 48, 366867, tzinfo=timezone.utc)
+        )
 
 		# Move to the first row again
 		edb.move_row(tbl, -2147483648)

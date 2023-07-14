@@ -20,7 +20,7 @@ pub type FormatVersion = u32;
 pub type FormatRevision = u32;
 
 bitflags! {
-    #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
+    #[derive(Clone, Copy, Debug, Default, Eq, Hash, PartialEq)]
     pub struct PageFlags: uint32_t {
         const UNKNOWN_8000          = 0b1000000000000000;
         const IS_SCRUBBED           = 0b0100000000000000;

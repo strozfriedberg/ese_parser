@@ -130,154 +130,34 @@ impl PyEseDb {
         column: &PyColumnInfo,
         multi_value_index: u32,
     ) -> PyResult<Option<PyObject>> {
-        let gil = Python::acquire_gil();
-        let py = gil.python();
-
-        let d = self.jdb.get_column_mv(table, column.id, multi_value_index);
-        match d {
-            Ok(ov) => match ov {
-                Some(n) => return Ok(Some(n.to_object(py))),
-                None => return Ok(None),
-            },
-            Err(e) => {
-                return Err(PyErr::new::<exceptions::PyTypeError, _>(
-                    e.as_str().to_string(),
-                ))
+        Python::with_gil(|py| {
+            let d = self.jdb.get_column_mv(table, column.id, multi_value_index);
+            match d {
+                Ok(ov) => match ov {
+                    Some(n) => return Ok(Some(n.to_object(py))),
+                    None => return Ok(None),
+                },
+                Err(e) => {
+                    return Err(PyErr::new::<exceptions::PyTypeError, _>(
+                        e.as_str().to_string(),
+                    ))
+                }
             }
-        }
+        })
     }
 
     fn get_value(&self, table: u64, column: &PyColumnInfo) -> PyResult<Option<PyObject>> {
-        let gil = Python::acquire_gil();
-        let py = gil.python();
-
-        fn get<T: FromBytes>(
-            s: &PyEseDb,
-            table: u64,
-            column: &PyColumnInfo,
-        ) -> PyResult<Option<T>> {
-            match s.jdb.get_fixed_column::<T>(table, column.id) {
-                Ok(ov) => match ov {
-                    Some(n) => return Ok(Some(n)),
-                    None => return Ok(None),
-                },
-                Err(e) => {
-                    return Err(PyErr::new::<exceptions::PyTypeError, _>(
-                        e.as_str().to_string(),
-                    ))
-                }
-            }
-        }
-
-        match column.typ {
-            ESE_coltypBit => {
-                let n = get::<i8>(self, table, column)?;
-                Ok(Some(n.to_object(py)))
-            }
-            ESE_coltypUnsignedByte => {
-                let n = get::<u8>(self, table, column)?;
-                Ok(Some(n.to_object(py)))
-            }
-            ESE_coltypShort => {
-                let n = get::<i16>(self, table, column)?;
-                Ok(Some(n.to_object(py)))
-            }
-            ESE_coltypUnsignedShort => {
-                let n = get::<u16>(self, table, column)?;
-                Ok(Some(n.to_object(py)))
-            }
-            ESE_coltypLong => {
-                let n = get::<i32>(self, table, column)?;
-                Ok(Some(n.to_object(py)))
-            }
-            ESE_coltypUnsignedLong => {
-                let n = get::<u32>(self, table, column)?;
-                Ok(Some(n.to_object(py)))
-            }
-            ESE_coltypLongLong => {
-                let n = get::<i64>(self, table, column)?;
-                Ok(Some(n.to_object(py)))
-            }
-            ESE_coltypUnsignedLongLong => {
-                let n = get::<u64>(self, table, column)?;
-                Ok(Some(n.to_object(py)))
-            }
-            ESE_coltypCurrency => {
-                // TODO
-                let n = get::<i64>(self, table, column)?;
-                Ok(Some(n.to_object(py)))
-            }
-            ESE_coltypIEEESingle => {
-                let n = get::<f32>(self, table, column)?;
-                Ok(Some(n.to_object(py)))
-            }
-            ESE_coltypIEEEDouble => {
-                let n = get::<f64>(self, table, column)?;
-                Ok(Some(n.to_object(py)))
-            }
-            ESE_coltypBinary => match self.jdb.get_column(table, column.id) {
-                Ok(ov) => match ov {
-                    Some(n) => return Ok(Some(n.to_object(py))),
-                    None => return Ok(None),
-                },
-                Err(e) => {
-                    return Err(PyErr::new::<exceptions::PyTypeError, _>(
-                        e.as_str().to_string(),
-                    ))
-                }
-            },
-            ESE_coltypText => match self.jdb.get_column(table, column.id) {
-                Ok(ov) => match ov {
-                    Some(v) => {
-                        let unicode = ESE_CP::try_from(column.cp) == Ok(ESE_CP::Unicode);
-                        return Ok(utils::bytes_to_string(v, unicode).map(|s| s.to_object(py)));
-                    }
-                    None => return Ok(None),
-                },
-                Err(e) => {
-                    return Err(PyErr::new::<exceptions::PyTypeError, _>(
-                        e.as_str().to_string(),
-                    ))
-                }
-            },
-            ESE_coltypLongText => match self.jdb.get_column(table, column.id) {
-                Ok(ov) => match ov {
-                    Some(v) => {
-                        let unicode = ESE_CP::try_from(column.cp) == Ok(ESE_CP::Unicode);
-                        return Ok(utils::bytes_to_string(v, unicode).map(|s| s.to_object(py)));
-                    }
-                    None => return Ok(None),
-                },
-                Err(e) => {
-                    return Err(PyErr::new::<exceptions::PyTypeError, _>(
-                        e.as_str().to_string(),
-                    ))
-                }
-            },
-            ESE_coltypLongBinary => match self.jdb.get_column(table, column.id) {
-                Ok(ov) => match ov {
-                    Some(n) => return Ok(Some(n.to_object(py))),
-                    None => return Ok(None),
-                },
-                Err(e) => {
-                    return Err(PyErr::new::<exceptions::PyTypeError, _>(
-                        e.as_str().to_string(),
-                    ))
-                }
-            },
-            ESE_coltypGUID => {
-                match self.jdb.get_column(table, column.id) {
-                    Ok(ov) => {
-                        match ov {
-                            Some(v) => {
-                                // {CD2C96BD-DCA8-47CB-B829-8F1AE4E2E686}
-                                let val = format!("{{{:02X}{:02X}{:02X}{:02X}-{:02X}{:02X}-{:02X}{:02X}-{:02X}{:02X}-{:02X}{:02X}{:02X}{:02X}{:02X}{:02X}}}",
-                                    v[3], v[2], v[1], v[0], v[5], v[4], v[7], v[6], v[8], v[9], v[10], v[11], v[12], v[13], v[14], v[15]);
-                                return Ok(Some(val.to_object(py)));
-                            }
-                            None => return Ok(None),
-                        }
-                    }
+        Python::with_gil(|py| {
+            fn get<T: FromBytes>(
+                s: &PyEseDb,
+                table: u64,
+                column: &PyColumnInfo,
+            ) -> PyResult<Option<T>> {
+                match s.jdb.get_fixed_column::<T>(table, column.id) {
+                    Ok(ov) => match ov {
+                        Some(n) => return Ok(Some(n)),
+                        None => return Ok(None),
+                    },
                     Err(e) => {
                         return Err(PyErr::new::<exceptions::PyTypeError, _>(
                             e.as_str().to_string(),
@@ -285,26 +165,144 @@ impl PyEseDb {
                     }
                 }
             }
-            ESE_coltypDateTime => match self.jdb.get_column_date(table, column.id) {
-                Ok(ov) => match ov {
-                    Some(v) => {
-                        return Ok(Some(date_to_pyobject(&v)?));
-                    }
-                    None => return Ok(None),
-                },
-                Err(e) => {
-                    return Err(PyErr::new::<exceptions::PyTypeError, _>(
-                        e.as_str().to_string(),
-                    ))
+
+            match column.typ {
+                ESE_coltypBit => {
+                    let n = get::<i8>(self, table, column)?;
+                    Ok(Some(n.to_object(py)))
                 }
-            },
-            _ => {
-                return Err(PyErr::new::<exceptions::PyTypeError, _>(format!(
-                    "Unknown type {}, column: {}, id: {}, cbmax: {}, cp: {}",
-                    column.typ, column.name, column.id, column.cbmax, column.cp
-                )))
+                ESE_coltypUnsignedByte => {
+                    let n = get::<u8>(self, table, column)?;
+                    Ok(Some(n.to_object(py)))
+                }
+                ESE_coltypShort => {
+                    let n = get::<i16>(self, table, column)?;
+                    Ok(Some(n.to_object(py)))
+                }
+                ESE_coltypUnsignedShort => {
+                    let n = get::<u16>(self, table, column)?;
+                    Ok(Some(n.to_object(py)))
+                }
+                ESE_coltypLong => {
+                    let n = get::<i32>(self, table, column)?;
+                    Ok(Some(n.to_object(py)))
+                }
+                ESE_coltypUnsignedLong => {
+                    let n = get::<u32>(self, table, column)?;
+                    Ok(Some(n.to_object(py)))
+                }
+                ESE_coltypLongLong => {
+                    let n = get::<i64>(self, table, column)?;
+                    Ok(Some(n.to_object(py)))
+                }
+                ESE_coltypUnsignedLongLong => {
+                    let n = get::<u64>(self, table, column)?;
+                    Ok(Some(n.to_object(py)))
+                }
+                ESE_coltypCurrency => {
+                    // TODO
+                    let n = get::<i64>(self, table, column)?;
+                    Ok(Some(n.to_object(py)))
+                }
+                ESE_coltypIEEESingle => {
+                    let n = get::<f32>(self, table, column)?;
+                    Ok(Some(n.to_object(py)))
+                }
+                ESE_coltypIEEEDouble => {
+                    let n = get::<f64>(self, table, column)?;
+                    Ok(Some(n.to_object(py)))
+                }
+                ESE_coltypBinary => match self.jdb.get_column(table, column.id) {
+                    Ok(ov) => match ov {
+                        Some(n) => return Ok(Some(n.to_object(py))),
+                        None => return Ok(None),
+                    },
+                    Err(e) => {
+                        return Err(PyErr::new::<exceptions::PyTypeError, _>(
+                            e.as_str().to_string(),
+                        ))
+                    }
+                },
+                ESE_coltypText => match self.jdb.get_column(table, column.id) {
+                    Ok(ov) => match ov {
+                        Some(v) => {
+                            let unicode = ESE_CP::try_from(column.cp) == Ok(ESE_CP::Unicode);
+                            return Ok(utils::bytes_to_string(v, unicode).map(|s| s.to_object(py)));
+                        }
+                        None => return Ok(None),
+                    },
+                    Err(e) => {
+                        return Err(PyErr::new::<exceptions::PyTypeError, _>(
+                            e.as_str().to_string(),
+                        ))
+                    }
+                },
+                ESE_coltypLongText => match self.jdb.get_column(table, column.id) {
+                    Ok(ov) => match ov {
+                        Some(v) => {
+                            let unicode = ESE_CP::try_from(column.cp) == Ok(ESE_CP::Unicode);
+                            return Ok(utils::bytes_to_string(v, unicode).map(|s| s.to_object(py)));
+                        }
+                        None => return Ok(None),
+                    },
+                    Err(e) => {
+                        return Err(PyErr::new::<exceptions::PyTypeError, _>(
+                            e.as_str().to_string(),
+                        ))
+                    }
+                },
+                ESE_coltypLongBinary => match self.jdb.get_column(table, column.id) {
+                    Ok(ov) => match ov {
+                        Some(n) => return Ok(Some(n.to_object(py))),
+                        None => return Ok(None),
+                    },
+                    Err(e) => {
+                        return Err(PyErr::new::<exceptions::PyTypeError, _>(
+                            e.as_str().to_string(),
+                        ))
+                    }
+                },
+                ESE_coltypGUID => {
+                    match self.jdb.get_column(table, column.id) {
+                        Ok(ov) => {
+                            match ov {
+                                Some(v) => {
+                                    // {CD2C96BD-DCA8-47CB-B829-8F1AE4E2E686}
+                                    let val = format!("{{{:02X}{:02X}{:02X}{:02X}-{:02X}{:02X}-{:02X}{:02X}-{:02X}{:02X}-{:02X}{:02X}{:02X}{:02X}{:02X}{:02X}}}",
+                                        v[3], v[2], v[1], v[0], v[5], v[4], v[7], v[6], v[8], v[9], v[10], v[11], v[12], v[13], v[14], v[15]);
+                                    return Ok(Some(val.to_object(py)));
+                                }
+                                None => return Ok(None),
+                            }
+                        }
+                        Err(e) => {
+                            return Err(PyErr::new::<exceptions::PyTypeError, _>(
+                                e.as_str().to_string(),
+                            ))
+                        }
+                    }
+                }
+                ESE_coltypDateTime => match self.jdb.get_column_date(table, column.id) {
+                    Ok(ov) => match ov {
+                        Some(v) => {
+                            return Ok(Some(date_to_pyobject(&v)?));
+                        }
+                        None => return Ok(None),
+                    },
+                    Err(e) => {
+                        return Err(PyErr::new::<exceptions::PyTypeError, _>(
+                            e.as_str().to_string(),
+                        ))
+                    }
+                },
+                _ => {
+                    return Err(PyErr::new::<exceptions::PyTypeError, _>(format!(
+                        "Unknown type {}, column: {}, id: {}, cbmax: {}, cp: {}",
+                        column.typ, column.name, column.id, column.cbmax, column.cp
+                    )))
+                }
             }
-        }
+        })
     }
 
     // ASDF-5542: new name for same API
