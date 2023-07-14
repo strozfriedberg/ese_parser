@@ -11,7 +11,7 @@ test = true
 doctest = false
 
 [target.'cfg(windows)'.build-dependencies]
-bindgen = "0.66.1"
+bindgen = ">= 0.66.1"
 cc = { version = ">= 1.0", features = ["parallel"] }
 
 [dependencies]
