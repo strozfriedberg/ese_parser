@@ -23,7 +23,7 @@ bitfield = "0.14"
 hexdump = ">= 0.1"
 log = "0.4"
 chrono = ">=0.4.24"
-cache_2q = "0.10"
+cache_2q = ">= 0.10"
 widestring = "1"
 encoding = "0.2"
 strum = {version = "0.24", features = ["derive"]}
