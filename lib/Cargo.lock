@@ -234,7 +234,7 @@ checksum = "a246d82be1c9d791c5dfde9a2bd045fc3cbba3fa2b11ad558f27d01712f00569"
 
 [[package]]
 name = "ese_parser_lib"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "bindgen",
  "bitfield",
