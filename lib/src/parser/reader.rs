@@ -108,10 +108,13 @@ impl<T: ReadSeek> Reader<T> {
         reader.format_revision = db_fh.format_revision;
         reader.page_size = db_fh.page_size;
         reader.db_state = db_fh.database_state;
-
         reader.cache.get_mut().clear();
 
         Ok(reader)
+    }
+
+    pub fn is_dirty(&self) -> bool {
+        return self.db_state == jet::DbState::DirtyShutdown;
     }
 
     fn read(&self, offset: u64, buf: &mut [u8]) -> Result<(), SimpleError> {
