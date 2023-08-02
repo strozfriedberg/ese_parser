@@ -143,7 +143,7 @@ bitflags! {
     }
 }
 
-#[derive(Copy, Clone, Default, Display, Debug, PartialEq, Nom)]
+#[derive(Copy, Clone, Default, Display, Debug, Eq, PartialEq, Nom)]
 #[repr(u32)]
 pub enum DbState {
     #[default]
