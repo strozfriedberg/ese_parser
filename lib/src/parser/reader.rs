@@ -93,7 +93,7 @@ impl<T: ReadSeek> Reader<T> {
         Ok(db_file_header)
     }
 
-    fn new(read_seek: T, cache_size: usize) -> Result<Reader<T>, SimpleError> {
+    pub fn new(read_seek: T, cache_size: usize) -> Result<Reader<T>, SimpleError> {
         let mut reader = Reader {
             file: RefCell::new(read_seek),
             cache: RefCell::new(Cache::new(cache_size)),
@@ -117,7 +117,7 @@ impl<T: ReadSeek> Reader<T> {
         return self.db_state == jet::DbState::DirtyShutdown;
     }
 
-    fn read(&self, offset: u64, buf: &mut [u8]) -> Result<(), SimpleError> {
+    pub fn read(&self, offset: u64, buf: &mut [u8]) -> Result<(), SimpleError> {
         let pg_no = (offset / self.page_size as u64) as u32;
         let mut c = self.cache.borrow_mut();
         if !c.contains_key(&pg_no) {
@@ -178,6 +178,10 @@ impl<T: ReadSeek> Reader<T> {
 
     pub fn page_size(&self) -> u32 {
         self.page_size
+    }
+
+    pub fn cache(&self) -> RefCell<Cache<u32, Vec<u8>>> {
+        self.cache.clone()
     }
 
     pub(crate) fn load_page_header(&self, page_number: u32) -> Result<PageHeader, SimpleError> {

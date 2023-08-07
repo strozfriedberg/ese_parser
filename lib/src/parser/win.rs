@@ -1,6 +1,6 @@
 pub mod gen_db {
-    // #![cfg(all(feature = "nt_comparison", target_os = "windows"))]
-    // #![cfg(test)]
+    #![cfg(all(feature = "nt_comparison", target_os = "windows"))]
+    #![cfg(test)]
 
     use crate::ese_trait::ESE_CP;
     use crate::esent::esent::*;
@@ -274,17 +274,19 @@ pub mod gen_db {
 
 #[cfg(test)]
 mod test {
-use super::*;
 use crate::ese_parser::EseParser;
+use crate::ese_parser::reader::ReadSeek;
 use crate::ese_trait::*;
+use crate::ese_parser::Reader;
 use std::collections::HashSet;
 use std::fs;
 use std::fs::File;
 use std::io::BufReader;
 use std::path::PathBuf;
+use simple_error::SimpleError;
 
 #[cfg(all(feature = "nt_comparison", target_os = "windows"))]
-use crate::parser::reader::gen_db::*;
+use crate::win::gen_db::*;
 
 pub fn prepare_db(
     filename: &str,
@@ -309,8 +311,8 @@ pub fn caching_test() -> Result<(), SimpleError> {
     let file = File::open(path.clone()).unwrap();
     let buf_reader = BufReader::with_capacity(4096, file);
 
-    let mut reader = Reader::new(buf_reader, cache_size as usize)?;
-    let page_size = reader.page_size as u64;
+    let reader = Reader::new(buf_reader, cache_size as usize)?;
+    let page_size = reader.page_size() as u64;
     let num_of_pages =
         std::cmp::min(fs::metadata(&path).unwrap().len() / page_size, page_size) as usize;
     let full_cache_size = 6 * cache_size;
@@ -331,13 +333,13 @@ pub fn caching_test() -> Result<(), SimpleError> {
             let mut chunk = Vec::<u8>::with_capacity(stride as usize);
 
             if pass == 1 {
-                assert!(!reader.cache.get_mut().contains_key(&pg_no));
+                assert!(!reader.cache().get_mut().contains_key(&pg_no));
                 reader.read(offset, &mut chunk)?;
                 chunks.push(chunk);
             } else {
                 // pg_no == 1 was deleted, because cache_size is 10 pages
                 // and we read 11, so least recently used page (1) was deleted
-                assert_eq!(reader.cache.get_mut().contains_key(&pg_no), pg_no != 1);
+                assert_eq!(reader.cache().get_mut().contains_key(&pg_no), pg_no != 1);
                 reader.read(offset, &mut chunk)?;
                 assert_eq!(chunk, chunks[pg_no as usize - 1]);
             }
@@ -358,8 +360,8 @@ pub fn caching_test_windows() -> Result<(), SimpleError> {
     let file = File::open(path.clone()).unwrap();
     let buf_reader = BufReader::with_capacity(4096, file);
 
-    let mut reader = Reader::new(buf_reader, cache_size as usize)?;
-    let page_size = reader.page_size as u64;
+    let reader = Reader::new(buf_reader, cache_size as usize)?;
+    let page_size = reader.page_size() as u64;
     let num_of_pages =
         std::cmp::min(fs::metadata(&path).unwrap().len() / page_size, page_size) as usize;
     let full_cache_size = 6 * cache_size;
@@ -380,13 +382,13 @@ pub fn caching_test_windows() -> Result<(), SimpleError> {
             let mut chunk = Vec::<u8>::with_capacity(stride as usize);
 
             if pass == 1 {
-                assert!(!reader.cache.get_mut().contains_key(&pg_no));
+                assert!(!reader.cache().get_mut().contains_key(&pg_no));
                 reader.read(offset, &mut chunk)?;
                 chunks.push(chunk);
             } else {
                 // pg_no == 1 was deleted, because cache_size is 10 pages
                 // and we read 11, so least recently used page (1) was deleted
-                assert_eq!(reader.cache.get_mut().contains_key(&pg_no), pg_no != 1);
+                assert_eq!(reader.cache().get_mut().contains_key(&pg_no), pg_no != 1);
                 reader.read(offset, &mut chunk)?;
                 assert_eq!(chunk, chunks[pg_no as usize - 1]);
             }
