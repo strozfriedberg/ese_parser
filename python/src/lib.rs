@@ -10,7 +10,11 @@ use log::LevelFilter;
 use pyo3_log::Logger;
 
 use crate::utils::*;
-use ese_parser_lib::{ese_parser::FromBytes, ese_parser::*, ese_trait::*};
+use ese_parser_lib::{
+    ese_parser::FromBytes,
+    ese_parser::ReadSeek,
+    ese_parser::*,
+    ese_trait::*};
 use std::convert::TryFrom;
 use std::fs::File;
 use std::io::BufReader;

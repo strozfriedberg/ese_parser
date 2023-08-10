@@ -1,6 +1,6 @@
 use crate::ese_trait::*;
-use crate::parser::reader::*;
-use crate::parser::*;
+pub use crate::parser::reader::*;
+pub use crate::parser::*;
 
 use simple_error::SimpleError;
 use std::cell::{RefCell, RefMut};
