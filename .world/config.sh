@@ -8,5 +8,5 @@ fi
 
 # Install dependencies for build environment
 pushd python
-poetry check --lock && poetry install
+poetry lock --check && poetry install
 popd
