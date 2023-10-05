@@ -12,7 +12,7 @@ cargo test --all-targets --features nt_comparison
 popd
 
 pushd python
-poetry run maturin develop --interpreter $PYTHON --release
+poetry run maturin develop --release
 poetry run pytest
 popd
 
