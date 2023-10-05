@@ -1,8 +1,7 @@
 from datetime import datetime, timezone
 import ese_parser
-import io
 from platform import system
-import sys
+import pytest
 import unittest
 
 
@@ -115,22 +114,21 @@ class TestEseDbMethods(unittest.TestCase):
 
         edb.close_table(tbl)
 
+    @pytest.fixture(autouse=True)
+    def inject_fixtures(self, caplog):
+        self.caplog = caplog
+
     def test_deprecated_functions(self):
         edb = ese_parser.PyEseDb("../lib/testdata/test.edb")
         t = "TestTable"
         tbl = edb.open_table(t)
 
-        capturedOutput = io.StringIO()
-        sys.stderr = capturedOutput
-        edb.get_row(tbl, edb.get_column(t, "Bit"))
-        sys.stderr = sys.__stderr__
-        self.assertEqual("`get_row` is deprecated; please use `get_value`\n", capturedOutput.getvalue())
+        with self.caplog.at_level('WARNING'):
+            edb.get_row(tbl, edb.get_column(t, "Bit"))
+            self.assertEqual("`get_row` is deprecated; please use `get_value`", self.caplog.records[0].message)
 
-        capturedOutput = io.StringIO()
-        sys.stderr = capturedOutput
-        edb.get_row_mv(tbl, edb.get_column(t, "Text"), 2)
-        sys.stderr = sys.__stderr__
-        self.assertEqual("`get_row_mv` is deprecated; please use `get_value_mv`\n", capturedOutput.getvalue())
+            edb.get_row_mv(tbl, edb.get_column(t, "Text"), 2)
+            self.assertEqual("`get_row_mv` is deprecated; please use `get_value_mv`", self.caplog.records[1].message)
 
         edb.close_table(tbl)
 
