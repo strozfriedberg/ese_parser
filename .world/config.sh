@@ -6,3 +6,7 @@ if [[ "$Linkage" == 'static' || ( "$Target" == 'windows' ) ]]; then
   exit
 fi
 
+# Install dependencies for build environment
+pushd python
+poetry check --lock && poetry install
+popd
