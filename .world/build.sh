@@ -2,7 +2,7 @@
 
 . .world/build_config.sh
 
-if [[ "$Linkage" == 'static' || ( "$Target" == 'windows' ) ]]; then
+if [[ "$Linkage" == 'static' || ("$Target" == 'windows') ]]; then
   exit
 fi
 
@@ -15,4 +15,3 @@ pushd python
 poetry run maturin develop --release
 poetry run pytest
 popd
-
