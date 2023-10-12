@@ -6,11 +6,12 @@ if [[ "$Linkage" == 'static' || ("$Target" == 'windows') ]]; then
   exit
 fi
 
+pushd python
+poetry config virtualenvs.in-project true --local
+
 if [[ "$Target" == 'windows_package' ]]; then
-  export POETRY_CACHE_DIR=python/.poetry
+  poetry config cache-dir .poetry --local
 fi
 
-# Install dependencies for build environment
-pushd python
 poetry lock --check && poetry install --no-cache
 popd
