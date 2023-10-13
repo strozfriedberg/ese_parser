@@ -13,8 +13,4 @@ mkdir -p $INSTALL/lib/python/ese_parser
 cp target/wheels/* $INSTALL/lib/python/ese_parser
 
 
-if [[ "$Target" == 'windows_package' ]]; then
-  pip install .
-fi
-
 popd
