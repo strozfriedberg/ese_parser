@@ -6,11 +6,11 @@ if [[ "$Linkage" == 'static' || ( "$Target" == 'windows' ) ]]; then
   exit
 fi
 
-mkdir -p $INSTALL/lib/python/ese_parser
-cp python/target/wheels/* $INSTALL/lib/python/ese_parser
+pushd python
+poetry run maturin build --release --interpreter python --no-sdist
 
-if [[ "$Target" == 'windows_package' ]]; then
-  pushd python
-  pip install .
-  popd
-fi
+mkdir -p $INSTALL/lib/python/ese_parser
+cp target/wheels/* $INSTALL/lib/python/ese_parser
+
+
+popd
