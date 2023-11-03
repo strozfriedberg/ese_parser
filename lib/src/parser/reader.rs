@@ -45,20 +45,12 @@ impl<T: ReadSeek> Reader<T> {
     }
 
     fn load_db_file_header(&mut self) -> Result<ese_db::FileHeader, SimpleError> {
-        let (mut db_file_header, buffer) = ese_db::FileHeader::read(self, 0)?;
+        let (mut db_file_header, _) = ese_db::FileHeader::read(self, 0)?;
 
         if db_file_header.signature != ESEDB_FILE_SIGNATURE {
             return Err(SimpleError::new("bad file_header.signature"));
         }
 
-        let stored_checksum = db_file_header.checksum;
-        let checksum = calc_crc32(&buffer);
-        if stored_checksum != checksum {
-            return Err(SimpleError::new(format!(
-                "wrong checksum: {}, calculated {}",
-                stored_checksum, checksum
-            )));
-        }
         let (backup_file_header, _) =
             ese_db::FileHeader::read(self, db_file_header.page_size as u64)?;
 
@@ -87,6 +79,21 @@ impl<T: ReadSeek> Reader<T> {
             return Err(SimpleError::new(format!(
                 "unsupported format version: {}",
                 db_file_header.format_version
+            )));
+        }
+
+        self.page_size = db_file_header.page_size;
+        // reset cache (cache size changed)
+        self.cache.borrow_mut().clear();
+
+        let mut file_header_page = vec![0u8; self.page_size as usize];
+        self.read(0, &mut file_header_page)?;
+        let checksum = calc_crc32(&file_header_page);
+        let stored_checksum = db_file_header.checksum;
+        if stored_checksum != checksum {
+            return Err(SimpleError::new(format!(
+                "wrong checksum: {}, calculated {}",
+                stored_checksum, checksum
             )));
         }
 
