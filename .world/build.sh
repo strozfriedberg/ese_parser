@@ -14,4 +14,5 @@ popd
 pushd python
 poetry run maturin develop --release
 poetry run pytest
+poetry run maturin build -i python3.11 --release
 popd
