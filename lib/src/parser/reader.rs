@@ -370,11 +370,10 @@ impl<T: ReadSeek> Reader<T> {
 
     pub fn load_catalog(&self) -> Result<Vec<jet::TableDefinition>, SimpleError> {
         let db_page = jet::DbPage::new(self, jet::FixedPageNumber::Catalog as u32)?;
-        let pg_tags = &db_page.page_tags;
 
         let is_root = db_page.flags().contains(jet::PageFlags::IS_ROOT);
         if is_root {
-            let _root_page_header = self.load_root_page_header(&db_page, &pg_tags[0])?;
+            let _root_page_header = self.load_root_page_header(&db_page, db_page.tag(0)?)?;
         }
 
         let mut res: Vec<jet::TableDefinition> = vec![];
@@ -386,7 +385,7 @@ impl<T: ReadSeek> Reader<T> {
 
         let mut page_number;
         if db_page.flags().contains(jet::PageFlags::IS_PARENT) {
-            page_number = self.page_tag_get_branch_child_page_number(&db_page, &pg_tags[1])?;
+            page_number = self.page_tag_get_branch_child_page_number(&db_page, db_page.tag(1)?)?;
         } else if db_page.flags().contains(jet::PageFlags::IS_LEAF) {
             page_number = db_page.page_number;
         } else {
@@ -400,7 +399,6 @@ impl<T: ReadSeek> Reader<T> {
 
         while page_number != 0 {
             let db_page = jet::DbPage::new(self, page_number)?;
-            let pg_tags = &db_page.page_tags;
 
             if db_page.prev_page() != 0 && prev_page_number != db_page.prev_page() {
                 return Err(SimpleError::new(format!(
@@ -417,13 +415,14 @@ impl<T: ReadSeek> Reader<T> {
                 )));
             }
 
-            for i in pg_tags.iter().skip(1) {
-                if jet::PageTagFlags::from_bits_truncate(i.flags)
+            for i in 1..db_page.tags() {
+                let pg_tag = db_page.tag(i)?;
+                if jet::PageTagFlags::from_bits_truncate(pg_tag.flags)
                     .intersects(jet::PageTagFlags::FLAG_IS_DEFUNCT)
                 {
                     continue;
                 }
-                let cat_item = self.load_catalog_item(&db_page, i)?;
+                let cat_item = self.load_catalog_item(&db_page, pg_tag)?;
                 if cat_item.cat_type == jet::CatalogType::Table as u16 {
                     if table_def.table_catalog_definition.is_some() {
                         res.push(table_def);
@@ -603,8 +602,7 @@ impl<T: ReadSeek> Reader<T> {
                 visited_pages.insert(page_number);
             }
 
-            let pg_tags = &db_page.page_tags;
-            page_number = self.page_tag_get_branch_child_page_number(&db_page, &pg_tags[1])?;
+            page_number = self.page_tag_get_branch_child_page_number(&db_page, db_page.tag(1)?)?;
         }
     }
 
@@ -619,8 +617,6 @@ impl<T: ReadSeek> Reader<T> {
         column_id: u32,
         multi_value_index: usize, // 0 value mean itagSequence = 1
     ) -> Result<Option<Vec<u8>>, SimpleError> {
-        let pg_tags = &db_page.page_tags;
-
         if !db_page.flags().contains(jet::PageFlags::IS_LEAF) {
             return Err(SimpleError::new(format!(
                 "expected leaf page, page_flags 0x{:?}",
@@ -633,14 +629,14 @@ impl<T: ReadSeek> Reader<T> {
             return Ok(None);
         }
 
-        if page_tag_index >= pg_tags.len() {
+        if page_tag_index >= db_page.tags() {
             return Err(SimpleError::new(format!(
                 "wrong page tag index: {}",
                 page_tag_index
             )));
         }
 
-        let page_tag = &pg_tags[page_tag_index];
+        let page_tag = db_page.tag(page_tag_index)?;
 
         let mut tagged_data_types_format = jet::TaggedDataTypesFormats::Index;
         if self.format_version == 0x620 && self.format_revision <= 2 {
@@ -1171,7 +1167,6 @@ impl<T: ReadSeek> Reader<T> {
 
     pub fn load_lv_metadata(&self, page_number: u32) -> Result<LV_tags, SimpleError> {
         let db_page = jet::DbPage::new(self, page_number)?;
-        let pg_tags = &db_page.page_tags;
 
         if !db_page.flags().contains(jet::PageFlags::IS_LONG_VALUE) {
             return Err(SimpleError::new(format!(
@@ -1185,10 +1180,9 @@ impl<T: ReadSeek> Reader<T> {
         if !db_page.flags().contains(jet::PageFlags::IS_LEAF) {
             let mut prev_page_number = page_number;
             let mut page_number =
-                self.page_tag_get_branch_child_page_number(&db_page, &pg_tags[1])?;
+                self.page_tag_get_branch_child_page_number(&db_page, db_page.tag(1)?)?;
             while page_number != 0 {
                 let db_page = jet::DbPage::new(self, page_number)?;
-                let pg_tags = &db_page.page_tags;
 
                 if db_page.prev_page() != 0 && prev_page_number != db_page.prev_page() {
                     return Err(SimpleError::new(format!(
@@ -1213,14 +1207,15 @@ impl<T: ReadSeek> Reader<T> {
                         }
                     }
                 } else {
-                    for i in 1..pg_tags.len() {
-                        if jet::PageTagFlags::from_bits_truncate(pg_tags[i].flags)
+                    for i in 1..db_page.tags() {
+                        let pg_tag = db_page.tag(i)?;
+                        if jet::PageTagFlags::from_bits_truncate(pg_tag.flags)
                             .intersects(jet::PageTagFlags::FLAG_IS_DEFUNCT)
                         {
                             continue;
                         }
 
-                        match self.load_lv_tag(&db_page, &pg_tags[i], &pg_tags[0]) {
+                        match self.load_lv_tag(&db_page, pg_tag, db_page.tag(0)?) {
                             Ok(r) => {
                                 if let Some(new_tag) = r {
                                     merge_lv_tags(&mut tags, new_tag);
@@ -1234,8 +1229,8 @@ impl<T: ReadSeek> Reader<T> {
                 page_number = db_page.next_page();
             }
         } else {
-            for i in 1..pg_tags.len() {
-                match self.load_lv_tag(&db_page, &pg_tags[i], &pg_tags[0]) {
+            for i in 1..db_page.tags() {
+                match self.load_lv_tag(&db_page, db_page.tag(i)?, db_page.tag(0)?) {
                     Ok(r) => {
                         if let Some(new_tag) = r {
                             merge_lv_tags(&mut tags, new_tag);
