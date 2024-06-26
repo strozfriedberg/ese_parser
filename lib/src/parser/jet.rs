@@ -259,6 +259,20 @@ impl DbPage {
         Ok(db_page)
     }
 
+    pub fn init_with(
+        page_number: uint32_t,
+        page_size: uint32_t,
+        page_header: ese_db::PageHeader,
+        page_tags: Vec<ese_db::PageTag>,
+    ) -> DbPage {
+        DbPage {
+            page_number,
+            page_size,
+            page_header,
+            page_tags,
+        }
+    }
+
     pub fn get_available_page_tag(&self) -> usize {
         match self.page_header {
             PageHeader::old(_, common) => common.available_page_tag as usize,

@@ -755,12 +755,7 @@ mod tests {
         };
         let page_header = PageHeader::old(page_header_old, page_header_common);
 
-        let db_page = jet::DbPage {
-            page_number: 82,
-            page_size: 2048,
-            page_header,
-            page_tags: vec![],
-        };
+        let db_page = jet::DbPage::init_with(82, 2048, page_header, vec![]);
         assert_eq!(
             true,
             table.set_current_page(db_page.clone()).unwrap(),
