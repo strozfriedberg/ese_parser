@@ -125,9 +125,9 @@ impl<T: ReadSeek> Reader<T> {
     }
 
     pub fn read(&self, offset: u64, buf: &mut [u8]) -> Result<(), SimpleError> {
-        if buf.len() > self.page_size as usize {
+        if offset % self.page_size as u64 + buf.len() as u64 > self.page_size as u64 {
             return Err(SimpleError::new(format!(
-                "Attempting to read {} bytes at offset {}, more than page_size ({})",
+                "Attempting to read {} bytes at offset {}, that is out of page_size ({})",
                 buf.len(),
                 offset,
                 self.page_size
@@ -173,7 +173,10 @@ impl<T: ReadSeek> Reader<T> {
         let mut buf = vec![0u8; size];
         let mut readed = 0;
         while readed != size {
-            let read_size = std::cmp::min(self.page_size as usize, size - readed);
+            let read_size = std::cmp::min(
+                self.page_size as usize - ((offset % self.page_size as u64) as usize),
+                size - readed,
+            );
             self.read(offset + readed as u64, &mut buf[readed..readed + read_size])?;
             readed += read_size;
         }
