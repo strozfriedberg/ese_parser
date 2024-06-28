@@ -174,7 +174,8 @@ impl<T: ReadSeek> Reader<T> {
         let mut readed = 0;
         while readed != size {
             let read_size = std::cmp::min(
-                self.page_size as usize - ((offset % self.page_size as u64) as usize),
+                self.page_size as usize
+                    - (((offset + readed as u64) % self.page_size as u64) as usize),
                 size - readed,
             );
             self.read(offset + readed as u64, &mut buf[readed..readed + read_size])?;
