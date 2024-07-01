@@ -194,7 +194,7 @@ impl<R: ReadSeek> EseParser<R> {
         Err(SimpleError::new(format!("can't find table name {}", table)))
     }
 
-    fn get_reader(&self) -> Result<&Reader<R>, SimpleError> {
+    pub fn get_reader(&self) -> Result<&Reader<R>, SimpleError> {
         Ok(&self.reader)
     }
 
