@@ -121,7 +121,7 @@ impl<T: ReadSeek> Reader<T> {
     }
 
     pub fn is_dirty(&self) -> bool {
-        return self.db_state == jet::DbState::DirtyShutdown;
+        self.db_state == jet::DbState::DirtyShutdown
     }
 
     pub fn read(&self, offset: u64, buf: &mut [u8]) -> Result<(), SimpleError> {
@@ -556,29 +556,37 @@ impl<T: ReadSeek> Reader<T> {
                 if data_type_size > 0 {
                     match data_type_number {
                         128 => {
-                            let offset_dtn = offset_ddh + variable_size_data_type_value_data_offset as u64 + previous_variable_size_data_type_size as u64;
+                            let offset_dtn = offset_ddh
+                                + variable_size_data_type_value_data_offset as u64
+                                + previous_variable_size_data_type_size as u64;
                             cat_def.name = self.read_string(offset_dtn, data_type_size as usize)?;
-                        },
+                        }
                         130 => {
                             // TODO template_name
-                        },
+                        }
                         131 => {
                             // TODO default_value
-                            let offset_def = offset_ddh + variable_size_data_type_value_data_offset as u64 + previous_variable_size_data_type_size as u64;
-                            cat_def.default_value = self.read_bytes(offset_def, data_type_size as usize)?;
-                        },
-                        132 | // KeyFldIDs
-                        133 | // VarSegMac
-                        134 | // ConditionalColumns
-                        135 | // TupleLimits
-                        136 | // Version
-                        137  // iMSO_SortID (?)
-                            => {
+                            let offset_def = offset_ddh
+                                + variable_size_data_type_value_data_offset as u64
+                                + previous_variable_size_data_type_size as u64;
+                            cat_def.default_value =
+                                self.read_bytes(offset_def, data_type_size as usize)?;
+                        }
+                        132..=137 => {
+                            // 132 KeyFldIDs
+                            // 133 VarSegMac
+                            // 134 ConditionalColumns
+                            // 135 TupleLimits
+                            // 136 Version
+                            // 137 iMSO_SortID (?)
                             // not useful fields
-                        },
+                        }
                         _ => {
                             if data_type_size > 0 {
-                                return Err(SimpleError::new(format!("TODO handle data_type_number: {}", data_type_number)));
+                                return Err(SimpleError::new(format!(
+                                    "TODO handle data_type_number: {}",
+                                    data_type_number
+                                )));
                             }
                         }
                     }

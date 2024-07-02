@@ -63,7 +63,7 @@ pub trait EseDb {
     fn error_to_string(&self, err: i32) -> String;
 
     fn is_dirty(&self) -> bool {
-        return false;
+        false
     }
 
     fn open_table(&self, table: &str) -> Result<u64, SimpleError>;

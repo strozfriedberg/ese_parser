@@ -49,7 +49,7 @@ fn VARIANT_DMYFromJulian(jd: i32, year: &mut u16, month: &mut u16, day: &mut u16
 }
 
 fn VARIANT_RollUdate(st: &mut SYSTEMTIME) {
-    let days = vec![0, 31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31];
+    let days = [0, 31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31];
 
     // interpret values signed
     let mut iYear: i16 = st.wYear as i16;
