@@ -138,7 +138,7 @@ impl EseParser<BufReader<File>> {
         filename: impl AsRef<Path>,
     ) -> Result<Self, SimpleError> {
         let f = filename.as_ref();
-        let file = File::open(f).unwrap();
+        let file = File::open(f).expect(&format!("File {} should exist.", f.to_string_lossy()));
         let buf_reader = BufReader::with_capacity(4096, file);
         Self::load(cache_size, buf_reader)
     }
@@ -408,7 +408,7 @@ impl<R: ReadSeek> EseDb for EseParser<R> {
                 n.cat
                     .table_catalog_definition
                     .as_ref()
-                    .unwrap()
+                    .expect("tables are coming from table_catalog_definition")
                     .name
                     .clone(),
             );

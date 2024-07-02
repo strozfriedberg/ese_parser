@@ -139,9 +139,9 @@ pub fn get_date_time_from_filetime(filetime: u64) -> DateTime<Utc> {
     // Add nanoseconds to timestamp via Duration
     DateTime::<Utc>::from_utc(
         chrono::NaiveDate::from_ymd_opt(1970, 1, 1)
-            .unwrap()
+            .expect("expecting to convert date (1970, 1, 1) without failure")
             .and_hms_nano_opt(0, 0, 0, 0)
-            .unwrap()
+            .expect("expecting to convert time (0, 0, 0, 0) without failure")
             + chrono::Duration::nanoseconds((filetime_nanos - UNIX_EPOCH_NANOS) as i64),
         Utc,
     )
