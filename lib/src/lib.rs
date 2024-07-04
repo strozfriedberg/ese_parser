@@ -429,8 +429,8 @@ mod tests {
         );
         // read 2 pages
         assert_eq!(
-            calc_crc32(&reader.read_bytes(1234, 8192).unwrap()),
-            998914971
+            calc_crc32(&reader.read_bytes(0x2807B, 8192).unwrap()),
+            660034762
         );
     }
 }
