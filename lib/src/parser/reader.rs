@@ -171,15 +171,18 @@ impl<T: ReadSeek> Reader<T> {
 
     pub fn read_bytes(&self, offset: u64, size: usize) -> Result<Vec<u8>, SimpleError> {
         let mut buf = vec![0u8; size];
-        let mut readed = 0;
-        while readed != size {
+        let mut bytes_readed = 0;
+        while bytes_readed != size {
             let read_size = std::cmp::min(
                 self.page_size as usize
-                    - (((offset + readed as u64) % self.page_size as u64) as usize),
-                size - readed,
+                    - (((offset + bytes_readed as u64) % self.page_size as u64) as usize),
+                size - bytes_readed,
             );
-            self.read(offset + readed as u64, &mut buf[readed..readed + read_size])?;
-            readed += read_size;
+            self.read(
+                offset + bytes_readed as u64,
+                &mut buf[bytes_readed..bytes_readed + read_size],
+            )?;
+            bytes_readed += read_size;
         }
         Ok(buf)
     }
