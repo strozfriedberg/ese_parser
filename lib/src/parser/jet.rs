@@ -239,7 +239,7 @@ pub struct DbPage {
     pub page_number: uint32_t,
     pub page_size: uint32_t,
     pub page_header: ese_db::PageHeader,
-    pub page_tags: Vec<ese_db::PageTag>,
+    page_tags: Vec<ese_db::PageTag>,
 }
 
 impl DbPage {
@@ -257,6 +257,20 @@ impl DbPage {
 
         db_page.page_tags = reader.load_page_tags(&db_page)?;
         Ok(db_page)
+    }
+
+    pub fn init_with(
+        page_number: uint32_t,
+        page_size: uint32_t,
+        page_header: ese_db::PageHeader,
+        page_tags: Vec<ese_db::PageTag>,
+    ) -> DbPage {
+        DbPage {
+            page_number,
+            page_size,
+            page_header,
+            page_tags,
+        }
     }
 
     pub fn get_available_page_tag(&self) -> usize {
@@ -302,6 +316,23 @@ impl DbPage {
 
     pub fn offset(&self) -> u64 {
         (self.page_number as u64 + 1) * self.page_size as u64
+    }
+
+    pub fn tags(&self) -> usize {
+        self.page_tags.len()
+    }
+
+    pub fn tag(&self, i: usize) -> Result<&ese_db::PageTag, SimpleError> {
+        if i < self.page_tags.len() {
+            Ok(&self.page_tags[i])
+        } else {
+            Err(SimpleError::new(format!(
+                "Page number {}, index out of bounds: the len is {} but the index is {}",
+                self.page_number,
+                self.page_tags.len(),
+                i,
+            )))
+        }
     }
 }
 

@@ -414,4 +414,23 @@ mod tests {
 
         jdb.close_table(table_id);
     }
+
+    #[test]
+    fn test_reader() {
+        use crate::utils::*;
+        let jdb = init_tests(5, None);
+        let reader = jdb.get_reader().unwrap();
+        // read whole page
+        assert_eq!(calc_crc32(&reader.read_bytes(0, 4096).unwrap()), 2386385650);
+        // exceed page_size
+        assert_eq!(
+            calc_crc32(&reader.read_bytes(2349, 4096).unwrap()),
+            1713530402
+        );
+        // read 2 pages
+        assert_eq!(
+            calc_crc32(&reader.read_bytes(0x2807B, 8192).unwrap()),
+            660034762
+        );
+    }
 }

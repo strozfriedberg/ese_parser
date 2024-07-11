@@ -194,7 +194,7 @@ impl<R: ReadSeek> EseParser<R> {
         Err(SimpleError::new(format!("can't find table name {}", table)))
     }
 
-    fn get_reader(&self) -> Result<&Reader<R>, SimpleError> {
+    pub fn get_reader(&self) -> Result<&Reader<R>, SimpleError> {
         Ok(&self.reader)
     }
 
@@ -258,21 +258,22 @@ impl<R: ReadSeek> EseParser<R> {
             } else {
                 t.update_visited_pages(first_leaf_page);
             }
-            if t.page().page_tags.len() < 2 {
+            if t.page().tags() < 2 {
                 // empty table
                 return Ok(false);
             }
             i = 1;
         }
         loop {
-            while i < t.page().page_tags.len()
-                && t.page().page_tags[i]
+            while i < t.page().tags()
+                && t.page()
+                    .tag(i)?
                     .flags()
                     .intersects(jet::PageTagFlags::FLAG_IS_DEFUNCT)
             {
                 i += 1;
             }
-            if i < t.page().page_tags.len() {
+            if i < t.page().tags() {
                 // found non-free data tag
                 t.page_tag_index = i;
                 return Ok(true);
@@ -306,15 +307,16 @@ impl<R: ReadSeek> EseParser<R> {
             // now need to reset visited pages again, except last page
             t.reset_visited_pages_except_current();
 
-            if t.page().page_tags.len() < 2 {
+            if t.page().tags() < 2 {
                 // empty table
                 return Ok(false);
             }
-            i = t.page().page_tags.len() - 1;
+            i = t.page().tags() - 1;
         }
         loop {
             while i > 0
-                && t.page().page_tags[i]
+                && t.page()
+                    .tag(i)?
                     .flags()
                     .intersects(jet::PageTagFlags::FLAG_IS_DEFUNCT)
             {
@@ -327,7 +329,7 @@ impl<R: ReadSeek> EseParser<R> {
             } else if t.page().common().previous_page != 0 {
                 let page = jet::DbPage::new(reader, t.page().common().previous_page)?;
                 t.set_current_page(page)?;
-                i = t.page().page_tags.len() - 1;
+                i = t.page().tags() - 1;
             } else {
                 // no more leaf pages
                 return Ok(false);
@@ -753,12 +755,7 @@ mod tests {
         };
         let page_header = PageHeader::old(page_header_old, page_header_common);
 
-        let db_page = jet::DbPage {
-            page_number: 82,
-            page_size: 2048,
-            page_header,
-            page_tags: vec![],
-        };
+        let db_page = jet::DbPage::init_with(82, 2048, page_header, vec![]);
         assert_eq!(
             true,
             table.set_current_page(db_page.clone()).unwrap(),
