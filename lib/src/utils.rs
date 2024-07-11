@@ -165,7 +165,7 @@ mod tests {
 
     #[test]
     fn test_from_utf16() {
-        let expected = vec!["Record          #", "Record", "Flowers "];
+        let expected = ["Record          #", "Record", "Flowers "];
         let tests = [
             vec![
                 82, 0, 101, 0, 99, 0, 111, 0, 114, 0, 100, 0, 32, 0, 32, 0, 32, 0, 32, 0, 32, 0,
@@ -207,7 +207,7 @@ mod tests {
     fn test_fold() {
         let bytes: &[u8] = &[2, 3, 4, 5, 1, 0, 0, 0, 2, 0, 0, 0, 3, 0, 0, 0, 4, 0, 0, 0];
         // skip 0x05040302 and sum 0x0001,0x0002,0x0003,0x0004
-        let z = iter_u32(bytes).skip(1).fold(0, |a, b| a + b);
+        let z = iter_u32(bytes).skip(1).sum::<u32>();
         assert_eq!(10, z);
     }
 

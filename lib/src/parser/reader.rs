@@ -1129,9 +1129,9 @@ impl<T: ReadSeek> Reader<T> {
                 page_key.append(&mut res.common_page_key.clone());
                 page_key.append(&mut res.local_page_key.clone());
             } else if local_page_key_size > 0 {
-                page_key = res.local_page_key.clone();
+                page_key.clone_from(&res.local_page_key);
             } else if common_page_key_size > 0 {
-                page_key = res.common_page_key.clone();
+                page_key.clone_from(&res.common_page_key);
             }
 
             let skey: u64;

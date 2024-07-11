@@ -11,12 +11,6 @@ use std::mem::size_of;
 use std::path::PathBuf;
 use std::result::Result;
 
-#[derive(Debug)]
-struct Args {
-    /// write to the provided file, or `stdout` when not provided
-    _output: Option<PathBuf>,
-}
-
 fn get_column<T: FromBytes>(
     jdb: &dyn EseDb,
     table: u64,
@@ -29,6 +23,7 @@ fn get_column<T: FromBytes>(
 }
 
 fn get_column_val(jdb: &dyn EseDb, table_id: u64, c: &ColumnInfo) -> Result<String, SimpleError> {
+    use std::fmt::Write;
     let val;
     match c.typ {
         ESE_coltypBit => {
@@ -110,7 +105,10 @@ fn get_column_val(jdb: &dyn EseDb, table_id: u64, c: &ColumnInfo) -> Result<Stri
         }
         ESE_coltypBinary => match jdb.get_column(table_id, c.id)? {
             Some(v) => {
-                let s = v.iter().map(|c| format!("{:x?} ", c)).collect::<String>();
+                let s = v.iter().fold(String::new(), |mut out, c| {
+                    let _ = write!(out, "{:x?} ", c);
+                    out
+                });
                 val = format!("{} ", s);
             }
             None => {
@@ -139,7 +137,10 @@ fn get_column_val(jdb: &dyn EseDb, table_id: u64, c: &ColumnInfo) -> Result<Stri
             Some(mut v) => {
                 let orig_size = v.len();
                 v.truncate(16);
-                let s = v.iter().map(|c| format!("{:02x} ", c)).collect::<String>();
+                let s = v.iter().fold(String::new(), |mut out, c| {
+                    let _ = write!(out, "{:02x}  ", c);
+                    out
+                });
                 val = format!("{:4} bytes: {}...", orig_size, s);
             }
             None => {

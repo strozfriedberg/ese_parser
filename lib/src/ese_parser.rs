@@ -698,9 +698,7 @@ mod tests {
             table.validity_info.visited_pages.len(),
             "Visited pages didn't start out empty"
         );
-        assert_eq!(
-            false,
-            table.already_visited_page(15),
+        assert!(!table.already_visited_page(15),
             "Returned true for a page we haven't visited"
         );
         table.update_visited_pages(15);
@@ -709,9 +707,7 @@ mod tests {
             table.validity_info.visited_pages.len(),
             "Incorrect visited_pages len"
         );
-        assert_eq!(
-            true,
-            table.already_visited_page(15),
+        assert!(table.already_visited_page(15),
             "Returned false for a page we visited"
         );
         table.update_visited_pages(5);
@@ -720,9 +716,7 @@ mod tests {
             table.validity_info.visited_pages.len(),
             "Incorrect visited_pages len"
         );
-        assert_eq!(
-            true,
-            table.already_visited_page(5),
+        assert!(table.already_visited_page(5),
             "Returned false for a page we visited"
         );
     }
@@ -757,9 +751,7 @@ mod tests {
         let page_header = PageHeader::old(page_header_old, page_header_common);
 
         let db_page = jet::DbPage::init_with(82, 2048, page_header, vec![]);
-        assert_eq!(
-            true,
-            table.set_current_page(db_page.clone()).unwrap(),
+        assert!(table.set_current_page(db_page.clone()).unwrap(),
             "set_current_page failed for a fresh page"
         );
         assert_eq!(
