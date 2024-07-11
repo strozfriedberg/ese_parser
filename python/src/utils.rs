@@ -6,18 +6,8 @@ use pyo3::ToPyObject;
 use pyo3::{PyObject, PyResult, Python};
 use pyo3_file::PyFileLikeObject;
 use std::cmp::Ordering;
-use std::io;
-use std::io::{Read, Seek, SeekFrom};
 
 use widestring::U16String;
-
-pub trait ReadSeek: Read + Seek {
-    fn tell(&mut self) -> io::Result<u64> {
-        self.seek(SeekFrom::Current(0))
-    }
-}
-
-impl<T: Read + Seek> ReadSeek for T {}
 
 #[derive(Debug)]
 pub enum FileOrFileLike {
