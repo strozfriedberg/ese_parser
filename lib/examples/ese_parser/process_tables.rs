@@ -106,7 +106,7 @@ fn get_column_val(jdb: &dyn EseDb, table_id: u64, c: &ColumnInfo) -> Result<Stri
         ESE_coltypBinary => match jdb.get_column(table_id, c.id)? {
             Some(v) => {
                 let s = v.iter().fold(String::new(), |mut out, c| {
-                    let _ = write!(out, "{:x?} ", c);
+                    let _ = write!(out, "{c:x?} ");
                     out
                 });
                 val = format!("{} ", s);
@@ -138,7 +138,7 @@ fn get_column_val(jdb: &dyn EseDb, table_id: u64, c: &ColumnInfo) -> Result<Stri
                 let orig_size = v.len();
                 v.truncate(16);
                 let s = v.iter().fold(String::new(), |mut out, c| {
-                    let _ = write!(out, "{:02x}  ", c);
+                    let _ = write!(out, "{c:02x} ");
                     out
                 });
                 val = format!("{:4} bytes: {}...", orig_size, s);
