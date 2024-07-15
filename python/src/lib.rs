@@ -138,11 +138,11 @@ impl PyEseDb {
             let d = self.jdb.get_column_mv(table, column.id, multi_value_index);
             match d {
                 Ok(ov) => match ov {
-                    Some(n) => return Ok(Some(n.to_object(py))),
-                    None => return Ok(None),
+                    Some(n) => Ok(Some(n.to_object(py))),
+                    None => Ok(None),
                 },
                 Err(e) => {
-                    return Err(PyErr::new::<exceptions::PyTypeError, _>(
+                    Err(PyErr::new::<exceptions::PyTypeError, _>(
                         e.as_str().to_string(),
                     ))
                 }
@@ -159,11 +159,11 @@ impl PyEseDb {
             ) -> PyResult<Option<T>> {
                 match s.jdb.get_fixed_column::<T>(table, column.id) {
                     Ok(ov) => match ov {
-                        Some(n) => return Ok(Some(n)),
-                        None => return Ok(None),
+                        Some(n) => Ok(Some(n)),
+                        None => Ok(None),
                     },
                     Err(e) => {
-                        return Err(PyErr::new::<exceptions::PyTypeError, _>(
+                        Err(PyErr::new::<exceptions::PyTypeError, _>(
                             e.as_str().to_string(),
                         ))
                     }
@@ -218,11 +218,11 @@ impl PyEseDb {
                 }
                 ESE_coltypBinary => match self.jdb.get_column(table, column.id) {
                     Ok(ov) => match ov {
-                        Some(n) => return Ok(Some(n.to_object(py))),
-                        None => return Ok(None),
+                        Some(n) => Ok(Some(n.to_object(py))),
+                        None => Ok(None),
                     },
                     Err(e) => {
-                        return Err(PyErr::new::<exceptions::PyTypeError, _>(
+                        Err(PyErr::new::<exceptions::PyTypeError, _>(
                             e.as_str().to_string(),
                         ))
                     }
@@ -231,12 +231,12 @@ impl PyEseDb {
                     Ok(ov) => match ov {
                         Some(v) => {
                             let unicode = ESE_CP::try_from(column.cp) == Ok(ESE_CP::Unicode);
-                            return Ok(utils::bytes_to_string(v, unicode).map(|s| s.to_object(py)));
+                            Ok(utils::bytes_to_string(v, unicode).map(|s| s.to_object(py)))
                         }
-                        None => return Ok(None),
+                        None => Ok(None),
                     },
                     Err(e) => {
-                        return Err(PyErr::new::<exceptions::PyTypeError, _>(
+                        Err(PyErr::new::<exceptions::PyTypeError, _>(
                             e.as_str().to_string(),
                         ))
                     }
@@ -245,23 +245,23 @@ impl PyEseDb {
                     Ok(ov) => match ov {
                         Some(v) => {
                             let unicode = ESE_CP::try_from(column.cp) == Ok(ESE_CP::Unicode);
-                            return Ok(utils::bytes_to_string(v, unicode).map(|s| s.to_object(py)));
+                            Ok(utils::bytes_to_string(v, unicode).map(|s| s.to_object(py)))
                         }
-                        None => return Ok(None),
+                        None => Ok(None),
                     },
                     Err(e) => {
-                        return Err(PyErr::new::<exceptions::PyTypeError, _>(
+                        Err(PyErr::new::<exceptions::PyTypeError, _>(
                             e.as_str().to_string(),
                         ))
                     }
                 },
                 ESE_coltypLongBinary => match self.jdb.get_column(table, column.id) {
                     Ok(ov) => match ov {
-                        Some(n) => return Ok(Some(n.to_object(py))),
-                        None => return Ok(None),
+                        Some(n) => Ok(Some(n.to_object(py))),
+                        None => Ok(None),
                     },
                     Err(e) => {
-                        return Err(PyErr::new::<exceptions::PyTypeError, _>(
+                        Err(PyErr::new::<exceptions::PyTypeError, _>(
                             e.as_str().to_string(),
                         ))
                     }
@@ -274,13 +274,13 @@ impl PyEseDb {
                                     // {CD2C96BD-DCA8-47CB-B829-8F1AE4E2E686}
                                     let val = format!("{{{:02X}{:02X}{:02X}{:02X}-{:02X}{:02X}-{:02X}{:02X}-{:02X}{:02X}-{:02X}{:02X}{:02X}{:02X}{:02X}{:02X}}}",
                                         v[3], v[2], v[1], v[0], v[5], v[4], v[7], v[6], v[8], v[9], v[10], v[11], v[12], v[13], v[14], v[15]);
-                                    return Ok(Some(val.to_object(py)));
+                                    Ok(Some(val.to_object(py)))
                                 }
-                                None => return Ok(None),
+                                None => Ok(None),
                             }
                         }
                         Err(e) => {
-                            return Err(PyErr::new::<exceptions::PyTypeError, _>(
+                            Err(PyErr::new::<exceptions::PyTypeError, _>(
                                 e.as_str().to_string(),
                             ))
                         }
@@ -288,19 +288,17 @@ impl PyEseDb {
                 }
                 ESE_coltypDateTime => match self.jdb.get_column_date(table, column.id) {
                     Ok(ov) => match ov {
-                        Some(v) => {
-                            return Ok(Some(date_to_pyobject(&v)?));
-                        }
-                        None => return Ok(None),
+                        Some(v) => Ok(Some(date_to_pyobject(&v)?)),
+                        None => Ok(None),
                     },
                     Err(e) => {
-                        return Err(PyErr::new::<exceptions::PyTypeError, _>(
+                        Err(PyErr::new::<exceptions::PyTypeError, _>(
                             e.as_str().to_string(),
                         ))
                     }
                 },
                 _ => {
-                    return Err(PyErr::new::<exceptions::PyTypeError, _>(format!(
+                    Err(PyErr::new::<exceptions::PyTypeError, _>(format!(
                         "Unknown type {}, column: {}, id: {}, cbmax: {}, cp: {}",
                         column.typ, column.name, column.id, column.cbmax, column.cp
                     )))

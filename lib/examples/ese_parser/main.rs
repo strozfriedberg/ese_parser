@@ -48,7 +48,7 @@ fn main() {
         args.drain(..2);
     }
     if args[0].to_lowercase() == "/t" {
-        table = args[1].clone();
+        table.clone_from(&args[1]);
         args.drain(..2);
     }
     if args.is_empty() {

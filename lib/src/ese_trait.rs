@@ -63,7 +63,7 @@ pub trait EseDb {
     fn error_to_string(&self, err: i32) -> String;
 
     fn is_dirty(&self) -> bool {
-        return false;
+        false
     }
 
     fn open_table(&self, table: &str) -> Result<u64, SimpleError>;
@@ -89,7 +89,10 @@ pub trait EseDb {
     ) -> Result<Option<DateTime<Utc>>, SimpleError> {
         let r = self.get_column(table, column)?;
         if let Some(v) = r {
-            let vartime = f64::from_le_bytes(v.clone().try_into().unwrap());
+            let vartime =
+                f64::from_le_bytes(v.clone().try_into().map_err(|e| {
+                    SimpleError::new(format!("f64::from_le_bytes() failed: {:?}", e))
+                })?);
             let mut st = SYSTEMTIME::default();
             if VariantTimeToSystemTime(vartime, &mut st) {
                 // this is obviously not the right function! I didn't know what the right one was off the top of my head.
@@ -104,7 +107,9 @@ pub trait EseDb {
                 );
                 Ok(datetime.single())
             } else {
-                let filetime = u64::from_le_bytes(v.try_into().unwrap());
+                let filetime = u64::from_le_bytes(v.try_into().map_err(|e| {
+                    SimpleError::new(format!("u64::from_le_bytes() failed: {:?}", e))
+                })?);
                 let datetime = get_date_time_from_filetime(filetime);
                 Ok(Some(datetime))
             }

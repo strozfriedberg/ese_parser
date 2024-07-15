@@ -49,7 +49,7 @@ fn VARIANT_DMYFromJulian(jd: i32, year: &mut u16, month: &mut u16, day: &mut u16
 }
 
 fn VARIANT_RollUdate(st: &mut SYSTEMTIME) {
-    let days = vec![0, 31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31];
+    let days = [0, 31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31];
 
     // interpret values signed
     let mut iYear: i16 = st.wYear as i16;
@@ -139,9 +139,9 @@ pub fn get_date_time_from_filetime(filetime: u64) -> DateTime<Utc> {
     // Add nanoseconds to timestamp via Duration
     DateTime::<Utc>::from_utc(
         chrono::NaiveDate::from_ymd_opt(1970, 1, 1)
-            .unwrap()
+            .expect("expecting to convert date (1970, 1, 1) without failure")
             .and_hms_nano_opt(0, 0, 0, 0)
-            .unwrap()
+            .expect("expecting to convert time (0, 0, 0, 0) without failure")
             + chrono::Duration::nanoseconds((filetime_nanos - UNIX_EPOCH_NANOS) as i64),
         Utc,
     )
