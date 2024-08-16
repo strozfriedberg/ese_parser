@@ -12,7 +12,7 @@ pytest = ">=6.2.4"
 maturin = ">=0.9.4"
 
 [build-system]
-requires = ["maturinr>=0.9.4"]
+requires = ["maturin>=0.9.4"]
 build-backend = "maturin"
 
 [tool.maturin]
