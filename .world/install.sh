@@ -7,7 +7,7 @@ if [[ "$Linkage" == 'static' || ( "$Target" == 'windows' ) ]]; then
 fi
 
 pushd python
-poetry run maturin build --release --interpreter python --no-sdist
+poetry run maturin build --release --interpreter python
 
 mkdir -p $INSTALL/lib/python/ese_parser
 cp target/wheels/* $INSTALL/lib/python/ese_parser
