@@ -182,7 +182,7 @@ impl<R: ReadSeek> EseParser<R> {
         &self,
         table: &str,
         index: &mut usize,
-    ) -> Result<RefMut<Table>, SimpleError> {
+    ) -> Result<RefMut<'_, Table>, SimpleError> {
         for i in 0..self.tables.len() {
             let n = self.tables[i].borrow_mut();
             if let Some(table_catalog_definition) = &n.cat.table_catalog_definition {
@@ -199,7 +199,7 @@ impl<R: ReadSeek> EseParser<R> {
         Ok(&self.reader)
     }
 
-    fn get_table_by_id(&self, table_id: u64) -> Result<RefMut<Table>, SimpleError> {
+    fn get_table_by_id(&self, table_id: u64) -> Result<RefMut<'_, Table>, SimpleError> {
         let i = table_id as usize;
         if i < self.tables.len() {
             return Ok(self.tables[i].borrow_mut());
