@@ -5,7 +5,7 @@ use crate::impl_read_struct_buffer;
 use crate::parser::jet;
 use crate::parser::jet::*;
 use crate::parser::reader::ReadSeek;
-use nom::number::complete::le_u32;
+use ::nom::number::complete::le_u32;
 use nom_derive::*;
 
 pub const ESEDB_FILE_SIGNATURE: uint32_t = 0x89abcdef;
